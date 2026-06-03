@@ -10,7 +10,7 @@ Required env vars (test is skipped if any are missing):
 Run the sandbox-runner first:
     cd services/sandbox-runner && SANDBOX_ADDR=:8090 go run ./cmd/server
 
-Then: `just e2e`
+Then run the e2e suite:
+    cd services/orchestrator && pnpm test:e2e
 
-(`just` is not installed in every environment; the equivalent raw command is
-`cd services/orchestrator && pnpm test:e2e`.)
+(If `just` is installed, `just e2e` is a shortcut for the same command.)
