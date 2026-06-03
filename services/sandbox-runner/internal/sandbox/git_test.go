@@ -49,3 +49,28 @@ func TestCloneInto(t *testing.T) {
 		t.Fatalf("expected README.md in checkout: %v", err)
 	}
 }
+
+func TestCommitAllAndPush(t *testing.T) {
+	src := makeBareRepoWithCommit(t)
+	dest := filepath.Join(t.TempDir(), "checkout")
+	if err := CloneInto(src, "main", dest); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dest, "new.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sha, err := CommitAllAndPush(dest, "feature/test", "msg")
+	if err != nil {
+		t.Fatalf("CommitAllAndPush: %v", err)
+	}
+	if len(sha) < 7 {
+		t.Fatalf("expected commit sha, got %q", sha)
+	}
+
+	// Verify the branch exists on origin.
+	verify := filepath.Join(t.TempDir(), "verify")
+	if err := CloneInto(src, "feature/test", verify); err != nil {
+		t.Fatalf("branch not pushed to origin: %v", err)
+	}
+}
