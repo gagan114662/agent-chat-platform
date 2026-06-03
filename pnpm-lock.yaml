@@ -38,6 +38,9 @@ importers:
         specifier: ^3.4.0
         version: 3.4.9
     devDependencies:
+      '@temporalio/testing':
+        specifier: ^1.11.0
+        version: 1.17.2(esbuild@0.19.12)(tslib@2.8.1)
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.19
@@ -2951,6 +2954,32 @@ snapshots:
     dependencies:
       long: 5.3.2
       protobufjs: 7.5.5
+
+  '@temporalio/testing@1.17.2(esbuild@0.19.12)(tslib@2.8.1)':
+    dependencies:
+      '@temporalio/activity': 1.17.2
+      '@temporalio/client': 1.17.2
+      '@temporalio/common': 1.17.2
+      '@temporalio/core-bridge': 1.17.2
+      '@temporalio/proto': 1.17.2
+      '@temporalio/worker': 1.17.2(esbuild@0.19.12)(tslib@2.8.1)
+      '@temporalio/workflow': 1.17.2
+      abort-controller: 3.0.0
+    transitivePeerDependencies:
+      - '@minify-html/node'
+      - '@swc/css'
+      - '@swc/helpers'
+      - '@swc/html'
+      - clean-css
+      - cssnano
+      - csso
+      - esbuild
+      - html-minifier-terser
+      - lightningcss
+      - postcss
+      - tslib
+      - uglify-js
+      - webpack-cli
 
   '@temporalio/testing@1.17.2(tslib@2.8.1)':
     dependencies:
