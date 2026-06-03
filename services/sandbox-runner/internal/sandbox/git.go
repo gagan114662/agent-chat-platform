@@ -18,6 +18,22 @@ func gitRun(dir string, args ...string) error {
 	return nil
 }
 
+// gitOutput runs git in dir and returns trimmed stdout, wrapping errors like gitRun.
+func gitOutput(dir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("git %v: %w\n%s", args, err, ee.Stderr)
+		}
+		return "", fmt.Errorf("git %v: %w", args, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // CloneInto clones repoURL at branch into dest.
 func CloneInto(repoURL, branch, dest string) error {
 	return gitRun("", "clone", "--branch", branch, "--single-branch", repoURL, dest)
@@ -44,9 +60,5 @@ func CommitAllAndPush(repoDir, branch, message string) (string, error) {
 	if err := gitRun(repoDir, "push", "origin", branch); err != nil {
 		return "", err
 	}
-	out, err := exec.Command("git", "-C", repoDir, "rev-parse", "HEAD").Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
+	return gitOutput(repoDir, "rev-parse", "HEAD")
 }
