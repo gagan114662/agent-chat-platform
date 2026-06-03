@@ -1,6 +1,13 @@
 {
   "name": "@acp/orchestrator",
   "type": "module",
+  "exports": {
+    "./core/run-fusion.js": "./src/core/run-fusion.ts",
+    "./sandbox/sandbox-runner-client.js": "./src/sandbox/sandbox-runner-client.ts",
+    "./github/octokit-github-service.js": "./src/github/octokit-github-service.ts",
+    "./temporal/workflow.js": "./src/temporal/workflow.ts",
+    "./temporal/activities.js": "./src/temporal/activities.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
