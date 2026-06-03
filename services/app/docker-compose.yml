@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: acp
+      POSTGRES_PASSWORD: acp
+      POSTGRES_DB: acp
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U acp"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  temporal:
+    image: temporalio/auto-setup:1.25
+    ports: ["7233:7233"]
+    environment:
+      - DB=sqlite
+  sandbox-runner:
+    build:
+      context: ../sandbox-runner
+      dockerfile: Dockerfile
+    ports: ["8090:8090"]
+    environment:
+      - SANDBOX_ADDR=:8090
