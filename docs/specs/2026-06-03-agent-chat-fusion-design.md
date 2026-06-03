@@ -56,9 +56,52 @@ Services on Kubernetes behind an API gateway; events over self-hosted NATS.
 See [`../oss-build-accelerators.md`](../oss-build-accelerators.md) for the OSS adopted per
 component.
 
-## 5. The fusion flow (Section 2 — PENDING)
-_To be designed: exact state machine from @mention to merged PR, including failure/retry,
-human approval gates, and how results stream back into the thread._
+## 5. The fusion flow (Section 2 — APPROVED)
+
+Modeled as a **Temporal workflow** so every step survives crashes and can retry/resume.
+
+```
+[1] @agent mentioned in thread (intent, e.g. "fix the login bug")
+[2] Orchestrator validates: agent exists? permitted on repo? tenant within quota?
+[3] Create Task (IN_PROGRESS) linked to the thread
+[4] Sandbox Controller provisions isolated pod:
+      clone repo @ base branch · inject scoped GitHub token + agent key (Vault)
+      · egress allowlist · CPU/mem/time/cost caps
+[5] Agent Adapter runs the agent; stream stdout/progress into the thread live
+[6] Agent finishes → commit on new branch → push
+[7] GitHub Service opens PR; CI checks start (incl. QA-for-UI check)
+[7.5] QA GATE (conditional): if diff touches UI →
+      ephemeral preview deploy → browser QA (Playwright + agent-driven):
+      smoke flows, console errors, visual diff, responsive, a11y basics.
+      Treated as a required check in the loop below.
+[CI RESOLUTION LOOP] (Agent-Merge-style — actively drive CI green):
+      monitor checks → on RED: fetch failure logs → agent fixes in SAME
+      sandbox → push → re-run. Repeat up to N=3 attempts / time cap.
+      Still red → escalate to human with "tried X,Y,Z; blocker is …".
+[8] RISK ROUTER (only when all green):
+      eligible for autopilot → AUTO-MERGE ✅
+      forced-human          → post review card, @mention human, wait
+[9] merged → Task DONE → sandbox destroyed → logs/artifacts archived
+```
+
+### Merge policy (decided)
+- **Auto-merge is the default** ("autopilot"), from day one.
+- **Autonomy dial** per-repo & per-agent: `monitor-only → resolve-CI → autopilot-merge`
+  (ships at autopilot). "You decide what ships."
+- **CI is actively resolved, not just gated** (the Agent-Merge behavior): agent reads
+  failing checks and fixes them, bounded by attempt/time caps.
+- **QA-for-UI is mandatory**: any diff touching UI must pass automated browser QA before
+  merge (auto or human path). QA failures feed back into the CI resolution loop.
+
+### "Genuinely needs a human" = two layers (decided)
+- **Layer A — honor the repo's own rules.** Never bypass GitHub branch protection /
+  CODEOWNERS required reviewers. Augment GitHub's permission model, don't replace it.
+- **Layer B — safety tripwires** on top, per-repo configurable: auth/secrets/crypto, DB
+  migrations, infra/CI/deploy config, deletes / large net-negative diffs, public-API
+  contract changes, diff size over threshold (default >400 lines or >15 files), dependency
+  add/bump, payments/PII globs, any red check/QA, agent self-flagged low confidence.
+- **Shadow mode**: a tenant can run auto-merge observe-only first (logs what it *would*
+  have merged) to build trust before enabling for real.
 
 ## 6. Data model & multi-tenancy (Section 3 — PENDING)
 
