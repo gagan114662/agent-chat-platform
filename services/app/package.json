@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.json",
     "dev": "node --import tsx src/server.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --import tsx src/db/migrate.ts"
+    "db:migrate": "node --import tsx src/db/migrate.ts",
+    "db:seed": "node --import tsx src/db/seed.ts"
   },
   "dependencies": {
     "@acp/orchestrator": "workspace:*",
