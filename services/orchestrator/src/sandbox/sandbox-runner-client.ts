@@ -1,0 +1,30 @@
+import type { RunResult, SandboxRunRequest } from "../types.js";
+import { nodeFetch } from "../github/node-fetch.js";
+
+export interface SandboxRunner {
+  run(req: SandboxRunRequest): Promise<RunResult>;
+}
+
+export class SandboxRunnerClient implements SandboxRunner {
+  constructor(private readonly baseUrl: string) {}
+
+  // DEVIATION FROM SPEC: The spec body used undici's `request`. As warned in the
+  // task note (and confirmed by a failing test that did real DNS lookups —
+  // `getaddrinfo ENOTFOUND runner`), `nock` cannot intercept undici's transport.
+  // We reuse the same nock-interceptable `nodeFetch` shim (node:http/https based)
+  // already used for the GitHub service. The public API is unchanged:
+  // `new SandboxRunnerClient(baseUrl)` and `.run(req): Promise<RunResult>`, with
+  // the same throw-on-non-200 behavior.
+  async run(req: SandboxRunRequest): Promise<RunResult> {
+    const res = await nodeFetch(`${this.baseUrl}/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (res.status !== 200) {
+      const text = await res.text();
+      throw new Error(`sandbox-runner ${res.status}: ${text}`);
+    }
+    return (await res.json()) as RunResult;
+  }
+}
