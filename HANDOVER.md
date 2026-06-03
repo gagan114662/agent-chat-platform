@@ -56,8 +56,8 @@ Plan 1 = the walking skeleton: intent → sandbox → fake agent → branch → 
 | Task 0 | Monorepo scaffolding (pnpm + go workspaces) | ✅ DONE | `2a385d5` |
 | Task 1 | Go sandbox-runner — git clone | ✅ DONE | `e8395db` |
 | Task 2 | Go Agent interface + FakeAgent + commit/push | ✅ DONE | `5f9f006` |
-| Task 3 | Go Run() + HTTP /run endpoint + server | ✅ DONE | `d7a16a8` |
-| **Task 4** | **TS orchestrator: package + types + GitHub service (Octokit)** | ⏳ **NOT STARTED** | — |
+| Task 3 | Go Run() + HTTP /run endpoint + server | ✅ DONE + reviewed | `d7a16a8` |
+| **Task 4** | **TS orchestrator: package + types + GitHub service (Octokit)** | ⚠️ **IMPLEMENTED + tests green (3/3), but NOT reviewed** | `a6749f9` |
 | Task 5 | TS sandbox client + core fusion (auto-merge on green) | ⏳ pending | — |
 | Task 6 | TS Temporal workflow + activities | ⏳ pending | — |
 | Task 7 | E2E integration test (env-gated, real GitHub) | ⏳ pending | — |
@@ -70,22 +70,28 @@ code-quality review before being marked done.
 
 ## Resume here (exact next step)
 
-Execute **Task 4** from `docs/plans/2026-06-03-plan-1-fusion-engine.md`. The chosen workflow is
-**superpowers:subagent-driven-development**:
+**FIRST: review Task 4 (already implemented in `a6749f9`, but never reviewed).**
+The implementer deviated from the plan: `src/github/octokit-github-service.ts` is ~95 lines
+(plan was ~30) because Octokit v21 uses global `fetch` (undici) which `nock` couldn't intercept,
+so a **custom-fetch injection workaround** was added. The 3 tests pass (`pnpm test` → 3/3 green).
+Before trusting it:
+1. Dispatch a **spec-compliance reviewer** for Task 4. Verify: public constructor is still
+   `constructor(token: string)`; the test was NOT weakened to pass; `openPr`/`getChecksStatus`/
+   `merge` behave per spec; the fetch workaround is sound.
+2. Then a **code-quality reviewer** (only after spec passes). Fix issues via the same subagent,
+   re-review until approved.
+3. Mark Task 4 done.
 
-1. Dispatch ONE implementer subagent with the FULL Task 4 text (don't make it read the plan).
-   - It creates `services/orchestrator/` package.json, tsconfig.json, vitest.config.ts,
-     `src/types.ts`, `src/github/github-service.ts`, runs `pnpm install`, then TDD-implements
-     `src/github/octokit-github-service.ts` against `octokit-github-service.test.ts` (nock).
-   - **Known risk to watch:** Octokit v21 uses global `fetch` (undici) under Node — `nock` may
-     not intercept it. If interception fails, the preferred fix is injecting a custom fetch via
-     the Octokit constructor while keeping the public signature `constructor(token: string)`.
-     The implementer was instructed to report DONE_WITH_CONCERNS rather than weaken tests.
-2. Then dispatch a **spec-compliance reviewer**, fix any gaps, re-review.
-3. Then dispatch a **code-quality reviewer** (only after spec passes), fix, re-review.
-4. Mark Task 4 complete; proceed to Task 5, 6, 7 the same way.
-5. After Task 7: dispatch a final whole-implementation review, then use
+**THEN: execute Tasks 5 → 6 → 7** from `docs/plans/2026-06-03-plan-1-fusion-engine.md` using
+**superpowers:subagent-driven-development**: one implementer subagent per task (full task text,
+don't make it read the plan) → spec-compliance review → code-quality review → mark complete.
+
+4. After Task 7: dispatch a final whole-implementation review, then use
    **superpowers:finishing-a-development-branch** (open a PR from `plan-1-fusion-engine`).
+
+> Note on process: Tasks 0–3 were each implemented and passed BOTH reviews. Task 4's code
+> landed without my review gates (its dispatch was interrupted), so treat it as unverified
+> until the two reviews above pass.
 
 Reviewer/implementer prompt templates live in:
 `~/.claude/plugins/cache/claude-plugins-official/superpowers/5.1.0/skills/subagent-driven-development/`
