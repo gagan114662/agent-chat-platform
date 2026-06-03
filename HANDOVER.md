@@ -9,15 +9,24 @@
 
 Building **agent-chat-platform**: a chat-driven AI agent execution platform (Slack-for-AI-agents
 fused with conductor.build-style sandboxed execution → GitHub PRs). The **design spec is
-complete and approved**, **Plan 1 is COMPLETE/merged/live-proven**, and **Plan 2.0a (chat+tasks
-backend & fusion wiring) is BUILT and in review (PR open).** Next up: **Plan 2.0b (React UI)**.
+complete and approved**, **Plan 1 is COMPLETE/merged/live-proven**, and **Plan 2.0a (backend) +
+2.0b (React UI) are BUILT, with PRs open.** The full chat→fusion→chat seam is implemented end to end.
 
 - **Repo:** https://github.com/gagan114662/agent-chat-platform (private, owner `gagan114662`)
 - **Local path:** `/Users/gaganarora/Desktop/my projects/agent-chat-platform`
-- **Working branch:** `plan-2.0-chat-tasks` (Plan 2.0a; PR open → `main`). Plan 1 already merged (`dc57e6a`).
-- **Next action:** review/merge the 2.0a PR, then **write + build Plan 2.0b (the React UI)** consuming
-  `GET /threads/:id/messages` + `GET /ws?threadId=`. The full chat→fusion live run still needs a real
-  Temporal server (see 2.0a note below).
+- **Open PRs (stacked):** **#2** `plan-2.0-chat-tasks` → `main` (2.0a backend); **#3** `plan-2.0b-web-ui`
+  → `plan-2.0-chat-tasks` (2.0b UI). Plan 1 already merged (`dc57e6a`).
+- **Next action:** review/merge **#2 then #3** (stacked order). To see the UI live, run the 2.0a stack
+  + `cd services/web && pnpm dev` (Vite proxies to `:8080`). Then continue Phase 2.1 (channel/thread
+  navigation, DMs, task board) or 2.2 (real auth/RBAC).
+
+### Plan 2.0b — BUILT ✅ (PR #3)
+- `services/web` (`@acp/web`): React + Vite + TS + Tailwind v4. Renders the thread, posts messages, and
+  streams the agent's live step events + final PR card via `useThreadStream` (REST history + WS, dedupe
+  by id). Components: `MessageItem` (chat/system/pr_card), `Composer`, `ThreadView`, `Sidebar`, `App`.
+- **Verified:** `pnpm test` 7/7 (component+hook, `fetch`/`WebSocket` stubbed), `pnpm build` clean, and a
+  screenshot of the rendered shell confirmed the Tailwind layout. Additive (backend untouched).
+- Static nav + seeded thread id for now; navigation/auth deferred to 2.1/2.2.
 
 ### Plan 2.0a — BUILT ✅ (in review)
 - 13 tasks implemented via subagent-driven dev (spec on risky tasks + code-quality review); see
