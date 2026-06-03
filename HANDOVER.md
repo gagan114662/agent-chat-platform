@@ -9,13 +9,32 @@
 
 Building **agent-chat-platform**: a chat-driven AI agent execution platform (Slack-for-AI-agents
 fused with conductor.build-style sandboxed execution → GitHub PRs). The **design spec is
-complete and approved**, **Plan 1 (the Fusion Engine walking skeleton) is COMPLETE, merged to
-`main`, and proven end-to-end against real GitHub.** Next up: **Plan 2**.
+complete and approved**, **Plan 1 is COMPLETE/merged/live-proven**, and **Plan 2.0a (chat+tasks
+backend & fusion wiring) is BUILT and in review (PR open).** Next up: **Plan 2.0b (React UI)**.
 
 - **Repo:** https://github.com/gagan114662/agent-chat-platform (private, owner `gagan114662`)
 - **Local path:** `/Users/gaganarora/Desktop/my projects/agent-chat-platform`
-- **Working branch:** `main` (Plan 1 merged via PR #1, merge commit `dc57e6a`).
-- **Next action:** brainstorm + spec **Plan 2 (chat + tasks + agents-as-principals)**.
+- **Working branch:** `plan-2.0-chat-tasks` (Plan 2.0a; PR open → `main`). Plan 1 already merged (`dc57e6a`).
+- **Next action:** review/merge the 2.0a PR, then **write + build Plan 2.0b (the React UI)** consuming
+  `GET /threads/:id/messages` + `GET /ws?threadId=`. The full chat→fusion live run still needs a real
+  Temporal server (see 2.0a note below).
+
+### Plan 2.0a — BUILT ✅ (in review)
+- 13 tasks implemented via subagent-driven dev (spec on risky tasks + code-quality review); see
+  `docs/specs/2026-06-03-plan-2.0-chat-tasks-design.md` and `docs/plans/2026-06-03-plan-2.0a-chat-tasks-backend.md`.
+- New package `services/app` (`@acp/app`): Fastify HTTP+WS, Drizzle/Postgres, in-process Temporal
+  worker reusing Plan-1's `runFusion` (now with an optional `onEvent` step-event hook). `POST
+  /threads/:id/messages` with an `@mention` → Task+Run → `chatFusionWorkflow` → live events stream to
+  the thread (WS via Postgres `LISTEN/NOTIFY`) → `pr_card`. Agents are first-class principals.
+- **Verified:** orchestrator 14/14, app 19/19 (unit+integration, incl. a real time-skipping Temporal
+  run driving workflow→sink→pr_card→task-done), e2e gate skips cleanly, Go suite clean, all tsc clean.
+- **NOT yet live-run as one combined flow:** the env-gated `chat-fusion.e2e.test.ts` needs a **real
+  Temporal server** (`TEMPORAL_ADDRESS`) + sandbox-runner + the fixture repo + `E2E_*`. This sandbox
+  had no Docker daemon (Colima VM won't boot) and no `temporal` CLI, so it wasn't run here. To run:
+  start Postgres (native, already configured) + `temporal server start-dev` (or compose) + the Go
+  sandbox-runner, `pnpm db:migrate && pnpm db:seed`, then `pnpm test:e2e` (see `services/app/README.md`).
+- **Deferred to 2.0b/2.1+:** React UI (2.0b), DMs/admin/task-board (2.1), SSO/RBAC (2.2),
+  NATS/presence/RLS-enforcement/K8s (2.3), real agents. Plan-1 deferred hardening still tracked below.
 
 ### Plan 1 — DONE ✅ (live-proven)
 - All Tasks 0–7 implemented, each passed spec-compliance + code-quality review.
