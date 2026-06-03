@@ -171,6 +171,35 @@ AgentAdapter
   field in `identify()`, and a compatibility window so old adapters keep working across
   platform changes.
 
-## 8. Sandbox isolation, security & cost controls (Section 5 — PENDING)
+## 8. Sandbox isolation, security & cost controls (Section 5 — APPROVED)
+
+Highest-risk subsystem: untrusted agent code, real repos, real tokens. Opinionated defaults.
+
+### Isolation (defense in depth)
+- Fresh pod per Task-work-session in the **org's namespace**, on **gVisor or Kata** runtime
+  (kernel/microVM boundary, not just a container).
+- **NetworkPolicy egress allowlist**: only git remote + agent LLM API + package registries;
+  everything else blocked (anti-exfiltration).
+- **No standing secrets**: short-lived, scoped GitHub installation token (one repo) + agent
+  key injected at start, revoked at teardown (Vault/OpenBao).
+- Read-only base image; only the worktree volume writable; all Linux capabilities dropped.
+
+### Cost & runaway controls
+- Per-session caps: CPU/mem, wall-clock timeout, max LLM spend → graceful stop + thread note.
+- Per-org **ResourceQuota** (max concurrent sandboxes) — no noisy-neighbor starvation.
+- **Metered per Run** (compute + LLM tokens) → billing + dashboard.
+- Aggressive teardown at terminal state; reaper kills orphans.
+
+### Supply-chain / prompt-injection hardening
+- Repo content is treated as **untrusted input**; minimal token scope + locked egress make
+  injection low-impact.
+- Adapters pinned by digest; registry scans them.
+
+### Lifecycle (decided): sandbox alive across the Task's loops
+- One sandbox **persists through the active Task work** — initial run, CI-resolution loop, and
+  request-changes iterations — then destroyed at terminal state. Faster iteration, retained
+  context.
+- **Complementary (later):** a small **warm pool + scale-to-zero** for instant first pickup,
+  and optional **snapshot/restore** for near-instant cold starts.
 
 ## 9. Error handling, observability & testing strategy (Section 6 — PENDING)
