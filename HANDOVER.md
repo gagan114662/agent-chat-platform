@@ -82,11 +82,16 @@ Current true state:
 - `pnpm exec tsc --noEmit -p tsconfig.json` → clean.
 - `cd services/sandbox-runner && go test ./... && go vet ./... && go build ./...` → all clean.
 
-**Next step:** a final whole-implementation review of Plan 1 was run, then
-**superpowers:finishing-a-development-branch** to open a PR from `plan-1-fusion-engine` → `main`.
-If the PR is not yet open, that is the remaining action. The real e2e (Task 7) has never been
-run against live GitHub — it needs the `E2E_*` env vars + a fixture repo + a running
-sandbox-runner (see `docs/plans/e2e-setup.md`).
+**Status:** the final whole-implementation review passed ("Ready to open PR" — cross-seam
+contracts all coherent, all suites green), and a PR is open:
+**https://github.com/gagan114662/agent-chat-platform/pull/1** (`plan-1-fusion-engine` → `main`).
+
+**Remaining for a future session:**
+- Review/merge PR #1.
+- The real e2e (Task 7) has never been run against live GitHub — it needs the `E2E_*` env vars +
+  a fixture repo + a running sandbox-runner (see `docs/plans/e2e-setup.md`). Running it is the
+  true proof of the Definition of Done (a real auto-merged PR created by the agent).
+- Then begin Plan 2 (chat + tasks + agents-as-principals).
 
 Reviewer/implementer prompt templates live in:
 `~/.claude/plugins/cache/claude-plugins-official/superpowers/5.1.0/skills/subagent-driven-development/`
