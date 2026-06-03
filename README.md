@@ -41,5 +41,5 @@ mention→sandbox→PR) before scaling out.
 
 ## Status
 
-🟡 **Design in progress.** Section 1 (architecture) approved. Sections 2–6 pending.
-No application code scaffolded yet.
+✅ **Design complete.** All 6 spec sections approved & committed. Next: implementation plan
+(`docs/plans/`), then build the thin vertical slice. No application code scaffolded yet.

@@ -202,4 +202,40 @@ Highest-risk subsystem: untrusted agent code, real repos, real tokens. Opinionat
 - **Complementary (later):** a small **warm pool + scale-to-zero** for instant first pickup,
   and optional **snapshot/restore** for near-instant cold starts.
 
-## 9. Error handling, observability & testing strategy (Section 6 — PENDING)
+## 9. Error handling, observability & testing strategy (Section 6 — APPROVED)
+
+### Error handling (fail loudly in the thread, never silently)
+- Every failure maps to a **thread message + Task state**: provision fail → retry×N →
+  `BLOCKED`; agent crash → capture logs → retry/`BLOCKED`; CI unresolved after N → escalate to
+  human; budget hit → graceful stop + "hit budget" card.
+- **Temporal durability**: service restart mid-Run resumes from the last completed step — no
+  orphaned sandboxes or lost PRs.
+- **Idempotency**: external actions (open PR, merge, create branch) keyed by Run id so retries
+  never double-act.
+
+### Observability
+- **OpenTelemetry** trace per Run spanning mention → sandbox → agent → PR → merge
+  (org/run/agent attributes).
+- Metrics: time-to-first-output, CI-resolution success rate, auto-merge rate, human-gate rate,
+  cost per Run, sandbox utilization.
+- **Per-org dashboard** incl. a "what auto-merged" **audit log** (trust-critical).
+
+### Testing strategy
+- **Unit**: adapter contract conformance (golden event-stream spec), risk classifier, policy
+  engine.
+- **Integration**: a **fake agent adapter** + **throwaway test GitHub repo** exercising the
+  full mention→merge loop deterministically in CI.
+- **Isolation/security tests**: assert egress blocked, secrets revoked at teardown, cross-tenant
+  access fails (tests, not hopes).
+- **Dogfooding**: QA-for-UI uses the same browser-QA harness shipped to users.
+
+---
+
+## 10. Build sequencing (thin vertical slice first)
+
+Per the Approach-C risk mitigation, build a **walking skeleton** before horizontal scale:
+**one tenant · one repo · one agent · mention → sandbox → PR → auto-merge**. Harden isolation,
+add the SDK/registry, multi-agent, dashboards, and scale-out afterward. Detailed phasing lives
+in the implementation plan (see `docs/plans/`).
+
+**Spec status:** ✅ Complete — all 6 sections approved. Ready for implementation planning.
