@@ -63,7 +63,7 @@ export async function runFusion(
     if (status === "failure") {
       return { outcome: "checks_failed", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha };
     }
-    await sleep(opts.pollMs);
+    if (i < opts.maxPolls - 1) await sleep(opts.pollMs);
   }
   return { outcome: "timeout", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha };
 }

@@ -1,7 +1,7 @@
 import { Octokit } from "@octokit/rest";
 import type { GitHubService, OpenPrInput } from "./github-service.js";
 import type { ChecksStatus, PullRequest } from "../types.js";
-import { nodeFetch } from "./node-fetch.js";
+import { nodeFetch } from "../http/node-fetch.js";
 
 export class OctokitGitHubService implements GitHubService {
   private readonly octokit: Octokit;

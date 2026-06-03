@@ -3,15 +3,18 @@
  * `node:http` / `node:https` modules.
  *
  * WHY THIS EXISTS:
- * Octokit v21 uses the global undici `fetch` by default. undici's `fetch`
- * bypasses Node's http/https transport, so `nock` — which works by patching
- * those core modules — cannot intercept Octokit requests in tests. By passing
- * this http/https-based shim to Octokit via `request.fetch`, requests flow
- * through the patchable transport and nock can mock them. In production it
- * behaves as an ordinary fetch.
+ * The global undici `fetch` (used by Octokit v21 and available globally on
+ * modern Node) bypasses Node's http/https transport, so `nock` — which works
+ * by patching those core modules — cannot intercept those requests in tests.
+ * This shim routes requests through the patchable http/https transport so nock
+ * can mock them, while behaving as an ordinary fetch in production.
+ *
+ * It is shared by multiple callers:
+ *   - injected into Octokit via `request.fetch` (GitHub service), and
+ *   - used directly as the HTTP client by the sandbox runner client.
  *
  * It is intentionally minimal (a walking-skeleton helper) but aims to be a
- * correct general-purpose shim for the subset of fetch Octokit relies on:
+ * correct general-purpose shim for the subset of fetch these callers rely on:
  * methods, headers (object / Headers / tuple array), string + Uint8Array
  * bodies, response status/headers/body, response url, and AbortSignal.
  */

@@ -1,5 +1,5 @@
 import type { RunResult, SandboxRunRequest } from "../types.js";
-import { nodeFetch } from "../github/node-fetch.js";
+import { nodeFetch } from "../http/node-fetch.js";
 
 export interface SandboxRunner {
   run(req: SandboxRunRequest): Promise<RunResult>;
@@ -16,7 +16,8 @@ export class SandboxRunnerClient implements SandboxRunner {
   // `new SandboxRunnerClient(baseUrl)` and `.run(req): Promise<RunResult>`, with
   // the same throw-on-non-200 behavior.
   async run(req: SandboxRunRequest): Promise<RunResult> {
-    const res = await nodeFetch(`${this.baseUrl}/run`, {
+    const url = `${this.baseUrl}/run`;
+    const res = await nodeFetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(req),
@@ -25,6 +26,11 @@ export class SandboxRunnerClient implements SandboxRunner {
       const text = await res.text();
       throw new Error(`sandbox-runner ${res.status}: ${text}`);
     }
-    return (await res.json()) as RunResult;
+    try {
+      return (await res.json()) as RunResult;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`sandbox-runner ${url}: invalid JSON response: ${message}`);
+    }
   }
 }
