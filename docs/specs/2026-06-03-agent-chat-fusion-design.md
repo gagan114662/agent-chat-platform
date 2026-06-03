@@ -135,7 +135,41 @@ Org ──< Workspace ──< Channel ──< Thread ──< Message (author = H
   scoped per namespace. A tenant's agent code cannot reach another tenant's data or pods.
 - **Cluster-per-org** offered later as a premium/compliance tier.
 
-## 7. Agent adapter interface (Section 4 — PENDING)
+## 7. Agent adapter interface (Section 4 — APPROVED)
+
+One contract every agent implements; adding an agent is config, not a fork.
+
+```
+AgentAdapter
+├─ identify()        → name, version, capabilities (can_edit_code, can_run_tests, …)
+├─ prepare(ctx)      → install/auth CLI; ctx = {repo path, intent, secrets, env}
+├─ run(intent)       → emits a STREAM of typed events:
+│     log(line) · progress(step,pct) · file_changed(path) ·
+│     needs_input(prompt) · confidence(score) · done(summary)
+├─ apply_feedback(notes) → request-changes / CI-fix loop
+└─ teardown()
+```
+
+### Two styles behind one interface
+- **CLI agents** (Claude Code, Codex CLI, Aider…): adapter wraps the binary, parses
+  output → typed events.
+- **Protocol agents** (MCP / A2A / ACP / REST): adapter bridges protocol → same events.
+  Also how non-coding agents (designer, QA) join chat without a sandbox.
+
+### Decisions
+- **One event stream, many agents** — orchestrator/UI never special-case an agent.
+- **`confidence()` and `needs_input()` are contract-level** — feed the risk router and let
+  an agent pull a human mid-run.
+- **Adapters run inside the per-org sandbox** — a bad adapter can't escape tenant isolation.
+
+### Extensibility model (decided): Open adapter SDK + registry from day one
+- Publish the **adapter SDK** and a **registry** immediately; third parties/customers can
+  publish agents at launch. Ship first-party adapters (Claude Code, Codex, Gemini, Aider) as
+  reference implementations on the same SDK.
+- **⚠️ Risk:** committing to a public contract early while the platform is still moving.
+  **Mitigation:** strict **semantic versioning of the adapter SDK**, a capability-negotiation
+  field in `identify()`, and a compatibility window so old adapters keep working across
+  platform changes.
 
 ## 8. Sandbox isolation, security & cost controls (Section 5 — PENDING)
 
