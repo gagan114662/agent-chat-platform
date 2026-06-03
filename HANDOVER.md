@@ -57,10 +57,10 @@ Plan 1 = the walking skeleton: intent → sandbox → fake agent → branch → 
 | Task 1 | Go sandbox-runner — git clone | ✅ DONE | `e8395db` |
 | Task 2 | Go Agent interface + FakeAgent + commit/push | ✅ DONE | `5f9f006` |
 | Task 3 | Go Run() + HTTP /run endpoint + server | ✅ DONE + reviewed | `d7a16a8` |
-| **Task 4** | **TS orchestrator: package + types + GitHub service (Octokit)** | ⚠️ **IMPLEMENTED + tests green (3/3), but NOT reviewed** | `a6749f9` |
-| Task 5 | TS sandbox client + core fusion (auto-merge on green) | ⏳ pending | — |
-| Task 6 | TS Temporal workflow + activities | ⏳ pending | — |
-| Task 7 | E2E integration test (env-gated, real GitHub) | ⏳ pending | — |
+| Task 4 | TS orchestrator: package + types + GitHub service (Octokit) | ✅ DONE + reviewed | `a6749f9`, `420793c` |
+| Task 5 | TS sandbox client + core fusion (auto-merge on green) | ✅ DONE + reviewed | `798fb19`, `0b57e5d` |
+| Task 6 | TS Temporal workflow + activities | ✅ DONE + reviewed | `4be71d3`, `ea332a8` |
+| Task 7 | E2E integration test (env-gated, real GitHub) | ✅ DONE + reviewed | `244bd9c`, `0f82479` |
 
 **The Go sandbox-runner service (Tasks 1–3) is complete and fully tested** (5 Go tests pass,
 `go build`/`go vet` clean). Each completed task passed a spec-compliance review AND a
@@ -70,28 +70,23 @@ code-quality review before being marked done.
 
 ## Resume here (exact next step)
 
-**FIRST: review Task 4 (already implemented in `a6749f9`, but never reviewed).**
-The implementer deviated from the plan: `src/github/octokit-github-service.ts` is ~95 lines
-(plan was ~30) because Octokit v21 uses global `fetch` (undici) which `nock` couldn't intercept,
-so a **custom-fetch injection workaround** was added. The 3 tests pass (`pnpm test` → 3/3 green).
-Before trusting it:
-1. Dispatch a **spec-compliance reviewer** for Task 4. Verify: public constructor is still
-   `constructor(token: string)`; the test was NOT weakened to pass; `openPr`/`getChecksStatus`/
-   `merge` behave per spec; the fetch workaround is sound.
-2. Then a **code-quality reviewer** (only after spec passes). Fix issues via the same subagent,
-   re-review until approved.
-3. Mark Task 4 done.
+**All Plan 1 tasks (0–7) are implemented and passed BOTH reviews (spec compliance + code
+quality).** Task 4's review gap was closed: it passed spec review, and a code-quality review
+drove a refactor (`420793c`) that extracted the fetch shim to `src/http/node-fetch.ts`, added
+abort/timeout handling, and validated the merge result. Tasks 5–7 were executed via
+subagent-driven-development with the same two-stage review.
 
-**THEN: execute Tasks 5 → 6 → 7** from `docs/plans/2026-06-03-plan-1-fusion-engine.md` using
-**superpowers:subagent-driven-development**: one implementer subagent per task (full task text,
-don't make it read the plan) → spec-compliance review → code-quality review → mark complete.
+Current true state:
+- `cd services/orchestrator && pnpm test` → **13/13 green** (unit; e2e excluded).
+- `pnpm test:e2e` (no env) → e2e suite **skips cleanly, exit 0**.
+- `pnpm exec tsc --noEmit -p tsconfig.json` → clean.
+- `cd services/sandbox-runner && go test ./... && go vet ./... && go build ./...` → all clean.
 
-4. After Task 7: dispatch a final whole-implementation review, then use
-   **superpowers:finishing-a-development-branch** (open a PR from `plan-1-fusion-engine`).
-
-> Note on process: Tasks 0–3 were each implemented and passed BOTH reviews. Task 4's code
-> landed without my review gates (its dispatch was interrupted), so treat it as unverified
-> until the two reviews above pass.
+**Next step:** a final whole-implementation review of Plan 1 was run, then
+**superpowers:finishing-a-development-branch** to open a PR from `plan-1-fusion-engine` → `main`.
+If the PR is not yet open, that is the remaining action. The real e2e (Task 7) has never been
+run against live GitHub — it needs the `E2E_*` env vars + a fixture repo + a running
+sandbox-runner (see `docs/plans/e2e-setup.md`).
 
 Reviewer/implementer prompt templates live in:
 `~/.claude/plugins/cache/claude-plugins-official/superpowers/5.1.0/skills/subagent-driven-development/`
@@ -121,6 +116,12 @@ Reviewer/implementer prompt templates live in:
 - `DisallowUnknownFields()` on the JSON decoder.
 - `context.Context` threading into git operations (currently accepted but unused in `Run()`).
 - Empty-branch/message guards in `CommitAllAndPush`.
+- **Secret leak (flagged in Task 7 review):** the sandbox-runner echoes the (token-bearing)
+  `RepoURL` in clone-failure errors — `git.go` wraps `args`+git output into the error, `http.go`
+  writes `err.Error()` to the HTTP response, and the orchestrator client folds that into its
+  thrown error. The e2e test feeds a `https://x-access-token:<PAT>@github.com/...` URL, so a
+  clone failure during e2e would print the PAT in test output/logs. Sanitize credentials out of
+  URLs before including them in any error/log.
 
 ---
 
