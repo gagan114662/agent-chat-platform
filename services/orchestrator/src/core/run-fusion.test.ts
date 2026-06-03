@@ -43,4 +43,16 @@ describe("runFusion", () => {
     expect(out.outcome).toBe("timeout");
     expect(d.github.merge).not.toHaveBeenCalled();
   });
+
+  it("emits ordered step events when onEvent is provided", async () => {
+    const d = deps(["pending", "success"]);
+    const events: string[] = [];
+    await runFusion(d, input, {
+      pollMs: 0, maxPolls: 5,
+      onEvent: (e) => { events.push(e.type); },
+    });
+    expect(events).toEqual([
+      "sandbox_started", "branch_pushed", "pr_opened", "checks", "checks", "outcome",
+    ]);
+  });
 });
