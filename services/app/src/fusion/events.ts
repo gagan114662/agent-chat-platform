@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type postgres from "postgres";
 import type { DB } from "../db/client.js";
