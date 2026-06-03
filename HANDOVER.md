@@ -9,13 +9,25 @@
 
 Building **agent-chat-platform**: a chat-driven AI agent execution platform (Slack-for-AI-agents
 fused with conductor.build-style sandboxed execution → GitHub PRs). The **design spec is
-complete and approved**, and we are **mid-way through executing Plan 1 (the Fusion Engine
-walking skeleton)** using subagent-driven development.
+complete and approved**, **Plan 1 (the Fusion Engine walking skeleton) is COMPLETE, merged to
+`main`, and proven end-to-end against real GitHub.** Next up: **Plan 2**.
 
 - **Repo:** https://github.com/gagan114662/agent-chat-platform (private, owner `gagan114662`)
 - **Local path:** `/Users/gaganarora/Desktop/my projects/agent-chat-platform`
-- **Working branch:** `plan-1-fusion-engine` (NOT merged to main yet)
-- **Next action:** implement **Task 4** of Plan 1 (TypeScript GitHub service). See "Resume here".
+- **Working branch:** `main` (Plan 1 merged via PR #1, merge commit `dc57e6a`).
+- **Next action:** brainstorm + spec **Plan 2 (chat + tasks + agents-as-principals)**.
+
+### Plan 1 — DONE ✅ (live-proven)
+- All Tasks 0–7 implemented, each passed spec-compliance + code-quality review.
+- PR #1 (`plan-1-fusion-engine` → `main`) **merged**.
+- **Live e2e proven:** ran against a real throwaway fixture repo
+  (`gagan114662/acp-e2e-fixture`) with the sandbox-runner on `:8090`. Outcome = **`merged`** —
+  the agent opened and auto-merged a real PR; `AGENT_CHANGES.md` landed on the fixture's `main`.
+- **Integration truth discovered during the live run:** the orchestrator's `getChecksStatus`
+  uses `getCombinedStatusForRef` = the *legacy commit-status API*, which does NOT include GitHub
+  Actions check-runs. To go green, the fixture repo has a workflow (`.github/workflows/green.yml`)
+  that POSTs a success **commit status** (context `e2e/always-green`) on push. Re-running the e2e
+  needs that fixture + the `E2E_*` env vars (see `docs/plans/e2e-setup.md`).
 
 ---
 
