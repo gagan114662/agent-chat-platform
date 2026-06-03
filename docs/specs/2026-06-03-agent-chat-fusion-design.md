@@ -103,7 +103,37 @@ Modeled as a **Temporal workflow** so every step survives crashes and can retry/
 - **Shadow mode**: a tenant can run auto-merge observe-only first (logs what it *would*
   have merged) to build trust before enabling for real.
 
-## 6. Data model & multi-tenancy (Section 3 — PENDING)
+## 6. Data model & multi-tenancy (Section 3 — APPROVED)
+
+Postgres; every row scoped by `org_id`.
+
+```
+Org ──< Workspace ──< Channel ──< Thread ──< Message (author = Human | Agent)
+ │           ├──< Repo (GitHub install + merge policy)
+ │           ├──< Member (Human)
+ │           └──< Agent (identity + adapter cfg)
+ └──< Task ──┬─ linked Thread
+             ├─ assignee (Human | Agent)
+             └──< Run (one execution attempt)
+                    ├─ Sandbox (pod id, lifecycle, cost)
+                    ├─ PR (github #, branch, checks, QA result)
+                    └─ Event log (streamed steps)
+```
+
+### Decisions
+- **Agents are first-class principals** (own identity/permissions/per-repo config; author
+  messages, own tasks, open PRs natively) — not second-class bot-users. This is why we lean
+  toward **building the chat service** rather than forking Zulip/Mattermost.
+- **`Run` is the unit of execution & audit**: one Task → many Runs (retries / request-changes
+  loops); each Run owns exactly one Sandbox and at most one PR. Cost/logs/outcome always
+  trace to a Run.
+- **`Repo` carries the merge policy** (autonomy dial + Layer-B tripwires + protected globs).
+
+### Tenant isolation = defense in depth (decided)
+- **Postgres Row-Level Security** keyed on `org_id` on every table.
+- **One Kubernetes namespace per org** for sandboxes: NetworkPolicy, ResourceQuota, secrets
+  scoped per namespace. A tenant's agent code cannot reach another tenant's data or pods.
+- **Cluster-per-org** offered later as a premium/compliance tier.
 
 ## 7. Agent adapter interface (Section 4 — PENDING)
 
