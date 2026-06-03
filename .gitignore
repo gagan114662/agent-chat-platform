@@ -5,3 +5,4 @@ dist/
 .tmp/
 *.tsbuildinfo
 services/sandbox-runner/bin/
+.gstack/
