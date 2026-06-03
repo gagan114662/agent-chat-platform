@@ -3,4 +3,5 @@ dist/
 *.log
 .env
 .tmp/
+*.tsbuildinfo
 services/sandbox-runner/bin/
