@@ -31,4 +31,12 @@ describe("OctokitGitHubService", () => {
     const svc = new OctokitGitHubService("tok");
     await expect(svc.merge("o", "r", 7)).resolves.toBeUndefined();
   });
+
+  it("rejects when GitHub reports the merge did not happen", async () => {
+    nock(api)
+      .put("/repos/o/r/pulls/7/merge")
+      .reply(200, { merged: false, message: "Pull Request is not mergeable" });
+    const svc = new OctokitGitHubService("tok");
+    await expect(svc.merge("o", "r", 7)).rejects.toThrow(/not mergeable/);
+  });
 });
