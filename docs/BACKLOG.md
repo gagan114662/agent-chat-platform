@@ -82,3 +82,9 @@ of the wedge. ✅ have · 🔜 partial · ❌ missing.
 - **Command palette (⌘K), notifications/unread, retention tiers** ❌ (overlaps conductor backlog #10/#12).
 
 - **Security scan** — run [vercel-labs/deepsec](https://github.com/vercel-labs/deepsec) for bugs+vulns; triage+fix (GH issue filed). Focus: auth bypass, secret/token leak paths, untrusted-code sandbox, cross-tenant access (RLS not yet enforced), web XSS, dep audit.
+
+---
+
+# North-star references (reload.chat)
+- **"Your engineer's Claude has never met your designer's Claude"** (https://blogs.reload.chat/blog/your-engineers-claude-has-never-met-your-designers-claude) — the core thesis behind our wedge: each person runs many isolated agents; humans are the copy-paste middleware; the fix is a Slack-style shared workspace where agents share channels, **hand off tasks with full context**, gate critical decisions to humans, and log every decision into a **searchable shared memory**. Directly motivates issue #26 (memory/context graph) + #27 (multi-agent coordination/hand-off) + #20/#21 (human approval). Treat as product north-star.
+- **docs.reload.chat** — product surface confirms: Workspaces · Channels (public/private, roles) · Agents (Claude Code/Cursor/Claude Desktop, step-by-step connect) · **Memory (shared context)** · Tasks · role-based invites · plan tiers. Mine `https://docs.reload.chat/llms.txt` for the detailed API/MCP/memory docs when building #26/#27/#9.
