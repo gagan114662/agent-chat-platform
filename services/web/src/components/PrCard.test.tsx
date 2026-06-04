@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { PrCard } from "./PrCard.js";
-import type { Message, ChangedFile } from "../types.js";
+import type { Message, ChangedFile, Checkpoint } from "../types.js";
 
 const base = { id: "x", orgId: "o1", threadId: "t1", authorKind: "agent", authorId: "a", kind: "pr_card", createdAt: new Date(0).toISOString() } as const;
 
@@ -118,6 +118,41 @@ describe("PrCard edit", () => {
     fireEvent.change(titleInput, { target: { value: "new title" } });
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
     expect(onUpdatePr).toHaveBeenCalledWith("run1", { title: "new title" });
+  });
+});
+
+describe("PrCard checkpoints", () => {
+  const cps: Checkpoint[] = [
+    { id: "cp1", orgId: "o1", runId: "run1", label: "agent push", branch: "agent/run1", commitSha: "deadbeefcafe", createdAt: new Date(0).toISOString() },
+  ];
+
+  it("shows a Checkpoints toggle when a runId is present", () => {
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} />);
+    expect(screen.getByRole("button", { name: /checkpoints/i })).toBeInTheDocument();
+  });
+
+  it("hides the Checkpoints toggle when no runId is present", () => {
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7 } } as Message} />);
+    expect(screen.queryByRole("button", { name: /checkpoints/i })).toBeNull();
+  });
+
+  it("clicking Checkpoints lazy-loads via onLoadCheckpoints(runId) and lists them", async () => {
+    const onLoadCheckpoints = vi.fn(async () => cps);
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} onLoadCheckpoints={onLoadCheckpoints} />);
+    fireEvent.click(screen.getByRole("button", { name: /^checkpoints$/i }));
+    expect(onLoadCheckpoints).toHaveBeenCalledWith("run1");
+    await waitFor(() => expect(screen.getByText(/agent push/)).toBeInTheDocument());
+    expect(screen.getByText(/deadbee/)).toBeInTheDocument();
+  });
+
+  it("clicking Restore calls onRestoreCheckpoint(runId, cpId)", async () => {
+    const onLoadCheckpoints = vi.fn(async () => cps);
+    const onRestoreCheckpoint = vi.fn();
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} onLoadCheckpoints={onLoadCheckpoints} onRestoreCheckpoint={onRestoreCheckpoint} />);
+    fireEvent.click(screen.getByRole("button", { name: /^checkpoints$/i }));
+    const restoreBtn = await screen.findByRole("button", { name: /restore/i });
+    fireEvent.click(restoreBtn);
+    expect(onRestoreCheckpoint).toHaveBeenCalledWith("run1", "cp1");
   });
 });
 

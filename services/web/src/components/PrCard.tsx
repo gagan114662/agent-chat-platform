@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Message, ChangedFile } from "../types.js";
+import type { Message, ChangedFile, Checkpoint } from "../types.js";
 import type { FileContent } from "../api.js";
 import { DiffView } from "./DiffView.js";
 import { FilePreview } from "./FilePreview.js";
@@ -20,9 +20,11 @@ interface PrCardProps {
   onOpenFile?: (runId: string, path: string) => Promise<FileContent>;
   onSyncComments?: (runId: string) => void;
   onUpdatePr?: (runId: string, patch: { title?: string; body?: string; base?: string }) => void;
+  onLoadCheckpoints?: (runId: string) => Promise<Checkpoint[]>;
+  onRestoreCheckpoint?: (runId: string, cpId: string) => void;
 }
 
-export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr }: PrCardProps) {
+export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr, onLoadCheckpoints, onRestoreCheckpoint }: PrCardProps) {
   const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string; runId?: string; parentRunId?: string };
   const outcome = m.outcome ?? "merged";
   // #53 stacked PRs: when this run is a child of another, surface a small badge.
@@ -35,6 +37,8 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
   const canDiff = typeof m.runId === "string";
   // A runId also lets a human edit the PR title/body/base in-thread (#56).
   const canEdit = typeof m.runId === "string";
+  // #62: a runId lets a human list + restore the run's checkpoints (commit snapshots).
+  const canCheckpoint = typeof m.runId === "string";
 
   const [diffOpen, setDiffOpen] = useState(false);
   const [diffFiles, setDiffFiles] = useState<ChangedFile[] | null>(null);
@@ -54,6 +58,23 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
       .then((f) => setFileContent(f))
       .catch(() => setFileContent(null))
       .finally(() => setFileLoading(false));
+  };
+
+  // #62 checkpoints: lazy-loaded list of the run's commit snapshots.
+  const [cpOpen, setCpOpen] = useState(false);
+  const [checkpoints, setCheckpoints] = useState<Checkpoint[] | null>(null);
+  const [cpLoading, setCpLoading] = useState(false);
+
+  const toggleCheckpoints = () => {
+    if (cpOpen) { setCpOpen(false); return; }
+    setCpOpen(true);
+    if (checkpoints === null && onLoadCheckpoints && m.runId) {
+      setCpLoading(true);
+      onLoadCheckpoints(m.runId)
+        .then((cps) => setCheckpoints(cps))
+        .catch(() => setCheckpoints([]))
+        .finally(() => setCpLoading(false));
+    }
   };
 
   const [editOpen, setEditOpen] = useState(false);
@@ -103,7 +124,7 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
         )}
       </div>
       <p className="mt-1 text-sm">{message.body}</p>
-      {(actionable || canDiff || canEdit) && (
+      {(actionable || canDiff || canEdit || canCheckpoint) && (
         <div className="mt-3 flex gap-2">
           {actionable && (
             <button
@@ -149,6 +170,43 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
             >
               Edit
             </button>
+          )}
+          {canCheckpoint && (
+            <button
+              type="button"
+              onClick={toggleCheckpoints}
+              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              {cpOpen ? "Hide checkpoints" : "Checkpoints"}
+            </button>
+          )}
+        </div>
+      )}
+      {cpOpen && (
+        <div className="mt-3 rounded-lg border border-neutral-200 bg-white/70 p-3">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Checkpoints</p>
+          {cpLoading ? (
+            <p className="px-1 text-xs text-neutral-400">Loading checkpoints…</p>
+          ) : (checkpoints?.length ?? 0) === 0 ? (
+            <p className="px-1 text-xs text-neutral-400">No checkpoints yet.</p>
+          ) : (
+            <ul className="space-y-1">
+              {(checkpoints ?? []).map((cp) => (
+                <li key={cp.id} className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate text-xs text-neutral-700">
+                    <span className="font-medium">{cp.label}</span>{" "}
+                    <span className="font-mono text-neutral-500">{cp.branch} · {cp.commitSha.slice(0, 7)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => m.runId && onRestoreCheckpoint?.(m.runId, cp.id)}
+                    className="shrink-0 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                  >
+                    ↩ Restore
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}
