@@ -18,6 +18,10 @@ export interface RunFusionActivityInput {
   // token inside the activity, where the worker shares the app's environment.
   tokenEnvVar: string; sandboxUrl: string; pollMs: number; maxPolls: number;
   autonomy: Autonomy;
+  // Plan mode (#20): when true, the run proposes a read-only plan and parks
+  // (the planGate below always declines the first pass — approval comes via the
+  // approve-plan route, which starts a fresh execute run with planMode off).
+  planMode?: boolean;
   sink: SinkCtx;
 }
 
@@ -44,9 +48,15 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
       const res = await sandbox.feedback({ repoUrl, branch, notes: failure });
       return { commitSha: res.commitSha };
     };
+    // Plan mode: the first pass only PROPOSES a plan and parks. The planGate
+    // always declines so runFusion emits outcome "awaiting_plan" → the sink
+    // transitions the run to awaiting_plan_approval. Approval is handled by the
+    // approve-plan route, which starts a NEW run with planMode forced off.
+    const planGate = async () => ({ approved: false });
     const result = await runFusionTraced(deps, fusionInput, {
       pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink, mergeGate,
       maxFixAttempts, ciFix,
+      planMode: input.planMode ?? false, planGate,
     });
     await reportRunUsage(db, reporterFromEnv(), { orgId: input.sink.orgId, runId: input.sink.runId, outcome: result.outcome });
     await captureDecision(db, {

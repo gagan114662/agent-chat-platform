@@ -51,6 +51,7 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
       });
       await startFusionRun(d.temporal, {
         run, orgId, threadId, repo, agentId: agent.id, intent: body, sandboxUrl: d.sandboxUrl,
+        planMode: repo.planMode, // #20: plan-first when the repo opts in
       });
       started.push(run.id);
     }

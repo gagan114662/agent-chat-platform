@@ -27,6 +27,26 @@ async function loadHeldRunWithRepo(db: DB, { orgId, runId }: ApprovalInput) {
   return { run, task, thread, repo };
 }
 
+// Loads an awaiting_plan_approval run (org-scoped) together with its task→thread→repo.
+// Throws if the run is missing, belongs to another org, or is not awaiting plan approval
+// — the only state the plan approve/reject routes can act on.
+export async function loadPlanRunWithRepo(db: DB, { orgId, runId }: ApprovalInput) {
+  const [run] = await db.select().from(runs)
+    .where(and(eq(runs.id, runId), eq(runs.orgId, orgId), eq(runs.state, "awaiting_plan_approval")));
+  if (!run) throw new Error(`plan run not found: ${runId}`);
+
+  const [task] = await db.select().from(tasks).where(and(eq(tasks.id, run.taskId), eq(tasks.orgId, orgId)));
+  if (!task) throw new Error(`task not found for run: ${runId}`);
+
+  const [thread] = await db.select().from(threads).where(and(eq(threads.id, task.threadId), eq(threads.orgId, orgId)));
+  if (!thread?.repoId) throw new Error(`thread/repo not found for run: ${runId}`);
+
+  const [repo] = await db.select().from(repos).where(and(eq(repos.id, thread.repoId), eq(repos.orgId, orgId)));
+  if (!repo) throw new Error(`repo not found for run: ${runId}`);
+
+  return { run, task, thread, repo };
+}
+
 // Approve a held_for_human run: merge its PR via the injected GitHub client, transition
 // run→merged (which flips the task→done), and post a confirmation pr_card into the thread.
 // The GitHub client is injected (Pick<GitHubService,"merge">) so callers/tests control it.

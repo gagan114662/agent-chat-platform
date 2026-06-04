@@ -36,6 +36,20 @@ export async function declineRun(runId: string): Promise<void> {
   if (!res.ok) throw new Error(`declineRun ${res.status}`);
 }
 
+export async function approvePlan(runId: string): Promise<void> {
+  const res = await fetch(`/runs/${runId}/approve-plan`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`approvePlan ${res.status}`);
+}
+
+export async function rejectPlan(runId: string, notes?: string): Promise<void> {
+  const res = await fetch(`/runs/${runId}/reject-plan`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ notes }),
+  });
+  if (!res.ok) throw new Error(`rejectPlan ${res.status}`);
+}
+
 export async function runDiff(runId: string): Promise<ChangedFile[]> {
   const res = await fetch(`/runs/${runId}/diff`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`runDiff ${res.status}`);

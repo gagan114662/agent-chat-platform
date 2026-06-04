@@ -34,6 +34,20 @@ describe("SandboxRunnerClient", () => {
     expect(res).toEqual({ branch: "feature/x", commitSha: "fixsha" });
   });
 
+  it("posts /plan and returns PlanResult", async () => {
+    nock("http://runner:8090")
+      .post("/plan", { repoUrl: "https://github.com/o/r.git", baseBranch: "main", intent: "do it" })
+      .reply(200, { plan: "1. step one\n2. step two" });
+
+    const client = new SandboxRunnerClient("http://runner:8090");
+    const res = await client.plan({
+      repoUrl: "https://github.com/o/r.git",
+      baseBranch: "main",
+      intent: "do it",
+    });
+    expect(res).toEqual({ plan: "1. step one\n2. step two" });
+  });
+
   it("rejects with status and body on a non-200 response", async () => {
     nock("http://runner:8090").post("/run").reply(500, "boom");
 
