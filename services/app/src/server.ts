@@ -18,6 +18,7 @@ import { registerCommentSyncRoutes } from "./http/comment-sync-routes.js";
 import { registerPrEditRoutes } from "./http/pr-edit-routes.js";
 import { registerAutonomyRoutes } from "./http/autonomy-routes.js";
 import { registerCheckpointRoutes } from "./http/checkpoint-routes.js";
+import { registerIntegrationRoutes } from "./http/integration-routes.js";
 import { registerAuth } from "./http/auth-routes.js";
 import { resolveSession } from "./auth/auth.js";
 import { eq } from "drizzle-orm";
@@ -75,6 +76,7 @@ export async function buildServer() {
   registerPrEditRoutes(app, { db });
   registerAutonomyRoutes(app, { db, sql, temporal, sandboxUrl });
   registerCheckpointRoutes(app, { db, sql, temporal, sandboxUrl });
+  registerIntegrationRoutes(app, { db });
 
   // Public liveness/health probe (in PUBLIC_PATHS so the auth preHandler won't 401 it).
   app.get("/healthz", async () => ({ ok: true }));

@@ -16,6 +16,7 @@ function deps(checks: ChecksStatus[]) {
     getChecksStatus: vi.fn().mockImplementation(async () => checks[Math.min(i++, checks.length - 1)]),
     merge: vi.fn().mockResolvedValue(undefined),
     getChangedFiles: vi.fn().mockResolvedValue([]),
+    listIssues: vi.fn().mockResolvedValue([]),
     getFileContent: vi.fn().mockResolvedValue({ content: "", encoding: "utf8", size: 0 }),
     getCheckFailureContext: vi.fn().mockResolvedValue("ci: lint failed"),
     listReviewComments: vi.fn().mockResolvedValue([]),

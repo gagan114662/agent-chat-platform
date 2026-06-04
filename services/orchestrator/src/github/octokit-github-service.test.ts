@@ -120,6 +120,23 @@ describe("OctokitGitHubService", () => {
     await expect(svc.getFileContent("o", "r", "sha", "src")).rejects.toThrow(/not a file/i);
   });
 
+  it("lists issues and filters out pull requests", async () => {
+    nock(api)
+      .get("/repos/o/r/issues")
+      .query(true)
+      .reply(200, [
+        { number: 1, title: "Bug", body: "broken", state: "open", html_url: "https://github.com/o/r/issues/1" },
+        { number: 2, title: "A PR", body: "code", state: "open", html_url: "https://github.com/o/r/pull/2", pull_request: { url: "x" } },
+        { number: 3, title: "Feature", body: null, state: "open", html_url: "https://github.com/o/r/issues/3" },
+      ]);
+    const svc = new OctokitGitHubService("tok");
+    const issues = await svc.listIssues("o", "r");
+    expect(issues).toEqual([
+      { number: 1, title: "Bug", body: "broken", state: "open", htmlUrl: "https://github.com/o/r/issues/1" },
+      { number: 3, title: "Feature", body: undefined, state: "open", htmlUrl: "https://github.com/o/r/issues/3" },
+    ]);
+  });
+
   it("lists changed files for a PR", async () => {
     const patch = "@@ -1,2 +1,3 @@\n context\n-removed\n+added\n+added2";
     nock(api).get("/repos/o/r/pulls/7/files").reply(200, [

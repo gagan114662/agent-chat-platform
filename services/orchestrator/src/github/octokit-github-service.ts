@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest";
-import type { GitHubService, OpenPrInput, ReviewComment, FileContent } from "./github-service.js";
+import type { GitHubService, OpenPrInput, ReviewComment, FileContent, GitHubIssue } from "./github-service.js";
 import type { ChecksStatus, PullRequest } from "../types.js";
 import type { ChangedFile } from "../policy/risk.js";
 import { nodeFetch } from "../http/node-fetch.js";
@@ -80,6 +80,22 @@ export class OctokitGitHubService implements GitHubService {
       status: f.status,
       patch: f.patch,
     }));
+  }
+
+  async listIssues(owner: string, repo: string, opts?: { first?: number }): Promise<GitHubIssue[]> {
+    const res = await this.octokit.issues.listForRepo({
+      owner, repo, state: "open", per_page: opts?.first ?? 50,
+    });
+    // The issues endpoint also returns PRs; they carry a `pull_request` key. Drop them.
+    return res.data
+      .filter((issue) => !issue.pull_request)
+      .map((issue) => ({
+        number: issue.number,
+        title: issue.title,
+        body: issue.body ?? undefined,
+        state: issue.state,
+        htmlUrl: issue.html_url,
+      }));
   }
 
   async getFileContent(owner: string, repo: string, ref: string, path: string): Promise<FileContent> {
