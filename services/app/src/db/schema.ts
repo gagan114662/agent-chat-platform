@@ -48,9 +48,12 @@ export const channels = pgTable("channels", {
 export const threads = pgTable("threads", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
-  channelId: text("channel_id").notNull(),
+  channelId: text("channel_id"),                       // nullable — DMs have no channel
   title: text("title").notNull(),
   repoId: text("repo_id"),
+  kind: text("kind").notNull().default("channel"),     // 'channel' | 'dm'
+  dmPeerKind: text("dm_peer_kind"),                    // 'human' | 'agent' (dm only)
+  dmPeerId: text("dm_peer_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
