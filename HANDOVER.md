@@ -8,12 +8,12 @@
 ## TL;DR — where we are
 
 Building **agent-chat-platform**: a chat-driven AI agent execution platform (Slack-for-AI-agents
-fused with conductor.build-style sandboxed execution → GitHub PRs). **The full roadmap + frontend are COMPLETE and merged** (32 PRs). Plan 1, the chat→fusion loop, the real Claude Code agent, K8s isolation, Stripe billing, and Honeycomb traces are all **live-proven**.
+fused with conductor.build-style sandboxed execution → GitHub PRs). **The full roadmap + frontend + a security-hardening pass are merged** (43 PRs). Plan 1, the chat→fusion loop, the real Claude Code agent, K8s isolation, Stripe billing, and Honeycomb traces are all **live-proven**.
 
 - **Repo:** https://github.com/gagan114662/agent-chat-platform (private, owner `gagan114662`)
 - **Local path:** `/Users/gaganarora/Desktop/my projects/agent-chat-platform`
 - **`main` — all green:** Go (3 pkgs build/vet/test), orchestrator **31**, app **57**, web **30**, all tsc clean, web build ok.
-- **No open PRs.** PRs #1–#32 merged. Beyond the table below: #14 real Claude Code adapter (live), #15 merge-policy gate (4b), #16 K8s namespace-per-org (live on OrbStack), #25 Stripe metering (live test-mode), #30 OTLP→Honeycomb (live, acp-app dataset), #31 app restyle, #32 landing site, #24 verification skills.
+- **No open PRs.** PRs #1–#43 merged. Recent: #33 memory graph, #34 Context Explorer, #35 dev-proxy fix, #42 **security hardening (#36 cross-tenant IDOR + PAT-out-of-Temporal + runner hardening)**, #43 **CI fix-on-red loop (#18)**. Beyond the table below: #14 real Claude Code adapter (live), #15 merge-policy gate (4b), #16 K8s namespace-per-org (live on OrbStack), #25 Stripe metering (live test-mode), #30 OTLP→Honeycomb (live, acp-app dataset), #31 app restyle, #32 landing site, #24 verification skills.
 
 ### Shipped (all merged to `main`)
 | PR | Plan | What |
