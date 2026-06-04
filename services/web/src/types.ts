@@ -1,5 +1,5 @@
 export type AuthorKind = "human" | "agent";
-export type MessageKind = "chat" | "system" | "pr_card";
+export type MessageKind = "chat" | "system" | "pr_card" | "plan_card";
 
 export interface Message {
   id: string;
