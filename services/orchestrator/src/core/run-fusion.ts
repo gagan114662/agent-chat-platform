@@ -22,6 +22,7 @@ export type FusionEvent =
   | { type: "branch_pushed"; branch: string; commitSha: string }
   | { type: "pr_opened"; prNumber: number; prUrl: string }
   | { type: "checks"; status: "pending" | "success" | "failure" }
+  | { type: "ci_fix_attempt"; attempt: number; failure: string }
   | { type: "outcome"; outcome: FusionOutcome; prNumber?: number; prUrl?: string; commitSha?: string };
 
 export interface FusionOptions {
@@ -29,6 +30,11 @@ export interface FusionOptions {
   maxPolls: number;
   onEvent?: (e: FusionEvent) => void | Promise<void>;
   mergeGate?: (info: { prNumber: number; prUrl: string; commitSha: string; branch: string }) => Promise<{ merge: boolean; reason: string }>;
+  // Fix-on-red: when set and maxFixAttempts > 0, a failing check triggers up to
+  // maxFixAttempts agent fix attempts (re-run on the same branch) before giving up.
+  // Defaults keep today's behavior: maxFixAttempts 0 + no ciFix => no fix loop.
+  maxFixAttempts?: number; // default 0
+  ciFix?: (info: { branch: string; commitSha: string; prNumber: number; failure: string }) => Promise<{ commitSha: string }>;
 }
 
 export interface FusionResult {
@@ -68,6 +74,9 @@ export async function runFusion(
   });
   await emit({ type: "pr_opened", prNumber: pr.number, prUrl: pr.url });
 
+  const maxFixAttempts = opts.maxFixAttempts ?? 0;
+  let fixes = 0;
+
   for (let i = 0; i < opts.maxPolls; i++) {
     const status = await deps.github.getChecksStatus(input.owner, input.repo, run.commitSha);
     await emit({ type: "checks", status });
@@ -84,6 +93,17 @@ export async function runFusion(
       return { outcome: "merged", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha };
     }
     if (status === "failure") {
+      if (opts.ciFix && fixes < maxFixAttempts) {
+        fixes++;
+        const failure = await deps.github.getCheckFailureContext(input.owner, input.repo, run.commitSha);
+        await emit({ type: "ci_fix_attempt", attempt: fixes, failure });
+        const fixed = await opts.ciFix({ branch: run.branch, commitSha: run.commitSha, prNumber: pr.number, failure });
+        run.commitSha = fixed.commitSha;
+        // Re-poll the new commit from scratch (fresh poll budget). `fixes` is
+        // bounded by maxFixAttempts, so this can't loop forever.
+        i = -1;
+        continue;
+      }
       await emit({ type: "outcome", outcome: "checks_failed", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha });
       return { outcome: "checks_failed", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha };
     }

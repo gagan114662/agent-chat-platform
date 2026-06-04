@@ -14,6 +14,7 @@ function deps(checks: ChecksStatus[]) {
     getChecksStatus: vi.fn().mockImplementation(async () => checks[Math.min(i++, checks.length - 1)]),
     merge: vi.fn().mockResolvedValue(undefined),
     getChangedFiles: vi.fn().mockResolvedValue([]),
+    getCheckFailureContext: vi.fn().mockResolvedValue("ci: lint failed"),
   };
   return { sandbox, github };
 }
@@ -75,5 +76,45 @@ describe("runFusion", () => {
     });
     expect(out.outcome).toBe("merged");
     expect(d.github.merge).toHaveBeenCalled();
+  });
+
+  it("fixes on red then merges (failure -> ciFix -> success)", async () => {
+    const d = deps(["failure", "success"]);
+    const ciFix = vi.fn().mockResolvedValue({ commitSha: "fixsha" });
+    const out = await runFusion(d, input, {
+      pollMs: 0, maxPolls: 5,
+      maxFixAttempts: 1,
+      ciFix,
+    });
+    expect(out.outcome).toBe("merged");
+    expect(ciFix).toHaveBeenCalledTimes(1);
+    expect(ciFix).toHaveBeenCalledWith(
+      expect.objectContaining({ branch: "feature/x", failure: "ci: lint failed", prNumber: 7 }),
+    );
+    expect(d.github.getCheckFailureContext).toHaveBeenCalled();
+    // merged on the new (fixed) commit
+    expect(out.commitSha).toBe("fixsha");
+    expect(d.github.merge).toHaveBeenCalledWith("o", "r", 7);
+  });
+
+  it("does not attempt a fix when maxFixAttempts defaults to 0", async () => {
+    const d = deps(["failure"]);
+    const ciFix = vi.fn().mockResolvedValue({ commitSha: "fixsha" });
+    const out = await runFusion(d, input, { pollMs: 0, maxPolls: 5, ciFix });
+    expect(out.outcome).toBe("checks_failed");
+    expect(ciFix).not.toHaveBeenCalled();
+    expect(d.github.merge).not.toHaveBeenCalled();
+  });
+
+  it("escalates after exhausting maxFixAttempts (still red)", async () => {
+    const d = deps(["failure"]); // always red
+    const ciFix = vi.fn().mockResolvedValue({ commitSha: "fixsha" });
+    const out = await runFusion(d, input, {
+      pollMs: 0, maxPolls: 5,
+      maxFixAttempts: 2,
+      ciFix,
+    });
+    expect(out.outcome).toBe("checks_failed");
+    expect(ciFix).toHaveBeenCalledTimes(2);
   });
 });

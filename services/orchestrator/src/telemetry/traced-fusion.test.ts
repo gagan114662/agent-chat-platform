@@ -22,6 +22,7 @@ function deps(checks: ChecksStatus[]) {
     getChecksStatus: vi.fn().mockImplementation(async () => checks[Math.min(i++, checks.length - 1)]),
     merge: vi.fn().mockResolvedValue(undefined),
     getChangedFiles: vi.fn().mockResolvedValue([]),
+    getCheckFailureContext: vi.fn().mockResolvedValue("ci: lint failed"),
   };
   return { sandbox, github };
 }
