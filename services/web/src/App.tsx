@@ -3,7 +3,9 @@ import { Sidebar } from "./components/Sidebar.js";
 import { ThreadView } from "./components/ThreadView.js";
 import { Composer } from "./components/Composer.js";
 import { SearchBar } from "./components/SearchBar.js";
+import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
+import { useMemory } from "./useMemory.js";
 import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm } from "./api.js";
 import type { Channel, Thread, Repo, Principal } from "./types.js";
 import { useAuth } from "./useAuth.js";
@@ -23,6 +25,10 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
   const [dms, setDms] = useState<Thread[]>([]);
   const [principals, setPrincipals] = useState<Principal[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [view, setView] = useState<"thread" | "context">("thread");
+  const memory = useMemory();
+
+  const selectThread = (id: string) => { setActiveThreadId(id); setView("thread"); };
 
   // Load channels + repos once, then threads for each channel.
   useEffect(() => {
@@ -43,7 +49,7 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
     if (!channelId) return;
     const t = await createThread(channelId, { title, repoId });
     setThreads((prev) => [t, ...prev]);
-    setActiveThreadId(t.id);
+    selectThread(t.id);
   };
 
   const onCreateChannel = async (name: string) => {
@@ -54,7 +60,7 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
   const onStartDm = async (peerKind: "human" | "agent", peerId: string) => {
     const t = await startDm(peerKind, peerId);
     setDms((prev) => prev.some((d) => d.id === t.id) ? prev : [t, ...prev]);
-    setActiveThreadId(t.id);
+    selectThread(t.id);
   };
 
   return (
@@ -66,17 +72,20 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
         principals={principals}
         repos={repos}
         activeThreadId={activeThreadId}
-        onSelectThread={setActiveThreadId}
+        onSelectThread={selectThread}
         onCreateThread={onCreateThread}
         onCreateChannel={onCreateChannel}
         onStartDm={onStartDm}
+        onOpenContext={() => setView("context")}
         canCreateChannel={role === "admin"}
       />
       <main className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-[#e7e7f0] bg-white px-4 py-3">
           <div>
             <h1 className="text-sm font-semibold text-neutral-800">
-              {[...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected"}
+              {view === "context"
+                ? "Context Explorer"
+                : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
             </h1>
             <p className="text-xs text-neutral-400">chat → sandboxed agent → PR → back to chat</p>
           </div>
@@ -85,9 +94,19 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
             <button onClick={onLogout} className="text-xs text-neutral-500 hover:text-neutral-800">Sign out ({userId})</button>
           </div>
         </header>
-        {activeThreadId
-          ? <ThreadConversation threadId={activeThreadId} />
-          : <div className="flex-1" />}
+        {view === "context"
+          ? <ContextExplorer
+              graph={memory.graph}
+              stats={memory.stats}
+              scope={memory.scope}
+              onScopeChange={memory.setScope}
+              kind={memory.kind}
+              onKindChange={memory.setKind}
+              loading={memory.loading}
+            />
+          : activeThreadId
+            ? <ThreadConversation threadId={activeThreadId} />
+            : <div className="flex-1" />}
       </main>
     </div>
   );

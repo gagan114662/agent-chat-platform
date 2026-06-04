@@ -5,7 +5,7 @@ import { NewDmPicker } from "./NewDmPicker.js";
 
 export function Sidebar({
   channels, threads, dms, principals, repos, activeThreadId,
-  onSelectThread, onCreateThread, onCreateChannel, onStartDm, canCreateChannel,
+  onSelectThread, onCreateThread, onCreateChannel, onStartDm, onOpenContext, canCreateChannel,
 }: {
   channels: Channel[];
   threads: Thread[];
@@ -17,6 +17,7 @@ export function Sidebar({
   onCreateThread: (title: string, repoId?: string) => void;
   onCreateChannel: (name: string) => void;
   onStartDm: (peerKind: "human" | "agent", peerId: string) => void;
+  onOpenContext: () => void;
   canCreateChannel: boolean;
 }) {
   const [channelName, setChannelName] = useState("");
@@ -39,6 +40,12 @@ export function Sidebar({
     <aside className="flex w-60 shrink-0 flex-col border-r border-[#e7e7f0] bg-white">
       <div className="px-4 py-4 text-sm font-semibold text-neutral-800">Demo Workspace</div>
       <nav className="flex-1 overflow-y-auto px-2 text-sm text-neutral-600">
+        <button
+          onClick={onOpenContext}
+          className="mb-2 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+        >
+          🧠 Context
+        </button>
         {channels.map((c) => (
           <div key={c.id} className="mb-2">
             <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-400"># {c.name}</div>
