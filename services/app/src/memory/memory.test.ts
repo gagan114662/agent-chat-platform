@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { createNode, createEdge, listNodes, neighbors, searchNodes, counts } from "./memory.js";
+import { createNode, createEdge, listNodes, neighbors, searchNodes, counts, graph } from "./memory.js";
 import { orgs } from "../db/schema.js";
 
 const h = testDb();
@@ -30,5 +30,17 @@ describe("memory", () => {
     await createEdge(h.db, { orgId: "o1", fromId: a.id, toId: b.id, relation: "relates_to" });
     expect((await searchNodes(h.db, "o1", "AUTH")).map((n) => n.id)).toEqual([a.id]);
     expect(await counts(h.db, "o1")).toEqual({ nodes: 2, edges: 1 });
+  });
+  it("graph returns nodes + only edges among those nodes; kind filter drops dangling edges", async () => {
+    const a = await createNode(h.db, { orgId: "o1", kind: "decision", label: "merge PR 7", scope: "team" });
+    const b = await createNode(h.db, { orgId: "o1", kind: "identity", label: "coder" });
+    await createEdge(h.db, { orgId: "o1", fromId: a.id, toId: b.id, relation: "authored_by" });
+    const full = await graph(h.db, "o1");
+    expect(full.nodes.length).toBe(2);
+    expect(full.edges.map((e) => e.relation)).toEqual(["authored_by"]);
+    // filtering by kind narrows nodes and drops the now-dangling edge (b is excluded)
+    const narrowed = await graph(h.db, "o1", { kind: "decision" });
+    expect(narrowed.nodes.map((n) => n.id)).toEqual([a.id]);
+    expect(narrowed.edges).toEqual([]);
   });
 });

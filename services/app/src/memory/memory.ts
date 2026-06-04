@@ -48,3 +48,16 @@ export async function counts(db: DB, orgId: string): Promise<{ nodes: number; ed
   const [e] = await db.select({ c: sql<number>`count(*)::int` }).from(memoryEdges).where(eq(memoryEdges.orgId, orgId));
   return { nodes: n?.c ?? 0, edges: e?.c ?? 0 };
 }
+
+export interface MemoryGraph { nodes: Awaited<ReturnType<typeof listNodes>>; edges: { id: string; fromId: string; toId: string; relation: string }[]; }
+
+// Returns the org's nodes (optionally filtered) + the edges among those nodes.
+export async function graph(db: DB, orgId: string, filter: { kind?: NodeKind; scope?: Scope } = {}): Promise<MemoryGraph> {
+  const nodes = await listNodes(db, orgId, filter);
+  const ids = new Set(nodes.map((n) => n.id));
+  const all = await db.select().from(memoryEdges).where(eq(memoryEdges.orgId, orgId));
+  const edges = all
+    .filter((e) => ids.has(e.fromId) && ids.has(e.toId))
+    .map((e) => ({ id: e.id, fromId: e.fromId, toId: e.toId, relation: e.relation }));
+  return { nodes, edges };
+}
