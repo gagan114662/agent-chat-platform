@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { tick, type StartRun } from "./tick.js";
-import { orgs, workspaces, channels, threads, repos, agents, tasks, runs } from "../db/schema.js";
+import { orgs, workspaces, channels, threads, repos, agents, tasks, runs, incidents } from "../db/schema.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
@@ -101,6 +101,16 @@ describe("tick — observe ready tasks, dispatch within budget", () => {
     const res = await tick(makeDeps(start), { orgId: "o1" });
     expect(res.dispatched.length).toBe(0);
     expect(start).not.toHaveBeenCalled();
+  });
+
+  it("also detects + records alerts each iteration (#93): a failed run → alerts >= 1", async () => {
+    // a failed run in org-A → the tick's alert pass records one alert-incident
+    await h.db.insert(runs).values({ id: "r-cf", orgId: "o1", taskId: "k1-na", state: "checks_failed", workflowId: "wfcf" });
+    const start = vi.fn(async () => {});
+    const res = await tick(makeDeps(start), { orgId: "o1" });
+    expect(res.alerts).toBeGreaterThanOrEqual(1);
+    const inc = await h.db.select().from(incidents).where(eq(incidents.orgId, "o1"));
+    expect(inc.some((i) => i.source === "alert" && i.id === "o1:run-failed:r-cf")).toBe(true);
   });
 
   it("does not touch another org's tasks (org-scoped)", async () => {

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { registerAutonomyRoutes, runTickForAllOrgs } from "./autonomy-routes.js";
 import type { StartRun } from "../autonomy/tick.js";
-import { orgs, workspaces, channels, threads, repos, agents, goals, tasks, runs } from "../db/schema.js";
+import { orgs, workspaces, channels, threads, repos, agents, goals, tasks, runs, incidents } from "../db/schema.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
@@ -91,6 +91,55 @@ describe("autonomy routes", () => {
     // org-B task untouched
     const [bt] = await h.db.select().from(tasks).where(eq(tasks.id, "bt"));
     expect(bt.state).toBe("open");
+    await app.close();
+  });
+});
+
+describe("alerts routes (#93)", () => {
+  it("POST /orgs/:orgId/alerts/scan records new alerts and GET /orgs/:orgId/alerts lists them", async () => {
+    // a failed run in org-A → one alert
+    await h.db.insert(tasks).values({ id: "k1", orgId: "o1", threadId: "t1", title: "do k1", state: "in_progress", createdByKind: "agent", createdById: "planner" });
+    await h.db.insert(runs).values({ id: "r-cf", orgId: "o1", taskId: "k1", state: "checks_failed", workflowId: "wf1" });
+    const app = makeApp(vi.fn(async () => {}));
+
+    const scan = await app.inject({ method: "POST", url: "/orgs/o1/alerts/scan", headers: hdr("o1"), payload: {} });
+    expect(scan.statusCode).toBe(200);
+    expect(scan.json().alerts).toBe(1);
+
+    // idempotent: a second scan finds 0 new
+    const scan2 = await app.inject({ method: "POST", url: "/orgs/o1/alerts/scan", headers: hdr("o1"), payload: {} });
+    expect(scan2.json().alerts).toBe(0);
+
+    const list = await app.inject({ method: "GET", url: "/orgs/o1/alerts", headers: hdr("o1") });
+    expect(list.statusCode).toBe(200);
+    const items = list.json().alerts;
+    expect(items.length).toBe(1);
+    expect(items[0].source).toBe("alert");
+    await app.close();
+  });
+
+  it("POST /orgs/:orgId/alerts/scan for another org → 403 (cross-org)", async () => {
+    const app = makeApp(vi.fn(async () => {}));
+    const res = await app.inject({ method: "POST", url: "/orgs/o2/alerts/scan", headers: hdr("o1"), payload: {} });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("GET /orgs/:orgId/alerts for another org → 403 (cross-org)", async () => {
+    const app = makeApp(vi.fn(async () => {}));
+    const res = await app.inject({ method: "GET", url: "/orgs/o2/alerts", headers: hdr("o1") });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("GET /orgs/:orgId/alerts is org-scoped (another org's alert-incidents are excluded)", async () => {
+    await h.db.insert(incidents).values([
+      { id: "o1:run-failed:x", orgId: "o1", source: "alert", severity: "high", title: "A", body: "" },
+      { id: "o2:run-failed:y", orgId: "o2", source: "alert", severity: "high", title: "B", body: "" },
+    ]);
+    const app = makeApp(vi.fn(async () => {}));
+    const list = await app.inject({ method: "GET", url: "/orgs/o1/alerts", headers: hdr("o1") });
+    expect(list.json().alerts.map((a: { id: string }) => a.id)).toEqual(["o1:run-failed:x"]);
     await app.close();
   });
 });

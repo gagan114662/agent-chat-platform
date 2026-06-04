@@ -2,8 +2,11 @@ import type { FastifyInstance } from "fastify";
 import type { DB } from "../db/client.js";
 import type postgres from "postgres";
 import type { Client } from "@temporalio/client";
+import { and, desc, eq } from "drizzle-orm";
 import { createGoal, decomposeGoal } from "../autonomy/goals.js";
 import { tick, type StartRun, type TickResult } from "../autonomy/tick.js";
+import { detectAlerts, recordAlerts } from "../autonomy/alerts.js";
+import { incidents } from "../db/schema.js";
 import { actor } from "./actor.js";
 
 // `start` is the injectable fusion starter (see tick.ts) — routes pass it through so the
@@ -49,6 +52,30 @@ export function registerAutonomyRoutes(app: FastifyInstance, d: AutonomyDeps) {
       { orgId, budgetMax },
     );
     return reply.code(200).send(result);
+  });
+
+  // #93: manual alert scan — detect + record idempotent alert-incidents. Returns
+  // the count of NEW alerts. Org-guarded (an actor can only scan their own org → 403).
+  app.post("/orgs/:orgId/alerts/scan", async (req, reply) => {
+    const { orgId: pathOrgId } = req.params as { orgId: string };
+    const { threadId } = (req.body ?? {}) as { threadId?: string };
+    const { orgId } = actor(req);
+    if (orgId !== pathOrgId) return reply.code(403).send({ error: "forbidden" });
+    const detected = await detectAlerts(d.db, orgId);
+    const created = await recordAlerts(d.db, d.sql, { orgId, threadId }, detected);
+    return reply.code(200).send({ alerts: created });
+  });
+
+  // #93: list recent alert-incidents (source "alert"), org-scoped + guarded → 403.
+  app.get("/orgs/:orgId/alerts", async (req, reply) => {
+    const { orgId: pathOrgId } = req.params as { orgId: string };
+    const { orgId } = actor(req);
+    if (orgId !== pathOrgId) return reply.code(403).send({ error: "forbidden" });
+    const rows = await d.db.select().from(incidents)
+      .where(and(eq(incidents.orgId, orgId), eq(incidents.source, "alert")))
+      .orderBy(desc(incidents.createdAt), desc(incidents.id))
+      .limit(100);
+    return reply.code(200).send({ alerts: rows });
   });
 }
 
