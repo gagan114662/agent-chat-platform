@@ -47,4 +47,37 @@ describe("auth routes", () => {
     expect(list.json().map((m: { id: string }) => m.id)).toContain("m1");
     await app.close();
   });
+
+  it("strict mode requires a valid password", async () => {
+    process.env.AUTH_REQUIRE_SESSION = "true";
+    try {
+      const { hashPassword } = await import("../auth/password.js");
+      await h.db.update((await import("../db/schema.js")).members).set({ passwordHash: hashPassword("pw") }).where((await import("drizzle-orm")).eq((await import("../db/schema.js")).members.id, "m1"));
+      const app = makeApp();
+      const noPw = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "m1" } });
+      expect(noPw.statusCode).toBe(401);
+      const ok = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "m1", password: "pw" } });
+      expect(ok.statusCode).toBe(201);
+      await app.close();
+    } finally {
+      delete process.env.AUTH_REQUIRE_SESSION;
+    }
+  });
+
+  it("strict mode rejects unauthenticated requests and hides /auth/members", async () => {
+    process.env.AUTH_REQUIRE_SESSION = "true";
+    try {
+      const app = makeApp();
+      const me = await app.inject({ method: "GET", url: "/auth/me" });
+      expect(me.statusCode).toBe(401);
+      const members = await app.inject({ method: "GET", url: "/auth/members" });
+      expect(members.statusCode).toBe(404);
+      // login remains public
+      const login = await app.inject({ method: "GET", url: "/auth/login" }); // GET not allowed but path is public → 404 routing, not 401
+      expect(login.statusCode).not.toBe(401);
+      await app.close();
+    } finally {
+      delete process.env.AUTH_REQUIRE_SESSION;
+    }
+  });
 });

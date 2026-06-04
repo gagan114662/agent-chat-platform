@@ -28,6 +28,6 @@ describe("App auth gate", () => {
   it("shows the login screen when unauthenticated", async () => {
     vi.stubGlobal("fetch", makeFetch(401));
     render(<App />);
-    await waitFor(() => expect(screen.getByText(/sign in \(dev\)/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/^sign in$/i)).toBeInTheDocument());
   });
 });

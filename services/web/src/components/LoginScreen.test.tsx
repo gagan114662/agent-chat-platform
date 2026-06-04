@@ -12,6 +12,6 @@ describe("LoginScreen", () => {
     render(<LoginScreen onLogin={onLogin} />);
     await waitFor(() => expect(screen.getByText("You")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /sign in as you/i }));
-    expect(onLogin).toHaveBeenCalledWith("m1");
+    expect(onLogin).toHaveBeenCalledWith("m1", undefined);
   });
 });

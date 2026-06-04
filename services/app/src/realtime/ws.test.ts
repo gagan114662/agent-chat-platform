@@ -29,4 +29,23 @@ describe("ws fan-out", () => {
     expect((await got).body).toBe("live");
     ws.close(); await app.close();
   }, 20_000);
+
+  it("rejects an unauthenticated socket in strict mode", async () => {
+    process.env.AUTH_REQUIRE_SESSION = "true";
+    try {
+      const pubsub = new ThreadPubSub(h.sql);
+      await pubsub.start();
+      const app = Fastify();
+      await app.register(websocket);
+      registerWs(app, pubsub, async () => undefined); // resolver returns no principal
+      await app.listen({ port: 0, host: "127.0.0.1" });
+      const { port } = app.server.address() as { port: number };
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?threadId=t1`);
+      const closed = new Promise<number>((res) => ws.on("close", (code) => res(code)));
+      expect(await closed).toBe(1008);
+      await app.close();
+    } finally {
+      delete process.env.AUTH_REQUIRE_SESSION;
+    }
+  }, 20000);
 });
