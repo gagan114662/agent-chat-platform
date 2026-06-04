@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny-all }
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-egress }
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    # DNS
+    - to: []
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    # HTTPS to git remotes / LLM APIs / package registries (anti-exfiltration: only 443)
+    - to: []
+      ports: [{ protocol: TCP, port: 443 }]
+    # intra-namespace (app <-> sandbox-runner)
+    - to: [{ podSelector: {} }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-intra-ingress }
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from: [{ podSelector: {} }]
