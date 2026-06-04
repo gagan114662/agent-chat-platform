@@ -6,12 +6,14 @@ import "context"
 // (Apply(repoDir, intent) error) by running it and discarding the event stream.
 type agentBridge struct{ a Adapter }
 
-func (b agentBridge) Apply(repoDir, intent string) error {
-	return b.a.Run(context.Background(), repoDir, intent, func(Event) {})
+func (b agentBridge) Apply(ctx context.Context, repoDir, intent string) error {
+	return b.a.Run(ctx, repoDir, intent, func(Event) {})
 }
 
 // AsAgent wraps an Adapter so it structurally satisfies sandbox.Agent.
 // Lets any SDK adapter drop into the existing Run() loop.
-func AsAgent(a Adapter) interface{ Apply(repoDir, intent string) error } {
+func AsAgent(a Adapter) interface {
+	Apply(ctx context.Context, repoDir, intent string) error
+} {
 	return agentBridge{a}
 }

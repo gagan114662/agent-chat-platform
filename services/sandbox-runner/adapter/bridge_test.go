@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,12 +9,14 @@ import (
 )
 
 // localAgent mirrors sandbox.Agent's method set (structural typing).
-type localAgent interface{ Apply(repoDir, intent string) error }
+type localAgent interface {
+	Apply(ctx context.Context, repoDir, intent string) error
+}
 
 func TestAsAgent(t *testing.T) {
 	var ag localAgent = AsAgent(NewFakeAdapter())
 	dir := t.TempDir()
-	if err := ag.Apply(dir, "bridge it"); err != nil {
+	if err := ag.Apply(context.Background(), dir, "bridge it"); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 	b, err := os.ReadFile(filepath.Join(dir, "AGENT_CHANGES.md"))
