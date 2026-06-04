@@ -1,4 +1,5 @@
-import { runFusion, type FusionResult } from "@acp/orchestrator/core/run-fusion.js";
+import { runFusionTraced } from "@acp/orchestrator/telemetry/traced-fusion.js";
+import type { FusionResult } from "@acp/orchestrator/core/run-fusion.js";
 import { SandboxRunnerClient } from "@acp/orchestrator/sandbox/sandbox-runner-client.js";
 import { OctokitGitHubService } from "@acp/orchestrator/github/octokit-github-service.js";
 import { makeDb } from "../db/client.js";
@@ -19,7 +20,7 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
       github: new OctokitGitHubService(input.githubToken),
     };
     const sink = makeFusionSink(db, sql, input.sink);
-    return await runFusion(deps, input, { pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink });
+    return await runFusionTraced(deps, input, { pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink });
   } finally {
     await sql.end();
   }
