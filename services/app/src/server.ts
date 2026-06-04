@@ -10,6 +10,7 @@ import { registerAuth } from "./http/auth-routes.js";
 import { resolveSession } from "./auth/auth.js";
 import { startWorker } from "./fusion/worker.js";
 import { makeTemporalClient } from "./fusion/bridge.js";
+import { startTelemetry, stopTelemetry } from "./telemetry/otel-init.js";
 
 export async function buildServer() {
   const { db, sql } = makeDb();
@@ -29,6 +30,9 @@ export async function buildServer() {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("server.ts")) {
+  startTelemetry(); // exports traces to Honeycomb when HONEYCOMB_API_KEY is set
   const app = await buildServer();
+  const close = async () => { await stopTelemetry(); await app.close(); process.exit(0); };
+  process.on("SIGTERM", close); process.on("SIGINT", close);
   await app.listen({ port: Number(process.env.PORT ?? 8080), host: "0.0.0.0" });
 }
