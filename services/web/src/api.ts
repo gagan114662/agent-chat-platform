@@ -33,6 +33,12 @@ export async function runDiff(runId: string): Promise<ChangedFile[]> {
   return res.json();
 }
 
+export async function syncPrComments(runId: string): Promise<{ synced: number }> {
+  const res = await fetch(`/runs/${runId}/sync-comments`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`syncPrComments ${res.status}`);
+  return res.json();
+}
+
 export async function listChannels(): Promise<Channel[]> {
   const res = await fetch(`/channels`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`listChannels ${res.status}`);

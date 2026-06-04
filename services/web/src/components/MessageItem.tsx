@@ -6,11 +6,12 @@ interface MessageItemProps {
   onApprove?: (runId: string) => void;
   onDecline?: (runId: string) => void;
   onLoadDiff?: (runId: string) => Promise<ChangedFile[]>;
+  onSyncComments?: (runId: string) => void;
 }
 
-export function MessageItem({ message, onApprove, onDecline, onLoadDiff }: MessageItemProps) {
+export function MessageItem({ message, onApprove, onDecline, onLoadDiff, onSyncComments }: MessageItemProps) {
   if (message.kind === "pr_card") {
-    return <div className="px-4 py-1.5"><PrCard message={message} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} /></div>;
+    return <div className="px-4 py-1.5"><PrCard message={message} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onSyncComments={onSyncComments} /></div>;
   }
   if (message.kind === "system") {
     return (

@@ -6,7 +6,7 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, syncPrComments } from "./api.js";
 import type { Channel, Thread, Repo, Principal } from "./types.js";
 import { useAuth } from "./useAuth.js";
 import { LoginScreen } from "./components/LoginScreen.js";
@@ -118,9 +118,11 @@ function ThreadConversation({ threadId }: { threadId: string }) {
   const onApprove = (runId: string) => { approveRun(runId).then(refetch).catch(() => {}); };
   const onDecline = (runId: string) => { declineRun(runId).then(refetch).catch(() => {}); };
   const onLoadDiff = (runId: string) => runDiff(runId);
+  // Synced comments also arrive via WS, but refetch covers the no-socket case.
+  const onSyncComments = (runId: string) => { syncPrComments(runId).then(refetch).catch(() => {}); };
   return (
     <>
-      <ThreadView messages={messages} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} />
+      <ThreadView messages={messages} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onSyncComments={onSyncComments} />
       <Composer onSend={send} />
     </>
   );

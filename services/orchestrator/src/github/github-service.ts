@@ -10,6 +10,14 @@ export interface OpenPrInput {
   body: string;
 }
 
+export interface ReviewComment {
+  id: number;
+  body: string;
+  user: string;
+  path?: string;
+  line?: number;
+}
+
 export interface GitHubService {
   openPr(input: OpenPrInput): Promise<PullRequest>;
   getChecksStatus(owner: string, repo: string, ref: string): Promise<ChecksStatus>;
@@ -18,4 +26,6 @@ export interface GitHubService {
   // Summarizes the failing check/status contexts for a ref into a short string,
   // used as feedback notes for the agent on a fix-on-red attempt.
   getCheckFailureContext(owner: string, repo: string, ref: string): Promise<string>;
+  // Lists the PR review comments (the request-changes inflow), pulled on demand into the thread.
+  listReviewComments(owner: string, repo: string, prNumber: number): Promise<ReviewComment[]>;
 }

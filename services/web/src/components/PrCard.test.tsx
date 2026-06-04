@@ -63,3 +63,22 @@ describe("PrCard view diff", () => {
     expect(screen.getByText("-removed")).toBeInTheDocument();
   });
 });
+
+describe("PrCard sync comments", () => {
+  it("shows a Sync comments button when a runId is present", () => {
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} />);
+    expect(screen.getByRole("button", { name: /sync comments/i })).toBeInTheDocument();
+  });
+
+  it("hides the Sync comments button when no runId is present", () => {
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7 } } as Message} />);
+    expect(screen.queryByRole("button", { name: /sync comments/i })).toBeNull();
+  });
+
+  it("clicking Sync comments calls onSyncComments with the runId", () => {
+    const onSyncComments = vi.fn();
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} onSyncComments={onSyncComments} />);
+    fireEvent.click(screen.getByRole("button", { name: /sync comments/i }));
+    expect(onSyncComments).toHaveBeenCalledWith("run1");
+  });
+});

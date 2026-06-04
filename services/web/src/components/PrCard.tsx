@@ -15,9 +15,10 @@ interface PrCardProps {
   onApprove?: (runId: string) => void;
   onDecline?: (runId: string) => void;
   onLoadDiff?: (runId: string) => Promise<ChangedFile[]>;
+  onSyncComments?: (runId: string) => void;
 }
 
-export function PrCard({ message, onApprove, onDecline, onLoadDiff }: PrCardProps) {
+export function PrCard({ message, onApprove, onDecline, onLoadDiff, onSyncComments }: PrCardProps) {
   const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string; runId?: string };
   const outcome = m.outcome ?? "merged";
   // Only treat https:// URLs as links — never render javascript:/data:/etc. as an href.
@@ -84,6 +85,15 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff }: PrCardProp
               className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
             >
               {diffOpen ? "Hide diff" : "View diff"}
+            </button>
+          )}
+          {canDiff && (
+            <button
+              type="button"
+              onClick={() => onSyncComments?.(m.runId!)}
+              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              ↻ Sync comments
             </button>
           )}
         </div>

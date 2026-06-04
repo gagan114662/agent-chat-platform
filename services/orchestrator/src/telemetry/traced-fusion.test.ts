@@ -26,6 +26,7 @@ function deps(checks: ChecksStatus[]) {
     merge: vi.fn().mockResolvedValue(undefined),
     getChangedFiles: vi.fn().mockResolvedValue([]),
     getCheckFailureContext: vi.fn().mockResolvedValue("ci: lint failed"),
+    listReviewComments: vi.fn().mockResolvedValue([]),
   };
   return { sandbox, github };
 }
