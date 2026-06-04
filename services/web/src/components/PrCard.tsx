@@ -11,11 +11,11 @@ export function PrCard({ message }: { message: Message }) {
   const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string };
   const outcome = m.outcome ?? "merged";
   return (
-    <div className={`rounded-lg border px-4 py-3 ${OUTCOME_STYLES[outcome] ?? OUTCOME_STYLES.merged}`}>
+    <div className={`rounded-xl border px-4 py-3 ${OUTCOME_STYLES[outcome] ?? OUTCOME_STYLES.merged}`}>
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide">{outcome.replace("_", " ")}</span>
         {m.prNumber != null && (
-          <a href={m.prUrl} target="_blank" rel="noreferrer" className="text-sm font-medium underline underline-offset-2">
+          <a href={m.prUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-neutral-800 underline underline-offset-2">
             PR #{m.prNumber}
           </a>
         )}
