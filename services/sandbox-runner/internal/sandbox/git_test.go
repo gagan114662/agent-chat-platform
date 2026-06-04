@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,7 +42,7 @@ func TestCloneInto(t *testing.T) {
 	src := makeBareRepoWithCommit(t)
 	dest := filepath.Join(t.TempDir(), "checkout")
 
-	err := CloneInto(src, "main", dest)
+	err := CloneInto(context.Background(), src, "main", dest)
 	if err != nil {
 		t.Fatalf("CloneInto: %v", err)
 	}
@@ -53,14 +54,14 @@ func TestCloneInto(t *testing.T) {
 func TestCommitAllAndPush(t *testing.T) {
 	src := makeBareRepoWithCommit(t)
 	dest := filepath.Join(t.TempDir(), "checkout")
-	if err := CloneInto(src, "main", dest); err != nil {
+	if err := CloneInto(context.Background(), src, "main", dest); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dest, "new.txt"), []byte("x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	sha, err := CommitAllAndPush(dest, "feature/test", "msg")
+	sha, err := CommitAllAndPush(context.Background(), dest, "feature/test", "msg")
 	if err != nil {
 		t.Fatalf("CommitAllAndPush: %v", err)
 	}
@@ -70,7 +71,16 @@ func TestCommitAllAndPush(t *testing.T) {
 
 	// Verify the branch exists on origin.
 	verify := filepath.Join(t.TempDir(), "verify")
-	if err := CloneInto(src, "feature/test", verify); err != nil {
+	if err := CloneInto(context.Background(), src, "feature/test", verify); err != nil {
 		t.Fatalf("branch not pushed to origin: %v", err)
+	}
+}
+
+func TestCommitAllAndPushEmptyGuards(t *testing.T) {
+	if _, err := CommitAllAndPush(context.Background(), t.TempDir(), "", "m"); err == nil {
+		t.Fatal("expected error for empty branch")
+	}
+	if _, err := CommitAllAndPush(context.Background(), t.TempDir(), "b", ""); err == nil {
+		t.Fatal("expected error for empty message")
 	}
 }
