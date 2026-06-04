@@ -16,7 +16,7 @@ export function registerMemoryRoutes(app: FastifyInstance, d: { db: DB }) {
     const { kind, scope } = req.query as { kind?: NodeKind; scope?: Scope };
     return graph(d.db, orgId, { kind, scope });
   });
-  app.get("/memory/:id/neighbors", async (req) => neighbors(d.db, (req.params as { id: string }).id));
+  app.get("/memory/:id/neighbors", async (req) => neighbors(d.db, (req.params as { id: string }).id, actor(req).orgId));
   app.post("/memory", async (req, reply) => {
     const { orgId } = actor(req);
     const b = req.body as { kind: NodeKind; label: string; body?: string; scope?: Scope; metadata?: Record<string, unknown> };

@@ -32,11 +32,19 @@ describe("tasks", () => {
     const { run } = await openTaskForMention(h.db, {
       orgId: "o1", threadId: "t1", intent: "x", agentId: "a1", createdByKind: "human", createdById: "m1",
     });
-    const running = await transitionRun(h.db, run.id, "running", {});
+    const running = await transitionRun(h.db, run.id, "running", {}, "o1");
     expect(running.state).toBe("running");
-    const merged = await transitionRun(h.db, run.id, "merged", { prNumber: 7, prUrl: "u", commitSha: "s", branch: "b" });
+    const merged = await transitionRun(h.db, run.id, "merged", { prNumber: 7, prUrl: "u", commitSha: "s", branch: "b" }, "o1");
     expect(merged.state).toBe("merged");
     expect(merged.prNumber).toBe(7);
-    await expect(transitionRun(h.db, run.id, "running", {})).rejects.toThrow(/illegal transition/);
+    await expect(transitionRun(h.db, run.id, "running", {}, "o1")).rejects.toThrow(/illegal transition/);
+  });
+
+  it("transitionRun ignores a run from another org (cross-tenant IDOR)", async () => {
+    const { run } = await openTaskForMention(h.db, {
+      orgId: "o1", threadId: "t1", intent: "x", agentId: "a1", createdByKind: "human", createdById: "m1",
+    });
+    // org B tries to transition org A's run by id → run not found, state unchanged
+    await expect(transitionRun(h.db, run.id, "running", {}, "o2")).rejects.toThrow(/run not found/);
   });
 });

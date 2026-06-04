@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { tasks, runs } from "../db/schema.js";
 import { canTransition, isTerminal, type RunState } from "./runs.js";
@@ -31,16 +31,18 @@ export interface RunFields {
   branch?: string; commitSha?: string; prNumber?: number; prUrl?: string;
 }
 
-export async function transitionRun(db: DB, runId: string, to: RunState, fields: RunFields) {
-  const [current] = await db.select().from(runs).where(eq(runs.id, runId));
+export async function transitionRun(db: DB, runId: string, to: RunState, fields: RunFields, orgId: string) {
+  const [current] = await db.select().from(runs).where(and(eq(runs.id, runId), eq(runs.orgId, orgId)));
   if (!current) throw new Error(`run not found: ${runId}`);
   if (current.state !== to && !canTransition(current.state as RunState, to)) {
     throw new Error(`illegal transition ${current.state} -> ${to}`);
   }
-  const [run] = await db.update(runs).set({ state: to, ...fields }).where(eq(runs.id, runId)).returning();
+  const [run] = await db.update(runs).set({ state: to, ...fields })
+    .where(and(eq(runs.id, runId), eq(runs.orgId, orgId))).returning();
   if (isTerminal(to)) {
     const taskState = to === "merged" ? "done" : "blocked";
-    await db.update(tasks).set({ state: taskState }).where(eq(tasks.id, run.taskId));
+    await db.update(tasks).set({ state: taskState })
+      .where(and(eq(tasks.id, run.taskId), eq(tasks.orgId, orgId)));
   }
   return run;
 }

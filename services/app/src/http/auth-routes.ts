@@ -51,7 +51,7 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
 
   app.get("/auth/me", async (req, reply) => {
     if (!req.principal) return reply.code(401).send({ error: "unauthenticated" });
-    const role = await roleOf(d.db, req.principal.userId);
+    const role = await roleOf(d.db, req.principal.userId, req.principal.orgId);
     return { ...req.principal, role };
   });
 

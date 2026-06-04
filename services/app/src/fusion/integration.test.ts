@@ -58,7 +58,7 @@ describe("chat fusion integration", () => {
       );
       expect(result.outcome).toBe("merged");
 
-      const msgs = await listMessages(h.db, "t1");
+      const msgs = await listMessages(h.db, "t1", "o1");
       expect(msgs.at(-1)?.kind).toBe("pr_card");
       expect(msgs.some((m) => m.kind === "system")).toBe(true);
     } finally {

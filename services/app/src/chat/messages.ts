@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { messages } from "../db/schema.js";
 
@@ -29,6 +29,8 @@ export async function createMessage(db: DB, m: NewMessage) {
   return inserted ?? row;
 }
 
-export async function listMessages(db: DB, threadId: string) {
-  return db.select().from(messages).where(eq(messages.threadId, threadId)).orderBy(asc(messages.createdAt), asc(messages.id));
+export async function listMessages(db: DB, threadId: string, orgId: string) {
+  return db.select().from(messages)
+    .where(and(eq(messages.threadId, threadId), eq(messages.orgId, orgId)))
+    .orderBy(asc(messages.createdAt), asc(messages.id));
 }

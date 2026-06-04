@@ -14,12 +14,12 @@ export async function listPrincipals(db: DB, orgId: string, excludeMemberId?: st
   ];
 }
 
-async function peerName(db: DB, peerKind: "human" | "agent", peerId: string): Promise<string | undefined> {
+async function peerName(db: DB, orgId: string, peerKind: "human" | "agent", peerId: string): Promise<string | undefined> {
   if (peerKind === "human") {
-    const [m] = await db.select().from(members).where(eq(members.id, peerId));
+    const [m] = await db.select().from(members).where(and(eq(members.id, peerId), eq(members.orgId, orgId)));
     return m?.displayName;
   }
-  const [a] = await db.select().from(agents).where(eq(agents.id, peerId));
+  const [a] = await db.select().from(agents).where(and(eq(agents.id, peerId), eq(agents.orgId, orgId)));
   return a?.displayName;
 }
 
@@ -31,7 +31,7 @@ export async function getOrCreateDm(db: DB, input: { orgId: string; peerKind: "h
     eq(threads.dmPeerId, input.peerId),
   ));
   if (existing) return existing;
-  const name = await peerName(db, input.peerKind, input.peerId);
+  const name = await peerName(db, input.orgId, input.peerKind, input.peerId);
   if (!name) throw new Error(`principal not found: ${input.peerKind}/${input.peerId}`);
   const [t] = await db.insert(threads).values({
     id: randomUUID(), orgId: input.orgId, channelId: null, title: name,

@@ -22,8 +22,13 @@ describe("rbac", () => {
     expect(can("member", "message:post")).toBe(true);
   });
   it("roleOf reads the member role, defaults to member for unknown", async () => {
-    expect(await roleOf(h.db, "adm")).toBe("admin");
-    expect(await roleOf(h.db, "reg")).toBe("member");
-    expect(await roleOf(h.db, "ghost")).toBe("member");
+    expect(await roleOf(h.db, "adm", "o1")).toBe("admin");
+    expect(await roleOf(h.db, "reg", "o1")).toBe("member");
+    expect(await roleOf(h.db, "ghost", "o1")).toBe("member");
+  });
+
+  it("roleOf does not read a member from another org (cross-tenant IDOR)", async () => {
+    // org B reads org A's admin id → must NOT be granted admin; defaults to member
+    expect(await roleOf(h.db, "adm", "o2")).toBe("member");
   });
 });
