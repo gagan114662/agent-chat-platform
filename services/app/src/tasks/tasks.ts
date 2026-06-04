@@ -129,6 +129,28 @@ export async function fanOutTask(db: DB, i: FanOutInput) {
   return { task, runIds: created.map((c) => c.runId), created };
 }
 
+// #64 select-winner: mark ONE run the exclusive winner among its task's siblings.
+// Org-scoped (#14): a cross-org/unknown run id → throws (route maps to 404). The
+// clear-siblings + set-winner happen in a single transaction so the "exactly one
+// selected per task" invariant never observes an intermediate state. Idempotent:
+// selecting an already-selected run still leaves it the sole winner.
+export async function selectRun(db: DB, orgId: string, runId: string) {
+  const [run] = await db.select().from(runs)
+    .where(and(eq(runs.id, runId), eq(runs.orgId, orgId)));
+  if (!run) throw new Error(`run not found: ${runId}`);
+
+  const updated = await db.transaction(async (tx) => {
+    // Clear every sibling (same task + org), then set this run — exclusive winner.
+    await tx.update(runs).set({ selected: false })
+      .where(and(eq(runs.taskId, run.taskId), eq(runs.orgId, orgId)));
+    const [winner] = await tx.update(runs).set({ selected: true })
+      .where(and(eq(runs.id, runId), eq(runs.orgId, orgId)))
+      .returning();
+    return winner;
+  });
+  return updated;
+}
+
 export interface RunFields {
   branch?: string; commitSha?: string; prNumber?: number; prUrl?: string;
 }
