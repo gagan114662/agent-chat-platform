@@ -6,7 +6,7 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, syncPrComments, approvePlan, rejectPlan } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, syncPrComments, updatePr, approvePlan, rejectPlan } from "./api.js";
 import type { Channel, Thread, Repo, Principal } from "./types.js";
 import { useAuth } from "./useAuth.js";
 import { LoginScreen } from "./components/LoginScreen.js";
@@ -120,11 +120,12 @@ function ThreadConversation({ threadId }: { threadId: string }) {
   const onLoadDiff = (runId: string) => runDiff(runId);
   // Synced comments also arrive via WS, but refetch covers the no-socket case.
   const onSyncComments = (runId: string) => { syncPrComments(runId).then(refetch).catch(() => {}); };
+  const onUpdatePr = (runId: string, patch: { title?: string; body?: string; base?: string }) => { updatePr(runId, patch).then(refetch).catch(() => {}); };
   const onApprovePlan = (runId: string) => { approvePlan(runId).then(refetch).catch(() => {}); };
   const onRejectPlan = (runId: string, notes?: string) => { rejectPlan(runId, notes).then(refetch).catch(() => {}); };
   return (
     <>
-      <ThreadView messages={messages} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onSyncComments={onSyncComments} onApprovePlan={onApprovePlan} onRejectPlan={onRejectPlan} />
+      <ThreadView messages={messages} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} onApprovePlan={onApprovePlan} onRejectPlan={onRejectPlan} />
       <Composer onSend={send} />
     </>
   );

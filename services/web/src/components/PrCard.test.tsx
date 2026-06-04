@@ -77,6 +77,28 @@ describe("PrCard view diff", () => {
   });
 });
 
+describe("PrCard edit", () => {
+  it("shows an Edit toggle when a runId is present", () => {
+    render(<PrCard message={{ ...base, body: "🔶 held — PR #7", metadata: { outcome: "held_for_human", prNumber: 7, runId: "run1" } } as Message} />);
+    expect(screen.getByRole("button", { name: /^edit$/i })).toBeInTheDocument();
+  });
+
+  it("hides the Edit toggle when no runId is present", () => {
+    render(<PrCard message={{ ...base, body: "🔶 held — PR #7", metadata: { outcome: "held_for_human", prNumber: 7 } } as Message} />);
+    expect(screen.queryByRole("button", { name: /^edit$/i })).toBeNull();
+  });
+
+  it("editing the title and Save calls onUpdatePr with the patch", () => {
+    const onUpdatePr = vi.fn();
+    render(<PrCard message={{ ...base, body: "🔶 held — PR #7", metadata: { outcome: "held_for_human", prNumber: 7, runId: "run1" } } as Message} onUpdatePr={onUpdatePr} />);
+    fireEvent.click(screen.getByRole("button", { name: /^edit$/i }));
+    const titleInput = screen.getByLabelText(/title/i);
+    fireEvent.change(titleInput, { target: { value: "new title" } });
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(onUpdatePr).toHaveBeenCalledWith("run1", { title: "new title" });
+  });
+});
+
 describe("PrCard sync comments", () => {
   it("shows a Sync comments button when a runId is present", () => {
     render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} />);
