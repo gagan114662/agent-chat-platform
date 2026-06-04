@@ -16,11 +16,17 @@ chat→fusion→chat seam plus multi-thread navigation is implemented.
 - **Repo:** https://github.com/gagan114662/agent-chat-platform (private, owner `gagan114662`)
 - **Local path:** `/Users/gaganarora/Desktop/my projects/agent-chat-platform`
 - **`main`:** has Plan 1 + 2.0a + 2.0b merged. Suites green (orchestrator 14, app 19, web 7).
-- **Open PR:** **#4** `plan-2.1a-navigation` → `main` (nav). (PRs #2/#3 merged; #3 was auto-closed by
-  GitHub during the stacked merge but its code landed via local merge `ff99318`.)
-- **Next action:** review/merge **#4**, then continue Phase 2.1: **2.1b** (channel management, DMs,
-  message search, thread `createdAt`+ordering) or jump to **2.2** (real SSO/RBAC). To run live: bring up
-  the 2.0a stack (`services/app/README.md`) + `cd services/web && pnpm dev`.
+- **`main`:** Plan 1 + 2.0a + 2.0b + **2.1a** merged (PRs #1–#4). #3 was auto-closed during the stacked
+  merge but its code landed via local merge `ff99318`.
+- **Open PR:** **#5** `plan-2.1b-breadth` → `main` (channel create + thread ordering + message search).
+- **Next action:** review/merge **#5**, then **2.1c** (DMs — needs a member/principal model) or jump to
+  **2.2** (real SSO/RBAC). To run live: 2.0a stack (`services/app/README.md`) + `cd services/web && pnpm dev`.
+
+### Plan 2.1b — BUILT ✅ (PR #5)
+- Schema: `threads.createdAt` (migration `0001_special_malice.sql`), `listThreads` newest-first.
+- Backend: `createChannel` + `searchMessages` modules; `POST /channels`, `GET /search?q=` routes.
+- UI: `SearchBar` (header, jump-to-thread), channel-create in `Sidebar`, `App` wiring.
+- **Verified:** app 34/34, web 19/19, build clean, migration applied (prior suites still green).
 
 ### Plan 2.1a — BUILT ✅ (PR #4)
 - Backend `nav` module + routes (`GET /channels`, `GET /channels/:id/threads`, `POST .../threads`,

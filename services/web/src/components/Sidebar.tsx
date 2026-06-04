@@ -1,8 +1,9 @@
+import { useState } from "react";
 import type { Channel, Thread, Repo } from "../types.js";
 import { NewThreadForm } from "./NewThreadForm.js";
 
 export function Sidebar({
-  channels, threads, repos, activeThreadId, onSelectThread, onCreateThread,
+  channels, threads, repos, activeThreadId, onSelectThread, onCreateThread, onCreateChannel,
 }: {
   channels: Channel[];
   threads: Thread[];
@@ -10,7 +11,15 @@ export function Sidebar({
   activeThreadId: string | null;
   onSelectThread: (id: string) => void;
   onCreateThread: (title: string, repoId?: string) => void;
+  onCreateChannel: (name: string) => void;
 }) {
+  const [channelName, setChannelName] = useState("");
+  const createChannel = () => {
+    const n = channelName.trim();
+    if (!n) return;
+    onCreateChannel(n);
+    setChannelName("");
+  };
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-slate-50">
       <div className="px-4 py-4 text-sm font-semibold text-slate-700">Demo Workspace</div>
@@ -30,6 +39,16 @@ export function Sidebar({
           </div>
         ))}
       </nav>
+      <div className="flex gap-1 px-3 pt-2">
+        <input
+          value={channelName}
+          onChange={(e) => setChannelName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") createChannel(); }}
+          placeholder="New channel"
+          className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
+        />
+        <button onClick={createChannel} aria-label="create channel" className="rounded-md bg-slate-200 px-2 text-sm text-slate-600 hover:bg-slate-300">+</button>
+      </div>
       <NewThreadForm repos={repos} onCreate={onCreateThread} />
       <div className="px-4 py-3 text-xs text-slate-400">signed in as m1 · org o1 (dev stub)</div>
     </aside>

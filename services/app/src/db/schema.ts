@@ -51,6 +51,7 @@ export const threads = pgTable("threads", {
   channelId: text("channel_id").notNull(),
   title: text("title").notNull(),
   repoId: text("repo_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const messages = pgTable("messages", {

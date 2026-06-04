@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { listChannels, listThreads, listRepos, createThread } from "./nav.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel } from "./nav.js";
 import { orgs, workspaces, channels, threads, repos } from "../db/schema.js";
 
 const h = testDb();
@@ -37,5 +37,20 @@ describe("nav", () => {
   it("creates a thread with no repo", async () => {
     const t = await createThread(h.db, { orgId: "o1", channelId: "c1", title: "chatty" });
     expect(t.repoId).toBeNull();
+  });
+
+  it("lists threads newest-first by createdAt", async () => {
+    await h.db.insert(threads).values({ id: "told", orgId: "o1", channelId: "c1", title: "old", createdAt: new Date("2020-01-01T00:00:00Z") });
+    await h.db.insert(threads).values({ id: "tnew", orgId: "o1", channelId: "c1", title: "new", createdAt: new Date("2024-01-01T00:00:00Z") });
+    const list = await listThreads(h.db, "c1");
+    const ids = list.map((t) => t.id);
+    expect(ids.indexOf("tnew")).toBeLessThan(ids.indexOf("told"));
+  });
+
+  it("creates a channel in the org's workspace", async () => {
+    const c = await createChannel(h.db, { orgId: "o1", name: "random" });
+    expect(c.name).toBe("random");
+    expect(c.workspaceId).toBe("w1");
+    expect((await listChannels(h.db, "o1")).map((x) => x.name)).toContain("random");
   });
 });
