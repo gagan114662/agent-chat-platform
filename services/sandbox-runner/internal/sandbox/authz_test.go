@@ -17,6 +17,7 @@ func TestAdapterAuthorized(t *testing.T) {
 		{"", true},
 		{"fake", true},
 		{"claude-code", false},
+		{"codex", false}, // #63 codex is a non-fake adapter: default-deny without the allowlist (#38)
 	}
 	for _, c := range cases {
 		if got := adapterAuthorized(c.name); got != c.want {
@@ -39,6 +40,12 @@ func TestAdapterAuthorized(t *testing.T) {
 		if got := adapterAuthorized(c.name); got != c.want {
 			t.Errorf("adapterAuthorized(%q) = %v, want %v (allowlist set)", c.name, got, c.want)
 		}
+	}
+
+	// #63 codex passes the #38 gate once explicitly allowlisted.
+	t.Setenv("ACP_ALLOWED_ADAPTERS", "codex")
+	if !adapterAuthorized("codex") {
+		t.Errorf("adapterAuthorized(%q) = false, want true once allowlisted", "codex")
 	}
 }
 
