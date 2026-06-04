@@ -5,7 +5,7 @@ import { NewDmPicker } from "./NewDmPicker.js";
 
 export function Sidebar({
   channels, threads, dms, principals, repos, activeThreadId,
-  onSelectThread, onCreateThread, onCreateChannel, onStartDm,
+  onSelectThread, onCreateThread, onCreateChannel, onStartDm, canCreateChannel,
 }: {
   channels: Channel[];
   threads: Thread[];
@@ -17,6 +17,7 @@ export function Sidebar({
   onCreateThread: (title: string, repoId?: string) => void;
   onCreateChannel: (name: string) => void;
   onStartDm: (peerKind: "human" | "agent", peerId: string) => void;
+  canCreateChannel: boolean;
 }) {
   const [channelName, setChannelName] = useState("");
   const createChannel = () => {
@@ -50,16 +51,18 @@ export function Sidebar({
           <NewDmPicker principals={principals} onStartDm={onStartDm} />
         </div>
       </nav>
-      <div className="flex gap-1 px-3 pt-2">
-        <input
-          value={channelName}
-          onChange={(e) => setChannelName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") createChannel(); }}
-          placeholder="New channel"
-          className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
-        />
-        <button onClick={createChannel} aria-label="create channel" className="rounded-md bg-slate-200 px-2 text-sm text-slate-600 hover:bg-slate-300">+</button>
-      </div>
+      {canCreateChannel && (
+        <div className="flex gap-1 px-3 pt-2">
+          <input
+            value={channelName}
+            onChange={(e) => setChannelName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") createChannel(); }}
+            placeholder="New channel"
+            className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
+          />
+          <button onClick={createChannel} aria-label="create channel" className="rounded-md bg-slate-200 px-2 text-sm text-slate-600 hover:bg-slate-300">+</button>
+        </div>
+      )}
       <NewThreadForm repos={repos} onCreate={onCreateThread} />
       <div className="px-4 py-3 text-xs text-slate-400">signed in as m1 · org o1 (dev stub)</div>
     </aside>
