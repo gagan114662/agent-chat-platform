@@ -33,6 +33,7 @@ func TestHandleRun(t *testing.T) {
 
 func TestHandleRunUnknownAdapter(t *testing.T) {
 	t.Setenv("ACP_ALLOW_FILE_REPO", "1") // test fixture clones from a local bare repo via file://
+	t.Setenv("ACP_ALLOWED_ADAPTERS", "nope") // pass the authz gate so we exercise the unknown-adapter (400) path
 	src := makeBareRepoWithCommit(t)
 	body, _ := json.Marshal(map[string]string{
 		"repoUrl": "file://" + src, "baseBranch": "main", "intent": "x", "branch": "feature/z", "adapter": "nope",
