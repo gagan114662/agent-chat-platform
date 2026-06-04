@@ -24,7 +24,7 @@ describe("auth routes", () => {
 
     const me = await app.inject({ method: "GET", url: "/auth/me", headers: { authorization: `Bearer ${token}` } });
     expect(me.statusCode).toBe(200);
-    expect(me.json()).toEqual({ orgId: "o1", userId: "m1" });
+    expect(me.json()).toEqual({ orgId: "o1", userId: "m1", role: "member" });
 
     await app.inject({ method: "POST", url: "/auth/logout", headers: { authorization: `Bearer ${token}` } });
     const me2 = await app.inject({ method: "GET", url: "/auth/me", headers: { authorization: `Bearer ${token}` } });

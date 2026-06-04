@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import Fastify from "fastify";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { registerNavRoutes } from "./nav-routes.js";
-import { orgs, workspaces, channels, repos } from "../db/schema.js";
+import { orgs, workspaces, channels, repos, members } from "../db/schema.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
@@ -19,6 +19,8 @@ beforeEach(async () => {
   await h.db.insert(workspaces).values({ id: "w1", orgId: "o1", name: "W" });
   await h.db.insert(channels).values({ id: "c1", orgId: "o1", workspaceId: "w1", name: "general" });
   await h.db.insert(repos).values({ id: "r1", orgId: "o1", workspaceId: "w1", githubOwner: "o", githubName: "r", defaultBranch: "main", tokenEnvVar: "E2E_GITHUB_TOKEN" });
+  await h.db.insert(members).values({ id: "m1", orgId: "o1", workspaceId: "w1", displayName: "You", role: "admin" });
+  await h.db.insert(members).values({ id: "reg", orgId: "o1", workspaceId: "w1", displayName: "Reg", role: "member" });
 });
 
 describe("nav routes", () => {
@@ -71,6 +73,17 @@ describe("nav routes", () => {
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().name).toBe("random");
+    await app.close();
+  });
+
+  it("POST /channels as a non-admin is 403", async () => {
+    const app = makeApp();
+    const res = await app.inject({
+      method: "POST", url: "/channels",
+      headers: { "x-org-id": "o1", "x-user-id": "reg", "content-type": "application/json" },
+      payload: { name: "nope" },
+    });
+    expect(res.statusCode).toBe(403);
     await app.close();
   });
 

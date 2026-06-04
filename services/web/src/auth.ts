@@ -12,7 +12,7 @@ export function authHeaders(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : { ...DEV_HEADERS };
 }
 
-export interface Principal { orgId: string; userId: string; }
+export interface Principal { orgId: string; userId: string; role?: "admin" | "member"; }
 export interface LoginMember { id: string; displayName: string; orgId: string; }
 
 export async function listLoginMembers(): Promise<LoginMember[]> {

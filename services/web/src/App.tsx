@@ -13,10 +13,10 @@ export function App() {
   const { principal, loading, login, logout } = useAuth();
   if (loading) return <div className="flex h-screen items-center justify-center text-sm text-slate-400">Loading…</div>;
   if (!principal) return <LoginScreen onLogin={login} />;
-  return <Workspace onLogout={logout} userId={principal.userId} />;
+  return <Workspace onLogout={logout} userId={principal.userId} role={principal.role ?? "member"} />;
 }
 
-function Workspace({ onLogout, userId }: { onLogout: () => void; userId: string }) {
+function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: string; role: "admin" | "member" }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -70,6 +70,7 @@ function Workspace({ onLogout, userId }: { onLogout: () => void; userId: string 
         onCreateThread={onCreateThread}
         onCreateChannel={onCreateChannel}
         onStartDm={onStartDm}
+        canCreateChannel={role === "admin"}
       />
       <main className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
