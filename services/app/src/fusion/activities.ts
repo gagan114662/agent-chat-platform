@@ -6,6 +6,8 @@ import type { Autonomy } from "@acp/orchestrator/policy/policy.js";
 import { makeDb } from "../db/client.js";
 import { makeFusionSink, type SinkCtx } from "./events.js";
 import { buildMergeGate } from "./gate.js";
+import { reporterFromEnv } from "../billing/billing.js";
+import { reportRunUsage } from "../billing/report.js";
 
 export interface RunFusionActivityInput {
   owner: string; repo: string; repoUrl: string; baseBranch: string;
@@ -22,7 +24,9 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
     const deps = { sandbox: new SandboxRunnerClient(input.sandboxUrl), github };
     const sink = makeFusionSink(db, sql, input.sink);
     const mergeGate = buildMergeGate(github, { owner: input.owner, repo: input.repo, autonomy: input.autonomy });
-    return await runFusionTraced(deps, input, { pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink, mergeGate });
+    const result = await runFusionTraced(deps, input, { pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink, mergeGate });
+    await reportRunUsage(db, reporterFromEnv(), { orgId: input.sink.orgId, runId: input.sink.runId, outcome: result.outcome });
+    return result;
   } finally {
     await sql.end();
   }
