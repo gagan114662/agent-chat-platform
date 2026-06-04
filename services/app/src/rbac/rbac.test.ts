@@ -44,6 +44,12 @@ describe("rbac", () => {
     expect(can("member", "memory:write:org")).toBe(false);
     expect(can("admin", "memory:write:org")).toBe(true);
   });
+
+  it("team:manage is admin-only (#79)", () => {
+    expect(can("admin", "team:manage")).toBe(true);
+    expect(can("member", "team:manage")).toBe(false);
+    expect(can("viewer", "team:manage")).toBe(false);
+  });
   it("roleOf reads the member role, defaults to member for unknown", async () => {
     expect(await roleOf(h.db, "adm", "o1")).toBe("admin");
     expect(await roleOf(h.db, "reg", "o1")).toBe("member");

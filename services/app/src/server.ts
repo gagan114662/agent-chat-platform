@@ -9,6 +9,7 @@ import { registerTaskRoutes } from "./http/task-routes.js";
 import { registerFanoutRoutes } from "./http/fanout-routes.js";
 import { registerSelectRoutes } from "./http/select-routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
+import { registerTeamRoutes } from "./http/team-routes.js";
 import { registerNotifyRoutes } from "./http/notify-routes.js";
 import { registerDmRoutes } from "./http/dm-routes.js";
 import { registerMemoryRoutes } from "./http/memory-routes.js";
@@ -75,6 +76,7 @@ export async function buildServer() {
   registerFanoutRoutes(app, { db, sql, temporal, sandboxUrl });
   registerSelectRoutes(app, { db, sql });
   registerNavRoutes(app, { db });
+  registerTeamRoutes(app, { db });
   registerNotifyRoutes(app, { db });
   registerDmRoutes(app, { db });
   registerMemoryRoutes(app, { db });
@@ -113,6 +115,7 @@ export async function buildServer() {
           !req.url.startsWith("/auth") &&
           !req.url.startsWith("/threads") &&
           !req.url.startsWith("/channels") &&
+          !req.url.startsWith("/teams") &&
           !req.url.startsWith("/runs") &&
           !req.url.startsWith("/tasks") &&
           !req.url.startsWith("/goals") &&
