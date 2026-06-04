@@ -3,6 +3,7 @@ import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
 import { listChannels, listThreads, listRepos, createThread, createChannel } from "../nav/nav.js";
 import { searchMessages } from "../search/search.js";
+import { roleOf, can } from "../rbac/rbac.js";
 
 export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
   app.get("/channels", async (req) => listChannels(d.db, actor(req).orgId));
@@ -28,7 +29,10 @@ export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
 
   app.post("/channels", async (req, reply) => {
     const { name } = req.body as { name: string };
-    const { orgId } = actor(req);
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId), "channel:create")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
     if (!name?.trim()) return reply.code(400).send({ error: "name required" });
     const channel = await createChannel(d.db, { orgId, name: name.trim() });
     return reply.code(201).send(channel);
