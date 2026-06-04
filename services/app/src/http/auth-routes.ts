@@ -3,6 +3,7 @@ import type { DB } from "../db/client.js";
 import { createSession, resolveSession, deleteSession, listMembersForLogin, verifyCredentials } from "../auth/auth.js";
 import { roleOf } from "../rbac/rbac.js";
 import { devHeadersAllowed } from "../auth/dev-mode.js";
+import { resolveApiKey } from "../auth/api-keys.js";
 import { issueWsTicket } from "../realtime/ws-tickets.js";
 import { allow } from "../auth/rate-limit.js";
 
@@ -19,8 +20,16 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
   app.addHook("preHandler", async (req, reply) => {
     const token = bearer(req);
     if (token) {
-      const p = await resolveSession(d.db, token);
-      if (p) req.principal = p;
+      // #83 api keys: an `acp_`-prefixed bearer resolves as an API-key principal
+      // (revocable, org-scoped) BEFORE session resolution. An invalid/revoked key
+      // yields no principal → falls through → #37 fail-closed default-deny.
+      if (token.startsWith("acp_")) {
+        const p = await resolveApiKey(d.db, token);
+        if (p) req.principal = p;
+      } else {
+        const p = await resolveSession(d.db, token);
+        if (p) req.principal = p;
+      }
     }
     if (!devHeadersAllowed() && !req.principal) {
       // strip query string for the public-path check

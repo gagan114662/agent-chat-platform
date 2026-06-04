@@ -3,7 +3,7 @@ import { devHeadersAllowed } from "../auth/dev-mode.js";
 
 declare module "fastify" {
   interface FastifyRequest {
-    principal?: { orgId: string; userId: string };
+    principal?: { orgId: string; userId: string; scopes?: Record<string, unknown> };
   }
 }
 
