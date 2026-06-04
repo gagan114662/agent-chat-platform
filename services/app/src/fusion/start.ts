@@ -27,6 +27,10 @@ export interface StartFusionRunInput {
   // the parent's depth + 1. Threaded into the sink ctx so when this run later
   // authors a coordinating @mention it can pass its own depth (bounded by MAX_DEPTH).
   mentionDepth?: number;
+  // #53 stacked PRs: when set, the fusion PR bases on this branch instead of the
+  // repo default branch — so a child (hand-off) run stacks on its parent's branch
+  // (`agent/<parentRunId>`). Defaults to the repo default branch (flat behavior).
+  baseBranchOverride?: string;
 }
 
 // Shared starter: builds the RunFusionActivityInput and kicks off the fusion workflow.
@@ -35,7 +39,7 @@ export interface StartFusionRunInput {
 export async function startFusionRun(temporal: Client, i: StartFusionRunInput) {
   await startRun(temporal, i.run.workflowId, {
     owner: i.repo.githubOwner, repo: i.repo.githubName,
-    baseBranch: i.repo.defaultBranch, intent: i.intent, branch: `agent/${i.run.id}`,
+    baseBranch: i.baseBranchOverride ?? i.repo.defaultBranch, intent: i.intent, branch: `agent/${i.run.id}`,
     tokenEnvVar: i.repo.tokenEnvVar, sandboxUrl: i.sandboxUrl, pollMs: 5000, maxPolls: 24,
     autonomy: (i.repo.autonomy as "monitor-only" | "resolve-ci" | "autopilot-merge"),
     planMode: i.planMode ?? false,
