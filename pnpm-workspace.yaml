@@ -2,3 +2,4 @@ packages:
   - "services/orchestrator"
   - "services/app"
   - "services/web"
+  - "services/landing"
