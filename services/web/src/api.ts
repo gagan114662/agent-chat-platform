@@ -56,6 +56,18 @@ export async function runDiff(runId: string): Promise<ChangedFile[]> {
   return res.json();
 }
 
+export interface FileContent {
+  content: string;
+  encoding: "utf8" | "base64";
+  size: number;
+}
+
+export async function runFile(runId: string, path: string): Promise<FileContent> {
+  const res = await fetch(`/runs/${runId}/file?path=${encodeURIComponent(path)}`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`runFile ${res.status}`);
+  return res.json();
+}
+
 export async function syncPrComments(runId: string): Promise<{ synced: number }> {
   const res = await fetch(`/runs/${runId}/sync-comments`, { method: "POST", headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`syncPrComments ${res.status}`);
