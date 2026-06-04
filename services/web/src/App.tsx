@@ -4,21 +4,25 @@ import { ThreadView } from "./components/ThreadView.js";
 import { Composer } from "./components/Composer.js";
 import { SearchBar } from "./components/SearchBar.js";
 import { useThreadStream } from "./useThreadStream.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages } from "./api.js";
-import type { Channel, Thread, Repo } from "./types.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm } from "./api.js";
+import type { Channel, Thread, Repo, Principal } from "./types.js";
 
 export function App() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [dms, setDms] = useState<Thread[]>([]);
+  const [principals, setPrincipals] = useState<Principal[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
   // Load channels + repos once, then threads for each channel.
   useEffect(() => {
     (async () => {
-      const [chs, rps] = await Promise.all([listChannels(), listRepos()]);
+      const [chs, rps, ps, dmList] = await Promise.all([listChannels(), listRepos(), listPrincipals(), listDms()]);
       setChannels(chs);
       setRepos(rps);
+      setPrincipals(ps);
+      setDms(dmList);
       const all = (await Promise.all(chs.map((c) => listThreads(c.id)))).flat();
       setThreads(all);
       setActiveThreadId((cur) => cur ?? all[0]?.id ?? null);
@@ -38,22 +42,31 @@ export function App() {
     setChannels((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
   };
 
+  const onStartDm = async (peerKind: "human" | "agent", peerId: string) => {
+    const t = await startDm(peerKind, peerId);
+    setDms((prev) => prev.some((d) => d.id === t.id) ? prev : [t, ...prev]);
+    setActiveThreadId(t.id);
+  };
+
   return (
     <div className="flex h-screen bg-white text-slate-900">
       <Sidebar
         channels={channels}
         threads={threads}
+        dms={dms}
+        principals={principals}
         repos={repos}
         activeThreadId={activeThreadId}
         onSelectThread={setActiveThreadId}
         onCreateThread={onCreateThread}
         onCreateChannel={onCreateChannel}
+        onStartDm={onStartDm}
       />
       <main className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <div>
             <h1 className="text-sm font-semibold text-slate-700">
-              {threads.find((t) => t.id === activeThreadId)?.title ?? "No thread selected"}
+              {[...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected"}
             </h1>
             <p className="text-xs text-slate-400">chat → sandboxed agent → PR → back to chat</p>
           </div>

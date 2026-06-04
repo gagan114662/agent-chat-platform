@@ -17,7 +17,18 @@ export interface Message {
 export const DEV_HEADERS = { "x-org-id": "o1", "x-user-id": "m1" } as const;
 
 export interface Channel { id: string; orgId: string; workspaceId: string; name: string; }
-export interface Thread { id: string; orgId: string; channelId: string; title: string; repoId: string | null; }
+export interface Thread {
+  id: string;
+  orgId: string;
+  channelId: string | null;
+  title: string;
+  repoId: string | null;
+  kind: "channel" | "dm";
+  dmPeerKind?: "human" | "agent" | null;
+  dmPeerId?: string | null;
+}
+
+export interface Principal { kind: "human" | "agent"; id: string; name: string; }
 export interface Repo {
   id: string; orgId: string; workspaceId: string;
   githubOwner: string; githubName: string; defaultBranch: string; tokenEnvVar: string;

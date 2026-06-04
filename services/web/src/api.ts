@@ -1,4 +1,4 @@
-import type { Message, Channel, Thread, Repo, SearchResult } from "./types.js";
+import type { Message, Channel, Thread, Repo, SearchResult, Principal } from "./types.js";
 import { DEV_HEADERS } from "./types.js";
 
 export async function listMessages(threadId: string): Promise<Message[]> {
@@ -58,5 +58,27 @@ export async function createChannel(name: string): Promise<Channel> {
 export async function searchMessages(q: string): Promise<SearchResult[]> {
   const res = await fetch(`/search?q=${encodeURIComponent(q)}`, { headers: { ...DEV_HEADERS } });
   if (!res.ok) throw new Error(`searchMessages ${res.status}`);
+  return res.json();
+}
+
+export async function listPrincipals(): Promise<Principal[]> {
+  const res = await fetch(`/principals`, { headers: { ...DEV_HEADERS } });
+  if (!res.ok) throw new Error(`listPrincipals ${res.status}`);
+  return res.json();
+}
+
+export async function listDms(): Promise<Thread[]> {
+  const res = await fetch(`/dms`, { headers: { ...DEV_HEADERS } });
+  if (!res.ok) throw new Error(`listDms ${res.status}`);
+  return res.json();
+}
+
+export async function startDm(peerKind: "human" | "agent", peerId: string): Promise<Thread> {
+  const res = await fetch(`/dms`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...DEV_HEADERS },
+    body: JSON.stringify({ peerKind, peerId }),
+  });
+  if (!res.ok) throw new Error(`startDm ${res.status}`);
   return res.json();
 }

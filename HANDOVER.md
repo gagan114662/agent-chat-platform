@@ -18,9 +18,17 @@ chat→fusion→chat seam plus multi-thread navigation is implemented.
 - **`main`:** has Plan 1 + 2.0a + 2.0b merged. Suites green (orchestrator 14, app 19, web 7).
 - **`main`:** Plan 1 + 2.0a + 2.0b + **2.1a** merged (PRs #1–#4). #3 was auto-closed during the stacked
   merge but its code landed via local merge `ff99318`.
-- **Open PR:** **#5** `plan-2.1b-breadth` → `main` (channel create + thread ordering + message search).
-- **Next action:** review/merge **#5**, then **2.1c** (DMs — needs a member/principal model) or jump to
-  **2.2** (real SSO/RBAC). To run live: 2.0a stack (`services/app/README.md`) + `cd services/web && pnpm dev`.
+- **Open PR:** **#6** `plan-2.1c-dms` → `main` (direct messages). (#5 merged.)
+- **Next action:** review/merge **#6** — that completes **Phase 2.1** (a nav + b breadth + c DMs).
+  Then **Phase 2.2** (real SSO + human/agent RBAC, replacing the dev-header stub) or **2.3**
+  (NATS event backbone, presence, Postgres RLS enforcement, K8s). To run live: 2.0a stack
+  (`services/app/README.md`) + `cd services/web && pnpm dev`.
+
+### Plan 2.1c — BUILT ✅ (PR #6)
+- Schema (migration `0002_messy_the_hand.sql`): `threads.channelId` nullable + `kind`/`dmPeerKind`/`dmPeerId`.
+- Backend `dm` module (`listPrincipals` excl. self, `getOrCreateDm` idempotent, `listDms`) + routes
+  (`GET /principals`, `GET /dms`, `POST /dms`). UI: Direct Messages sidebar section + `NewDmPicker`.
+- **Verified:** app 40/40, web 23/23, build clean. DMs are pure chat (no repo → no fusion); one dev user.
 
 ### Plan 2.1b — BUILT ✅ (PR #5)
 - Schema: `threads.createdAt` (migration `0001_special_malice.sql`), `listThreads` newest-first.

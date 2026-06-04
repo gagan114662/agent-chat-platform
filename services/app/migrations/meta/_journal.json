@@ -15,6 +15,13 @@
       "when": 1780575286569,
       "tag": "0001_special_malice",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780576001409,
+      "tag": "0002_messy_the_hand",
+      "breakpoints": true
     }
   ]
 }

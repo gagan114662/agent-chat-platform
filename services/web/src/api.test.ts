@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { listChannels, listThreads, createThread, listRepos } from "./api.js";
 import { createChannel, searchMessages } from "./api.js";
+import { listPrincipals, listDms, startDm } from "./api.js";
 
 beforeEach(() => vi.restoreAllMocks());
 
@@ -48,5 +49,20 @@ describe("channel + search api", () => {
     vi.stubGlobal("fetch", f);
     await searchMessages("login bug");
     expect((f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("/search?q=login%20bug");
+  });
+});
+
+describe("dm api", () => {
+  it("listPrincipals parses the array", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [{ kind: "agent", id: "a1", name: "Coder" }] })) as unknown as typeof fetch);
+    expect((await listPrincipals()).map((p) => p.id)).toEqual(["a1"]);
+  });
+  it("startDm posts peerKind + peerId", async () => {
+    const f = vi.fn(async () => ({ ok: true, status: 201, json: async () => ({ id: "dm1", kind: "dm", title: "Coder" }) })) as unknown as typeof fetch;
+    vi.stubGlobal("fetch", f);
+    const t = await startDm("agent", "a1");
+    expect(t.id).toBe("dm1");
+    const init = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({ peerKind: "agent", peerId: "a1" });
   });
 });
