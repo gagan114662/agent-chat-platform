@@ -11,6 +11,8 @@ export default defineConfig({
       "/channels": { target: "http://localhost:8080", changeOrigin: true },
       "/repos": { target: "http://localhost:8080", changeOrigin: true },
       "/search": { target: "http://localhost:8080", changeOrigin: true },
+      "/unreads": { target: "http://localhost:8080", changeOrigin: true },
+      "/inbox": { target: "http://localhost:8080", changeOrigin: true },
       "/principals": { target: "http://localhost:8080", changeOrigin: true },
       "/dms": { target: "http://localhost:8080", changeOrigin: true },
       "/memory": { target: "http://localhost:8080", changeOrigin: true },

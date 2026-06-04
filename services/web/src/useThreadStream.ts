@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { Message } from "./types.js";
 import { listMessages, postMessage, getWsTicket } from "./api.js";
 
-export function useThreadStream(threadId: string) {
+export function useThreadStream(threadId: string, onLiveMessage?: () => void) {
   const [messages, setMessages] = useState<Message[]>([]);
   const seen = useRef<Set<string>>(new Set());
+  const onLive = useRef(onLiveMessage);
+  onLive.current = onLiveMessage;
 
   const append = (m: Message) => {
     if (seen.current.has(m.id)) return;
@@ -31,7 +33,7 @@ export function useThreadStream(threadId: string) {
       const q = `threadId=${encodeURIComponent(threadId)}${ticket ? `&ticket=${encodeURIComponent(ticket)}` : ""}`;
       ws = new WebSocket(`${proto}://${location.host}/ws?${q}`);
       ws.onmessage = (e) => {
-        try { append(JSON.parse(e.data) as Message); } catch { /* ignore non-JSON */ }
+        try { append(JSON.parse(e.data) as Message); onLive.current?.(); } catch { /* ignore non-JSON */ }
       };
     }).catch(() => {});
 
