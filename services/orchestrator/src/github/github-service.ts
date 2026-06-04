@@ -28,4 +28,11 @@ export interface GitHubService {
   getCheckFailureContext(owner: string, repo: string, ref: string): Promise<string>;
   // Lists the PR review comments (the request-changes inflow), pulled on demand into the thread.
   listReviewComments(owner: string, repo: string, prNumber: number): Promise<ReviewComment[]>;
+  // Edits a PR's title/body and/or switches its base branch. Only the provided fields are sent.
+  updatePr(
+    owner: string,
+    repo: string,
+    prNumber: number,
+    patch: { title?: string; body?: string; base?: string }
+  ): Promise<void>;
 }

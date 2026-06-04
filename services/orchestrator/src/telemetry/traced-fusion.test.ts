@@ -28,6 +28,7 @@ function deps(checks: ChecksStatus[]) {
     getChangedFiles: vi.fn().mockResolvedValue([]),
     getCheckFailureContext: vi.fn().mockResolvedValue("ci: lint failed"),
     listReviewComments: vi.fn().mockResolvedValue([]),
+    updatePr: vi.fn().mockResolvedValue(undefined),
   };
   return { sandbox, github };
 }
