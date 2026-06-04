@@ -12,7 +12,8 @@ var bareTokenRes = []*regexp.Regexp{
 	regexp.MustCompile(`x-access-token:[^@\s/]+`),
 	regexp.MustCompile(`gh[pousr]_[0-9A-Za-z]+`),
 	regexp.MustCompile(`github_pat_[0-9A-Za-z_]+`),
-	regexp.MustCompile(`Bearer\s+[\w.\-]+`),
+	regexp.MustCompile(`(?i)Bearer\s+[^\s,;]+`),
+	regexp.MustCompile(`(?i)token\s+[^\s,;]+`),
 	regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
 }
 
