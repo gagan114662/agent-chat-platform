@@ -8,33 +8,46 @@
 ## TL;DR — where we are
 
 Building **agent-chat-platform**: a chat-driven AI agent execution platform (Slack-for-AI-agents
-fused with conductor.build-style sandboxed execution → GitHub PRs). The **design spec is
-complete and approved**, **Plan 1 + Plan 2.0 (a backend + b UI) are COMPLETE and merged to `main`**
-(Plan 1 live-proven). **Plan 2.1a (channels & threads navigation) is BUILT (PR #4 open).** The full
-chat→fusion→chat seam plus multi-thread navigation is implemented.
+fused with conductor.build-style sandboxed execution → GitHub PRs). **The entire software-buildable
+roadmap is COMPLETE and merged to `main`** (13 PRs, #1–#13). Plan 1 was live-proven against real GitHub.
 
 - **Repo:** https://github.com/gagan114662/agent-chat-platform (private, owner `gagan114662`)
 - **Local path:** `/Users/gaganarora/Desktop/my projects/agent-chat-platform`
-- **`main`:** has Plan 1 + 2.0a + 2.0b merged. Suites green (orchestrator 14, app 19, web 7).
-- **`main`:** Plan 1 + 2.0a + 2.0b + **2.1a** merged (PRs #1–#4). #3 was auto-closed during the stacked
-  merge but its code landed via local merge `ff99318`.
-- **Phase 2.1 merged** (a nav + b breadth + c DMs). **Phase 2.2a (session auth) BUILT — PR #7 open.**
-- **Open PR:** **#7** `plan-2.2a-auth` → `main` (session-based auth backbone).
-- **Next action:** review/merge **#7**, then **2.2b** (RBAC: human/agent permission checks on routes) and
-  **2.2c** (passwords/SSO + **lock down the dev-header fallback** — see gap below). Then **2.3** (NATS,
-  presence, Postgres RLS, K8s). To run live: 2.0a stack (`services/app/README.md`) + `cd services/web && pnpm dev`
-  (the UI now shows a login screen; sign in as a seeded member).
+- **`main` — all green:** Go (3 pkgs build/vet/test), orchestrator **31**, app **57**, web **30**, all tsc clean, web build ok.
+- **No open PRs.** Everything below is merged.
 
-### Plan 2.2a — BUILT ✅ (PR #7)
-- Opaque server-side sessions (migration `0003_kind_lila_cheney.sql`): `POST /auth/login|logout`,
-  `GET /auth/me|members`; preHandler resolves `Bearer <token>` → `req.principal`; `actor()` returns it
-  or the dev-header fallback. Web: `authHeaders()` (bearer), `useAuth`, `LoginScreen`, `App` gate.
-- **Verified:** app 48/48, web 29/29, build clean; security-reviewed (opaque token, expiry+logout
-  revocation, preHandler covers all routes, web gate blocks on 401). Existing header-path tests intact.
-- **⚠️ Enforcement gap (deferred to 2.2c):** the dev-header fallback means an unauthenticated request
-  still resolves to `o1/m1` — routes are NOT yet enforced. Session takes precedence when present.
-  `GET /auth/members` is unauthenticated + cross-org (dev picker). WS endpoint isn't bearer-authed. Lock
-  these down in 2.2c (reject unauth in prod; scope `/auth/members`; authenticate WS).
+### Shipped (all merged to `main`)
+| PR | Plan | What |
+|---|---|---|
+| #1 | 1 | Fusion engine walking skeleton (intent→sandbox→agent→PR→auto-merge), **live-proven** |
+| #2/#3 | 2.0a/b | Chat+Tasks backend (mention→fusion→thread, agents-as-principals) + React UI |
+| #4 | 2.1a | Channels & threads navigation |
+| #5 | 2.1b | Channel creation, thread ordering, message search |
+| #6 | 2.1c | Direct messages |
+| #7 | 2.2a | Session-based auth (opaque tokens, login gate) |
+| #8 | 2.2b | RBAC (member roles, admin-only channel creation) |
+| #9 | 2.2c | Auth lockdown (`AUTH_REQUIRE_SESSION` enforcement, WS auth, password login) |
+| #10 | 3a | Sandbox-runner hardening (credential redaction, input validation, timeouts, ctx, graceful shutdown) |
+| #11 | 4a | Risk router + merge-policy engine + QA-for-UI gate (orchestrator core) |
+| #12 | 5 | Open adapter SDK + registry |
+| #13 | 6 | OpenTelemetry tracing for the fusion run |
+
+### Remaining — INFRA-BOUND or WIRING follow-ups (not software-buildable in a local sandbox)
+These need a cluster / external provider / a cross-cutting rewrite and were deliberately NOT built:
+- **Postgres RLS enforcement** — `FORCE ROW LEVEL SECURITY` keyed on `org_id` requires routing every
+  query through an org-scoped GUC transaction; it would break the current query path. Needs its own
+  data-layer plan (app-level `org_id` filtering is in place today).
+- **K8s namespace isolation + gVisor/Kata runtime** (Plan 3 infra) — needs a real cluster + node runtime.
+- **NATS event backbone + presence** (2.3) — needs a NATS server (Docker daemon won't boot in this sandbox;
+  realtime currently uses Postgres `LISTEN/NOTIFY`, which works for one process).
+- **Real OAuth/SSO** (2.2c) — needs an external IdP (password login + opaque sessions are built).
+- **Trace export + metrics + dashboards/billing** (Plan 6) — need an OTLP collector/Honeycomb + meter
+  provider + billing provider (in-process tracing spans are built).
+- **WIRING follow-ups (software, deferrable):** 4b — wire the risk/policy/QA engine into the app activity
+  (a `repos.autonomy` column + `held_for_human` thread card); real browser-QA execution via the `/browse`
+  harness; registry-driven adapter selection in `Run`; real CLI-wrapping adapters (Claude Code/Codex/…).
+
+To run the whole stack live: `services/app/README.md` (Postgres + Temporal + sandbox-runner) + `cd services/web && pnpm dev`. Set `AUTH_REQUIRE_SESSION=true` (with seeded passwords) for enforced auth.
 
 ### Plan 2.1c — BUILT ✅ (PR #6)
 - Schema (migration `0002_messy_the_hand.sql`): `threads.channelId` nullable + `kind`/`dmPeerKind`/`dmPeerId`.
