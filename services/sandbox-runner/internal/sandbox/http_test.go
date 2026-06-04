@@ -30,6 +30,19 @@ func TestHandleRun(t *testing.T) {
 	}
 }
 
+func TestHandleRunUnknownAdapter(t *testing.T) {
+	src := makeBareRepoWithCommit(t)
+	body, _ := json.Marshal(map[string]string{
+		"repoUrl": "file://" + src, "baseBranch": "main", "intent": "x", "branch": "feature/z", "adapter": "nope",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/run", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	NewHandler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown adapter, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandleRunRejectsUnknownField(t *testing.T) {
 	body := []byte(`{"repoUrl":"https://h/r","baseBranch":"main","intent":"x","branch":"b","bogus":1}`)
 	req := httptest.NewRequest(http.MethodPost, "/run", bytes.NewReader(body))

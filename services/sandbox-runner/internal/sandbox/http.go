@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/gagan114662/agent-chat-platform/sandbox-runner/adapter"
 )
 
 // NewHandler returns the sandbox-runner HTTP mux.
@@ -30,7 +32,23 @@ func NewHandler() http.Handler {
 		defer os.RemoveAll(work)
 		req.WorkDir = filepath.Join(work, "repo")
 
-		res, err := Run(r.Context(), req, FakeAgent{})
+		name := req.Adapter
+		if name == "" {
+			name = "fake"
+		}
+		factory, ok := adapter.DefaultRegistry().Get(name)
+		if !ok {
+			http.Error(w, "unknown adapter: "+name, http.StatusBadRequest)
+			return
+		}
+		ad := factory()
+		if err := ad.Prepare(r.Context(), adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Intent}); err != nil {
+			http.Error(w, redactCreds(err.Error()), http.StatusBadRequest)
+			return
+		}
+		var ag Agent = adapter.AsAgent(ad)
+
+		res, err := Run(r.Context(), req, ag)
 		if err != nil {
 			http.Error(w, redactCreds(err.Error()), http.StatusInternalServerError)
 			return

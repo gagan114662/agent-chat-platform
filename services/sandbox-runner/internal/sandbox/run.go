@@ -13,6 +13,7 @@ type RunRequest struct {
 	BaseBranch string `json:"baseBranch"`
 	Intent     string `json:"intent"`
 	Branch     string `json:"branch"`
+	Adapter    string `json:"adapter"`
 	WorkDir    string `json:"-"`
 }
 
