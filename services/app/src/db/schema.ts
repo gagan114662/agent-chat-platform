@@ -27,6 +27,7 @@ export const members = pgTable("members", {
   workspaceId: text("workspace_id").notNull(),
   displayName: text("display_name").notNull(),
   role: text("role").notNull().default("member"), // 'admin' | 'member'
+  passwordHash: text("password_hash"),
 });
 
 export const agents = pgTable("agents", {
