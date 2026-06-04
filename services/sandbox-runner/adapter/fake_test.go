@@ -1,0 +1,36 @@
+package adapter
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestFakeAdapter(t *testing.T) {
+	a := NewFakeAdapter()
+	id := a.Identify()
+	if id.Name != "fake" || !id.Has(CanEditCode) {
+		t.Fatalf("bad identity: %+v", id)
+	}
+	dir := t.TempDir()
+	var events []EventType
+	err := a.Run(context.Background(), dir, "add a greeting", func(e Event) { events = append(events, e.Type) })
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "AGENT_CHANGES.md"))
+	if err != nil || !strings.Contains(string(b), "add a greeting") {
+		t.Fatalf("expected change file with intent, got %q err %v", b, err)
+	}
+	// emits at least a file_changed and a done
+	var hasFile, hasDone bool
+	for _, e := range events {
+		hasFile = hasFile || e == EventFileChanged
+		hasDone = hasDone || e == EventDone
+	}
+	if !hasFile || !hasDone {
+		t.Fatalf("expected file_changed + done events, got %v", events)
+	}
+}
