@@ -9,6 +9,18 @@ import { buildMergeGate } from "./gate.js";
 import { reporterFromEnv } from "../billing/billing.js";
 import { reportRunUsage } from "../billing/report.js";
 import { captureDecision } from "../memory/capture.js";
+import { recallForIntent, formatRecall } from "../memory/memory.js";
+import type { DB } from "../db/client.js";
+
+// Augments the intent the AGENT sees with a recalled-context preamble so prior
+// org decisions/facts inform a new run. The FIRST line stays the original task
+// (so the orchestrator PR title — first line only — remains clean). Returns the
+// original intent unchanged when there's no matching memory. Org-scoped.
+export async function buildAgentIntent(db: DB, orgId: string, intent: string): Promise<string> {
+  const recalled = await recallForIntent(db, orgId, intent);
+  const preamble = formatRecall(recalled);
+  return preamble ? `${intent}\n\n${preamble}` : intent;
+}
 
 export interface RunFusionActivityInput {
   owner: string; repo: string; baseBranch: string;
@@ -37,9 +49,13 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
     const deps = { sandbox, github };
     const sink = makeFusionSink(db, sql, input.sink);
     const mergeGate = buildMergeGate(github, { owner: input.owner, repo: input.repo, autonomy: input.autonomy });
+    // #26: feed recalled org memory into the intent the agent sees (first line
+    // stays the original task → PR title stays clean). captureDecision below still
+    // records against the original input.intent.
+    const agentIntent = await buildAgentIntent(db, input.sink.orgId, input.intent);
     const fusionInput = {
       owner: input.owner, repo: input.repo, repoUrl,
-      baseBranch: input.baseBranch, intent: input.intent, branch: input.branch,
+      baseBranch: input.baseBranch, intent: agentIntent, branch: input.branch,
     };
     // Fix-on-red: on a red PR, re-run the agent on the same branch with the CI
     // failure as feedback. Bounded by CI_FIX_ATTEMPTS (default 2; 0 disables).

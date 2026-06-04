@@ -93,7 +93,7 @@ export async function runFusion(
     repo: input.repo,
     head: run.branch,
     base: input.baseBranch,
-    title: `agent: ${input.intent}`,
+    title: `agent: ${input.intent.split("\n")[0].slice(0, 72)}`,
     body: `Automated change for intent: ${input.intent}\n\nCommit: ${run.commitSha}`,
   });
   await emit({ type: "pr_opened", prNumber: pr.number, prUrl: pr.url });
