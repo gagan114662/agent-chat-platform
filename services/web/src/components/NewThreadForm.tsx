@@ -12,23 +12,23 @@ export function NewThreadForm({ repos, onCreate }: { repos: Repo[]; onCreate: (t
     setRepoId("");
   };
   return (
-    <div className="border-t border-slate-200 px-3 py-3">
+    <div className="border-t border-[#e7e7f0] px-3 py-3">
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="New thread title"
-        className="mb-2 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+        className="mb-2 w-full rounded-lg border border-[#e7e7f0] px-2 py-1.5 text-sm focus:border-neutral-800 focus:outline-none"
       />
       <select
         aria-label="repo"
         value={repoId}
         onChange={(e) => setRepoId(e.target.value)}
-        className="mb-2 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+        className="mb-2 w-full rounded-lg border border-[#e7e7f0] px-2 py-1.5 text-sm"
       >
         <option value="">No repo</option>
         {repos.map((r) => <option key={r.id} value={r.id}>{r.githubOwner}/{r.githubName}</option>)}
       </select>
-      <button onClick={submit} className="w-full rounded-md bg-indigo-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
+      <button onClick={submit} className="w-full rounded-lg bg-[#15151f] px-2 py-1.5 text-sm font-medium text-white hover:bg-black">
         Create thread
       </button>
     </div>

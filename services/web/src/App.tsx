@@ -11,7 +11,7 @@ import { LoginScreen } from "./components/LoginScreen.js";
 
 export function App() {
   const { principal, loading, login, logout } = useAuth();
-  if (loading) return <div className="flex h-screen items-center justify-center text-sm text-slate-400">Loading…</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center text-sm text-neutral-400">Loading…</div>;
   if (!principal) return <LoginScreen onLogin={login} />;
   return <Workspace onLogout={logout} userId={principal.userId} role={principal.role ?? "member"} />;
 }
@@ -58,7 +58,7 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
   };
 
   return (
-    <div className="flex h-screen bg-white text-slate-900">
+    <div className="flex h-screen bg-[#f0f0f7] text-[#2b2b2b]">
       <Sidebar
         channels={channels}
         threads={threads}
@@ -73,16 +73,16 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
         canCreateChannel={role === "admin"}
       />
       <main className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+        <header className="flex items-center justify-between border-b border-[#e7e7f0] bg-white px-4 py-3">
           <div>
-            <h1 className="text-sm font-semibold text-slate-700">
+            <h1 className="text-sm font-semibold text-neutral-800">
               {[...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected"}
             </h1>
-            <p className="text-xs text-slate-400">chat → sandboxed agent → PR → back to chat</p>
+            <p className="text-xs text-neutral-400">chat → sandboxed agent → PR → back to chat</p>
           </div>
           <div className="flex items-center gap-3">
             <SearchBar onSearch={searchMessages} onSelect={setActiveThreadId} />
-            <button onClick={onLogout} className="text-xs text-slate-400 hover:text-slate-600">Sign out ({userId})</button>
+            <button onClick={onLogout} className="text-xs text-neutral-500 hover:text-neutral-800">Sign out ({userId})</button>
           </div>
         </header>
         {activeThreadId
