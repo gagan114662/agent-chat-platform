@@ -44,4 +44,18 @@ describe("startFusionRun", () => {
     // branch (the child's own branch) is still its own run id, unchanged.
     expect(calls[0].input.branch).toBe("agent/r-child");
   });
+
+  it("threads model/provider into the activity input when set (#58)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, { ...baseInput, model: "claude-sonnet-4-6", provider: "bedrock" });
+    expect(calls[0].input.model).toBe("claude-sonnet-4-6");
+    expect(calls[0].input.provider).toBe("bedrock");
+  });
+
+  it("passes no model/provider when unset (default unchanged, #58)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, baseInput);
+    expect(calls[0].input.model).toBeUndefined();
+    expect(calls[0].input.provider).toBeUndefined();
+  });
 });

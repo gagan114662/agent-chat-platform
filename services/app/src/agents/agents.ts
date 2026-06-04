@@ -2,6 +2,27 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { agents, repos } from "../db/schema.js";
 
+// AgentModelConfig is the optional per-agent model/provider selection (#58),
+// stored on the agent's jsonb `config`. Both fields are optional; empty = the
+// platform default (Anthropic, the sandbox/CLI default model — today's behavior).
+export interface AgentModelConfig {
+  provider?: string;
+  model?: string;
+}
+
+// agentModelConfig reads the model/provider selection off an agent's jsonb config.
+// Tolerant of an absent/loosely-typed config (jsonb): only string values are
+// surfaced; anything else is ignored so a malformed config never injects argv/env.
+export function agentModelConfig(agent: { config?: unknown } | null | undefined): AgentModelConfig {
+  const cfg = agent?.config;
+  if (!cfg || typeof cfg !== "object") return {};
+  const c = cfg as Record<string, unknown>;
+  const out: AgentModelConfig = {};
+  if (typeof c.provider === "string" && c.provider !== "") out.provider = c.provider;
+  if (typeof c.model === "string" && c.model !== "") out.model = c.model;
+  return out;
+}
+
 export async function resolveMention(db: DB, orgId: string, handle: string) {
   const [a] = await db.select().from(agents)
     .where(and(eq(agents.orgId, orgId), eq(agents.handle, handle.toLowerCase())));

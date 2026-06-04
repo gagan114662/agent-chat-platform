@@ -8,6 +8,9 @@ import { transitionRun, openTaskForMention } from "../tasks/tasks.js";
 import { loadPlanRunWithRepo } from "../approvals/approvals.js";
 import { startFusionRun } from "../fusion/start.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
+import { agentModelConfig } from "../agents/agents.js";
+import { agents } from "../db/schema.js";
+import { and, eq } from "drizzle-orm";
 import { actor } from "./actor.js";
 
 export interface PlanDeps { db: DB; sql: postgres.Sql; temporal: Client; sandboxUrl: string; }
@@ -34,9 +37,14 @@ export function registerPlanRoutes(app: FastifyInstance, d: PlanDeps) {
     // fusion flow with planMode OFF (so it edits + opens a PR).
     await transitionRun(d.db, run.id, "running", {}, orgId);
     if (process.env[repo.tokenEnvVar]) {
+      // #58: thread the assignee agent's config.model/provider into the execute run.
+      const [agent] = task.assigneeId
+        ? await d.db.select().from(agents).where(and(eq(agents.id, task.assigneeId), eq(agents.orgId, orgId)))
+        : [];
       await startFusionRun(d.temporal, {
         run, orgId, threadId: thread.id, repo, agentId: task.assigneeId ?? "agent",
         intent: task.title, sandboxUrl: d.sandboxUrl, planMode: false,
+        ...agentModelConfig(agent),
       });
     }
 
@@ -86,9 +94,13 @@ export function registerPlanRoutes(app: FastifyInstance, d: PlanDeps) {
         createdByKind: "human", createdById: task.createdById,
       });
       if (process.env[repo.tokenEnvVar]) {
+        const [agent] = task.assigneeId
+          ? await d.db.select().from(agents).where(and(eq(agents.id, task.assigneeId), eq(agents.orgId, orgId)))
+          : [];
         await startFusionRun(d.temporal, {
           run: newRun, orgId, threadId: thread.id, repo, agentId: task.assigneeId ?? "agent",
           intent, sandboxUrl: d.sandboxUrl, planMode: true,
+          ...agentModelConfig(agent),
         });
       }
       replanned = true;
