@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
-import { listChannels, listThreads, listRepos, createThread } from "../nav/nav.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel } from "../nav/nav.js";
+import { searchMessages } from "../search/search.js";
 
 export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
   app.get("/channels", async (req) => listChannels(d.db, actor(req).orgId));
@@ -24,4 +25,17 @@ export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
   });
 
   app.get("/repos", async (req) => listRepos(d.db, actor(req).orgId));
+
+  app.post("/channels", async (req, reply) => {
+    const { name } = req.body as { name: string };
+    const { orgId } = actor(req);
+    if (!name?.trim()) return reply.code(400).send({ error: "name required" });
+    const channel = await createChannel(d.db, { orgId, name: name.trim() });
+    return reply.code(201).send(channel);
+  });
+
+  app.get("/search", async (req) => {
+    const q = (req.query as { q?: string }).q ?? "";
+    return searchMessages(d.db, actor(req).orgId, q);
+  });
 }

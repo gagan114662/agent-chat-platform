@@ -61,4 +61,28 @@ describe("nav routes", () => {
     expect(res.statusCode).toBe(400);
     await app.close();
   });
+
+  it("POST /channels creates a channel", async () => {
+    const app = makeApp();
+    const res = await app.inject({
+      method: "POST", url: "/channels",
+      headers: { "x-org-id": "o1", "content-type": "application/json" },
+      payload: { name: "random" },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().name).toBe("random");
+    await app.close();
+  });
+
+  it("GET /search filters by body, org-scoped", async () => {
+    const app = makeApp();
+    // seed a thread + message to find
+    await h.db.insert((await import("../db/schema.js")).threads).values({ id: "ts", orgId: "o1", channelId: "c1", title: "T", createdAt: new Date("2024-01-01T00:00:00Z") });
+    await h.db.insert((await import("../db/schema.js")).messages).values({ id: "ms", orgId: "o1", threadId: "ts", authorKind: "human", authorId: "u", kind: "chat", body: "needle here", metadata: {} });
+    const hit = await app.inject({ method: "GET", url: "/search?q=needle", headers: { "x-org-id": "o1" } });
+    expect(hit.json().map((r: { messageId: string }) => r.messageId)).toEqual(["ms"]);
+    const miss = await app.inject({ method: "GET", url: "/search?q=needle", headers: { "x-org-id": "o2" } });
+    expect(miss.json()).toEqual([]);
+    await app.close();
+  });
 });
