@@ -192,6 +192,28 @@ describe("runFusion", () => {
     expect(call.provider).toBeUndefined();
   });
 
+  it("threads mcpServers from the input into the sandbox run + plan (#57)", async () => {
+    const d = deps(["success"]);
+    await runFusion(d, { ...input, mcpServers: ["filesystem"] }, {
+      pollMs: 0, maxPolls: 5,
+      planMode: true,
+      planGate: async () => ({ approved: true }),
+    });
+    expect(d.sandbox.plan).toHaveBeenCalledWith(
+      expect.objectContaining({ mcpServers: ["filesystem"] }),
+    );
+    expect(d.sandbox.run).toHaveBeenCalledWith(
+      expect.objectContaining({ mcpServers: ["filesystem"] }),
+    );
+  });
+
+  it("passes no mcpServers when the input omits them (default unchanged, #57)", async () => {
+    const d = deps(["success"]);
+    await runFusion(d, input, { pollMs: 0, maxPolls: 5 });
+    const call = (d.sandbox.run as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.mcpServers).toBeUndefined();
+  });
+
   it("proceeds to merge when planMode + gate approves", async () => {
     const d = deps(["success"]);
     const out = await runFusion(d, input, {

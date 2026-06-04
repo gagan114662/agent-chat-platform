@@ -23,6 +23,21 @@ export function agentModelConfig(agent: { config?: unknown } | null | undefined)
   return out;
 }
 
+// agentMcp reads the per-agent MCP server selection (#57) off an agent's jsonb
+// `config.mcpServers` (an array of built-in catalog names). Tolerant of an
+// absent/loosely-typed config: returns undefined unless config.mcpServers is a
+// non-empty array of non-empty strings (anything else is ignored so a malformed
+// config never injects names). Undefined = no MCP servers (today's behavior).
+// Authorization is enforced downstream in the sandbox (default-deny catalog).
+export function agentMcp(agent: { config?: unknown } | null | undefined): string[] | undefined {
+  const cfg = agent?.config;
+  if (!cfg || typeof cfg !== "object") return undefined;
+  const c = cfg as Record<string, unknown>;
+  if (!Array.isArray(c.mcpServers)) return undefined;
+  const names = c.mcpServers.filter((n): n is string => typeof n === "string" && n !== "");
+  return names.length > 0 ? names : undefined;
+}
+
 export async function resolveMention(db: DB, orgId: string, handle: string) {
   const [a] = await db.select().from(agents)
     .where(and(eq(agents.orgId, orgId), eq(agents.handle, handle.toLowerCase())));

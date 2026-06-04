@@ -58,4 +58,16 @@ describe("startFusionRun", () => {
     expect(calls[0].input.model).toBeUndefined();
     expect(calls[0].input.provider).toBeUndefined();
   });
+
+  it("threads mcpServers into the activity input when set (#57)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, { ...baseInput, mcpServers: ["filesystem"] });
+    expect(calls[0].input.mcpServers).toEqual(["filesystem"]);
+  });
+
+  it("passes no mcpServers when unset (default unchanged, #57)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, baseInput);
+    expect(calls[0].input.mcpServers).toBeUndefined();
+  });
 });

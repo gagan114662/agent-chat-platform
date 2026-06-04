@@ -8,7 +8,7 @@ import { notify } from "../db/client.js";
 import { createMessage } from "../chat/messages.js";
 import { listCheckpoints } from "../fusion/checkpoints.js";
 import { startFusionRun } from "../fusion/start.js";
-import { agentModelConfig } from "../agents/agents.js";
+import { agentModelConfig, agentMcp } from "../agents/agents.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
 import { runCheckpoints, runs, tasks, threads, repos, agents } from "../db/schema.js";
 import { actor } from "./actor.js";
@@ -74,6 +74,7 @@ export function registerCheckpointRoutes(app: FastifyInstance, d: CheckpointDeps
           // rewind: base the fresh fusion run on the checkpoint's branch (#53 override).
           baseBranchOverride: checkpoint.branch,
           ...agentModelConfig(agent),
+          ...(agentMcp(agent) ? { mcpServers: agentMcp(agent) } : {}), // #57: per-agent MCP servers
         });
       }
     }

@@ -17,6 +17,9 @@ export interface FusionInput {
   // run/plan (and, via the app's ciFix closure, feedback). Empty = sandbox default.
   model?: string;
   provider?: string;
+  // Optional per-agent built-in MCP catalog servers (#57), threaded into the
+  // sandbox run/plan identically. Undefined = none.
+  mcpServers?: string[];
 }
 
 export type FusionOutcome = "merged" | "checks_failed" | "timeout" | "held_for_human" | "awaiting_plan";
@@ -76,6 +79,7 @@ export async function runFusion(
       intent: input.intent,
       model: input.model,
       provider: input.provider,
+      mcpServers: input.mcpServers,
     });
     await emit({ type: "plan_proposed", plan });
     const g = opts.planGate ? await opts.planGate({ plan }) : { approved: true };
@@ -93,6 +97,7 @@ export async function runFusion(
     branch: input.branch,
     model: input.model,
     provider: input.provider,
+    mcpServers: input.mcpServers,
   });
   await emit({ type: "branch_pushed", branch: run.branch, commitSha: run.commitSha });
 

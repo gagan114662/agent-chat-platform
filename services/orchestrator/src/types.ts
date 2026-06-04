@@ -11,6 +11,8 @@ export interface SandboxRunRequest {
   // Optional per-agent model/provider selection (#58). Empty = sandbox default.
   model?: string;
   provider?: string;
+  // Optional per-agent built-in MCP catalog servers (#57). Undefined = none.
+  mcpServers?: string[];
 }
 
 export interface SandboxFeedbackRequest {
@@ -20,6 +22,7 @@ export interface SandboxFeedbackRequest {
   adapter?: string;
   model?: string;
   provider?: string;
+  mcpServers?: string[];
 }
 
 export interface SandboxPlanRequest {
@@ -29,6 +32,7 @@ export interface SandboxPlanRequest {
   adapter?: string;
   model?: string;
   provider?: string;
+  mcpServers?: string[];
 }
 
 export interface PlanResult {
