@@ -14,6 +14,8 @@
     "@acp/orchestrator": "workspace:*",
     "@fastify/static": "^9.1.3",
     "@fastify/websocket": "^11.0.0",
+    "@octokit/auth-app": "^8.2.0",
+    "@octokit/rest": "^21.1.1",
     "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
     "@opentelemetry/resources": "^1.30.0",
     "@opentelemetry/sdk-node": "^0.57.0",
