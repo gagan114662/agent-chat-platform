@@ -34,6 +34,11 @@ describe("chat fusion integration", () => {
         workflowsPath: fileURLToPath(new URL("./workflows.ts", import.meta.url)),
         activities: {
           runChatFusionActivity: async (input: any) => {
+            // Regression (#36): the PAT and token-bearing repoUrl must NOT be in the
+            // workflow args (Temporal history). Only the env var NAME is passed.
+            expect(input.githubToken).toBeUndefined();
+            expect(input.repoUrl).toBeUndefined();
+            expect(input.tokenEnvVar).toBe("E2E_GITHUB_TOKEN");
             const sink = makeFusionSink(h.db, h.sql, input.sink);
             await sink({ type: "sandbox_started" });
             await sink({ type: "branch_pushed", branch: "agent/x", commitSha: "deadbeef" });
@@ -50,8 +55,8 @@ describe("chat fusion integration", () => {
         env.client.workflow.execute(chatFusionWorkflow, {
           taskQueue: "test", workflowId: run.workflowId,
           args: [{
-            owner: "o", repo: "r", repoUrl: "x", baseBranch: "main", intent: "fix bug",
-            branch: "agent/x", githubToken: "tok", sandboxUrl: "http://runner:8090",
+            owner: "o", repo: "r", baseBranch: "main", intent: "fix bug",
+            branch: "agent/x", tokenEnvVar: "E2E_GITHUB_TOKEN", sandboxUrl: "http://runner:8090",
             pollMs: 0, maxPolls: 3, autonomy: "autopilot-merge", sink: { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" },
           }],
         }),
