@@ -25,7 +25,9 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
     if (!devHeadersAllowed() && !req.principal) {
       // strip query string for the public-path check
       const path = req.url.split("?")[0];
-      if (!PUBLIC_PATHS.has(path)) {
+      // /ingest/* is machine-to-machine (its own x-acp-ingest-secret guard);
+      // it must bypass the user-session 401 here, NOT be left unauthenticated.
+      if (!PUBLIC_PATHS.has(path) && !path.startsWith("/ingest/")) {
         return reply.code(401).send({ error: "unauthenticated" });
       }
     }
