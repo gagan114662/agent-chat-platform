@@ -10,14 +10,20 @@ const OUTCOME_STYLES: Record<string, string> = {
 export function PrCard({ message }: { message: Message }) {
   const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string };
   const outcome = m.outcome ?? "merged";
+  // Only treat https:// URLs as links — never render javascript:/data:/etc. as an href.
+  const safePrUrl = m.prUrl && m.prUrl.startsWith("https://") ? m.prUrl : undefined;
   return (
     <div className={`rounded-xl border px-4 py-3 ${OUTCOME_STYLES[outcome] ?? OUTCOME_STYLES.merged}`}>
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide">{outcome.replace("_", " ")}</span>
         {m.prNumber != null && (
-          <a href={m.prUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-neutral-800 underline underline-offset-2">
-            PR #{m.prNumber}
-          </a>
+          safePrUrl ? (
+            <a href={safePrUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-neutral-800 underline underline-offset-2">
+              PR #{m.prNumber}
+            </a>
+          ) : (
+            <span className="text-sm font-medium text-neutral-800">PR #{m.prNumber}</span>
+          )
         )}
       </div>
       <p className="mt-1 text-sm">{message.body}</p>
