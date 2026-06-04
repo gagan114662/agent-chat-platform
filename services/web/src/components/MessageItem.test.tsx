@@ -22,4 +22,11 @@ describe("MessageItem", () => {
     expect(link).toHaveAttribute("href", "https://gh/pr/7");
     expect(screen.getByText("merged")).toBeInTheDocument();
   });
+
+  it("does NOT render a non-https prUrl as a link (XSS hardening, #36)", () => {
+    render(<MessageItem message={{ ...base, authorKind: "agent", kind: "pr_card", body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, prUrl: "javascript:alert(1)" } } as Message} />);
+    // no anchor — the PR number is shown as plain text instead
+    expect(screen.queryByRole("link", { name: "PR #7" })).toBeNull();
+    expect(screen.getByText("PR #7")).toBeInTheDocument();
+  });
 });

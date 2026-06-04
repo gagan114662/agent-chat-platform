@@ -28,11 +28,14 @@ export async function listNodes(db: DB, orgId: string, filter: { kind?: NodeKind
   return db.select().from(memoryNodes).where(and(...conds));
 }
 
-export async function neighbors(db: DB, nodeId: string) {
-  const edges = await db.select().from(memoryEdges).where(or(eq(memoryEdges.fromId, nodeId), eq(memoryEdges.toId, nodeId)));
+export async function neighbors(db: DB, nodeId: string, orgId: string) {
+  const edges = await db.select().from(memoryEdges).where(and(
+    eq(memoryEdges.orgId, orgId),
+    or(eq(memoryEdges.fromId, nodeId), eq(memoryEdges.toId, nodeId)),
+  ));
   const ids = [...new Set(edges.flatMap((e) => [e.fromId, e.toId]).filter((id) => id !== nodeId))];
   if (ids.length === 0) return [];
-  return db.select().from(memoryNodes).where(inArray(memoryNodes.id, ids));
+  return db.select().from(memoryNodes).where(and(eq(memoryNodes.orgId, orgId), inArray(memoryNodes.id, ids)));
 }
 
 export async function searchNodes(db: DB, orgId: string, q: string) {

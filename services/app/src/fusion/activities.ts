@@ -11,21 +11,32 @@ import { reportRunUsage } from "../billing/report.js";
 import { captureDecision } from "../memory/capture.js";
 
 export interface RunFusionActivityInput {
-  owner: string; repo: string; repoUrl: string; baseBranch: string;
+  owner: string; repo: string; baseBranch: string;
   intent: string; branch: string;
-  githubToken: string; sandboxUrl: string; pollMs: number; maxPolls: number;
+  // SECURITY (#36): the GitHub PAT is NEVER passed in the workflow args (it would be
+  // persisted in Temporal history). We pass only the env var NAME and resolve the
+  // token inside the activity, where the worker shares the app's environment.
+  tokenEnvVar: string; sandboxUrl: string; pollMs: number; maxPolls: number;
   autonomy: Autonomy;
   sink: SinkCtx;
 }
 
 export async function runChatFusionActivity(input: RunFusionActivityInput): Promise<FusionResult> {
+  const token = process.env[input.tokenEnvVar];
+  if (!token) throw new Error(`GitHub token not found in env var: ${input.tokenEnvVar}`);
+  const repoUrl = `https://x-access-token:${token}@github.com/${input.owner}/${input.repo}.git`;
+
   const { db, sql } = makeDb();
   try {
-    const github = new OctokitGitHubService(input.githubToken);
+    const github = new OctokitGitHubService(token);
     const deps = { sandbox: new SandboxRunnerClient(input.sandboxUrl), github };
     const sink = makeFusionSink(db, sql, input.sink);
     const mergeGate = buildMergeGate(github, { owner: input.owner, repo: input.repo, autonomy: input.autonomy });
-    const result = await runFusionTraced(deps, input, { pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink, mergeGate });
+    const fusionInput = {
+      owner: input.owner, repo: input.repo, repoUrl,
+      baseBranch: input.baseBranch, intent: input.intent, branch: input.branch,
+    };
+    const result = await runFusionTraced(deps, fusionInput, { pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink, mergeGate });
     await reportRunUsage(db, reporterFromEnv(), { orgId: input.sink.orgId, runId: input.sink.runId, outcome: result.outcome });
     await captureDecision(db, {
       orgId: input.sink.orgId, runId: input.sink.runId, agentId: input.sink.agentId, threadId: input.sink.threadId,

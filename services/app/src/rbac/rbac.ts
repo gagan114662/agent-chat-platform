@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { members } from "../db/schema.js";
 
@@ -12,7 +12,7 @@ export function can(role: Role, action: Action): boolean {
   return MEMBER_ACTIONS.includes(action);
 }
 
-export async function roleOf(db: DB, memberId: string): Promise<Role> {
-  const [m] = await db.select().from(members).where(eq(members.id, memberId));
+export async function roleOf(db: DB, memberId: string, orgId: string): Promise<Role> {
+  const [m] = await db.select().from(members).where(and(eq(members.id, memberId), eq(members.orgId, orgId)));
   return (m?.role as Role) ?? "member";
 }

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import type postgres from "postgres";
 import type { Client } from "@temporalio/client";
@@ -16,9 +16,12 @@ import { actor } from "./actor.js";
 export interface Deps { db: DB; sql: postgres.Sql; temporal: Client; sandboxUrl: string; }
 
 export function registerRoutes(app: FastifyInstance, d: Deps) {
-  app.get("/threads/:id/messages", async (req) => {
-    const { id } = req.params as { id: string };
-    return listMessages(d.db, id);
+  app.get("/threads/:id/messages", async (req, reply) => {
+    const { id: threadId } = req.params as { id: string };
+    const { orgId } = actor(req);
+    const [thread] = await d.db.select().from(threads).where(and(eq(threads.id, threadId), eq(threads.orgId, orgId)));
+    if (!thread) return reply.code(404).send({ error: "thread not found" });
+    return listMessages(d.db, threadId, orgId);
   });
 
   app.post("/threads/:id/messages", async (req, reply) => {
@@ -26,10 +29,13 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
     const { body } = req.body as { body: string };
     const { orgId, userId } = actor(req);
 
+    // Load the thread org-scoped FIRST so a foreign thread id can't be written to / mined for mentions.
+    const [thread] = await d.db.select().from(threads).where(and(eq(threads.id, threadId), eq(threads.orgId, orgId)));
+    if (!thread) return reply.code(404).send({ error: "thread not found" });
+
     const msg = await createMessage(d.db, { orgId, threadId, authorKind: "human", authorId: userId, body });
     await notify(d.sql, THREAD_CHANNEL, { threadId, message: msg });
 
-    const [thread] = await d.db.select().from(threads).where(eq(threads.id, threadId));
     const started: string[] = [];
     for (const handle of parseMentions(body)) {
       const agent = await resolveMention(d.db, orgId, handle);
@@ -45,9 +51,8 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
       });
       await startRun(d.temporal, run.workflowId, {
         owner: repo.githubOwner, repo: repo.githubName,
-        repoUrl: `https://x-access-token:${token}@github.com/${repo.githubOwner}/${repo.githubName}.git`,
         baseBranch: repo.defaultBranch, intent: body, branch: `agent/${run.id}`,
-        githubToken: token, sandboxUrl: d.sandboxUrl, pollMs: 5000, maxPolls: 24,
+        tokenEnvVar: repo.tokenEnvVar, sandboxUrl: d.sandboxUrl, pollMs: 5000, maxPolls: 24,
         autonomy: (repo.autonomy as "monitor-only" | "resolve-ci" | "autopilot-merge"),
         sink: { orgId, threadId, runId: run.id, agentId: agent.id },
       });

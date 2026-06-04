@@ -35,4 +35,14 @@ describe("dm", () => {
   it("throws on an unknown principal", async () => {
     await expect(getOrCreateDm(h.db, { orgId: "o1", peerKind: "human", peerId: "ghost" })).rejects.toThrow(/principal not found/);
   });
+
+  it("refuses to DM a peer from another org (cross-tenant IDOR)", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "O2" });
+    await h.db.insert(workspaces).values({ id: "w2", orgId: "o2", name: "W2" });
+    await h.db.insert(members).values({ id: "m9", orgId: "o2", workspaceId: "w2", displayName: "Other" });
+    await h.db.insert(agents).values({ id: "a9", orgId: "o2", workspaceId: "w2", handle: "x", displayName: "X", adapter: "fake", config: {} });
+    // org A tries to open a DM against org B's principals by id → not found
+    await expect(getOrCreateDm(h.db, { orgId: "o1", peerKind: "human", peerId: "m9" })).rejects.toThrow(/principal not found/);
+    await expect(getOrCreateDm(h.db, { orgId: "o1", peerKind: "agent", peerId: "a9" })).rejects.toThrow(/principal not found/);
+  });
 });

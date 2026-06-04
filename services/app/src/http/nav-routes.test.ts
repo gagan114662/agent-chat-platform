@@ -53,6 +53,20 @@ describe("nav routes", () => {
     await app.close();
   });
 
+  it("GET /channels/:id/threads does not return another org's threads (cross-tenant IDOR)", async () => {
+    const app = makeApp();
+    const created = await app.inject({
+      method: "POST", url: "/channels/c1/threads",
+      headers: { "x-org-id": "o1", "content-type": "application/json" },
+      payload: { title: "secret", repoId: "r1" },
+    });
+    expect(created.statusCode).toBe(201);
+    // org B requests org A's channel id → must not see the thread
+    const list = await app.inject({ method: "GET", url: "/channels/c1/threads", headers: { "x-org-id": "o2" } });
+    expect(list.json()).toEqual([]);
+    await app.close();
+  });
+
   it("POST with a foreign repo 400s", async () => {
     const app = makeApp();
     const res = await app.inject({

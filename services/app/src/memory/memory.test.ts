@@ -21,8 +21,16 @@ describe("memory", () => {
     const b = await createNode(h.db, { orgId: "o1", kind: "identity", label: "coder" });
     await createEdge(h.db, { orgId: "o1", fromId: a.id, toId: b.id, relation: "authored_by" });
     await createEdge(h.db, { orgId: "o1", fromId: a.id, toId: b.id, relation: "authored_by" }); // dup → no-op
-    expect((await neighbors(h.db, a.id)).map((n) => n.id)).toEqual([b.id]);
-    expect((await neighbors(h.db, b.id)).map((n) => n.id)).toEqual([a.id]);
+    expect((await neighbors(h.db, a.id, "o1")).map((n) => n.id)).toEqual([b.id]);
+    expect((await neighbors(h.db, b.id, "o1")).map((n) => n.id)).toEqual([a.id]);
+  });
+
+  it("does not return another org's neighbors via the node id (cross-tenant IDOR)", async () => {
+    const a = await createNode(h.db, { orgId: "o1", kind: "decision", label: "merge PR 7" });
+    const b = await createNode(h.db, { orgId: "o1", kind: "identity", label: "coder" });
+    await createEdge(h.db, { orgId: "o1", fromId: a.id, toId: b.id, relation: "authored_by" });
+    // org B walks org A's node id → must be empty
+    expect(await neighbors(h.db, a.id, "o2")).toEqual([]);
   });
   it("searches label/body and counts nodes+edges", async () => {
     const a = await createNode(h.db, { orgId: "o1", kind: "fact", label: "login flow", body: "the auth path" });

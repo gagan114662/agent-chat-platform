@@ -33,7 +33,7 @@ describe("fusion sink", () => {
     const evs = await h.db.select().from(runEvents).where(eq(runEvents.runId, run.id));
     expect(evs.map((e) => e.seq).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5]);
 
-    const msgs = await listMessages(h.db, "t1");
+    const msgs = await listMessages(h.db, "t1", "o1");
     expect(msgs.at(-1)?.kind).toBe("pr_card");
     expect((msgs.at(-1)?.metadata as any).prNumber).toBe(7);
     expect(msgs.every((m) => m.authorKind === "agent")).toBe(true);

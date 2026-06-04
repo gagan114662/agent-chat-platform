@@ -21,6 +21,17 @@ describe("memory routes", () => {
     expect(stats.json()).toEqual({ nodes: 1, edges: 0 });
     await app.close();
   });
+  it("GET /memory/:id/neighbors does not return another org's neighbors (cross-tenant IDOR)", async () => {
+    const app = makeApp();
+    const a = await createNode(h.db, { orgId: "o1", kind: "decision", label: "merge PR 7" });
+    const b = await createNode(h.db, { orgId: "o1", kind: "identity", label: "coder" });
+    await createEdge(h.db, { orgId: "o1", fromId: a.id, toId: b.id, relation: "authored_by" });
+    // org B walks org A's node id → must be empty
+    const res = await app.inject({ method: "GET", url: `/memory/${a.id}/neighbors`, headers: { "x-org-id": "o2" } });
+    expect(res.json()).toEqual([]);
+    await app.close();
+  });
+
   it("GET /memory/graph returns { nodes, edges }", async () => {
     const app = makeApp();
     const a = await createNode(h.db, { orgId: "o1", kind: "decision", label: "merge PR 7" });

@@ -48,4 +48,29 @@ describe("ws fan-out", () => {
       delete process.env.AUTH_REQUIRE_SESSION;
     }
   }, 20000);
+
+  it("rejects subscribing to a thread from another org (cross-tenant IDOR)", async () => {
+    process.env.AUTH_REQUIRE_SESSION = "true";
+    try {
+      const pubsub = new ThreadPubSub(h.sql);
+      await pubsub.start();
+      const app = Fastify();
+      await app.register(websocket);
+      // session principal is in org o2; thread t1 belongs to org o1
+      registerWs(
+        app,
+        pubsub,
+        async () => ({ orgId: "o2", userId: "m9" }),
+        async () => "o1", // thread t1 → org o1
+      );
+      await app.listen({ port: 0, host: "127.0.0.1" });
+      const { port } = app.server.address() as { port: number };
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?threadId=t1&token=x`);
+      const closed = new Promise<number>((res) => ws.on("close", (code) => res(code)));
+      expect(await closed).toBe(1008);
+      await app.close();
+    } finally {
+      delete process.env.AUTH_REQUIRE_SESSION;
+    }
+  }, 20000);
 });

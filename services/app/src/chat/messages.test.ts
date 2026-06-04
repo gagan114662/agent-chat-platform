@@ -19,9 +19,15 @@ describe("messages", () => {
   it("creates and lists messages in order", async () => {
     await createMessage(h.db, { orgId: "o1", threadId: "t1", authorKind: "human", authorId: "m1", body: "hi" });
     await createMessage(h.db, { orgId: "o1", threadId: "t1", authorKind: "agent", authorId: "a1", body: "hello", kind: "system" });
-    const msgs = await listMessages(h.db, "t1");
+    const msgs = await listMessages(h.db, "t1", "o1");
     expect(msgs.map((m) => m.body)).toEqual(["hi", "hello"]);
     expect(msgs[1].authorKind).toBe("agent");
     expect(msgs[1].kind).toBe("system");
+  });
+
+  it("does not leak another org's messages via the thread id (cross-tenant IDOR)", async () => {
+    await createMessage(h.db, { orgId: "o1", threadId: "t1", authorKind: "human", authorId: "m1", body: "secret" });
+    // org B requests org A's thread id → must be empty
+    expect(await listMessages(h.db, "t1", "o2")).toEqual([]);
   });
 });

@@ -7,8 +7,10 @@ export function listChannels(db: DB, orgId: string) {
   return db.select().from(channels).where(eq(channels.orgId, orgId)).orderBy(asc(channels.name));
 }
 
-export function listThreads(db: DB, channelId: string) {
-  return db.select().from(threads).where(eq(threads.channelId, channelId)).orderBy(desc(threads.createdAt));
+export function listThreads(db: DB, channelId: string, orgId: string) {
+  return db.select().from(threads)
+    .where(and(eq(threads.channelId, channelId), eq(threads.orgId, orgId)))
+    .orderBy(desc(threads.createdAt));
 }
 
 export function listRepos(db: DB, orgId: string) {
@@ -18,6 +20,9 @@ export function listRepos(db: DB, orgId: string) {
 export interface NewThread { orgId: string; channelId: string; title: string; repoId?: string | null; }
 
 export async function createThread(db: DB, t: NewThread) {
+  // Verify the target channel belongs to the actor's org (closes cross-tenant IDOR).
+  const [ch] = await db.select().from(channels).where(and(eq(channels.id, t.channelId), eq(channels.orgId, t.orgId)));
+  if (!ch) throw new Error(`channel not found in org: ${t.channelId}`);
   if (t.repoId) {
     const [r] = await db.select().from(repos).where(and(eq(repos.id, t.repoId), eq(repos.orgId, t.orgId)));
     if (!r) throw new Error(`repo not found in org: ${t.repoId}`);

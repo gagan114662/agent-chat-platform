@@ -23,8 +23,18 @@ describe("nav", () => {
     const t = await createThread(h.db, { orgId: "o1", channelId: "c1", title: "fix login", repoId: "r1" });
     expect(t.title).toBe("fix login");
     expect(t.repoId).toBe("r1");
-    const list = await listThreads(h.db, "c1");
+    const list = await listThreads(h.db, "c1", "o1");
     expect(list.map((x) => x.id)).toContain(t.id);
+  });
+
+  it("does not list another org's threads via the channel id (cross-tenant IDOR)", async () => {
+    await createThread(h.db, { orgId: "o1", channelId: "c1", title: "fix login", repoId: "r1" });
+    // org B requests org A's channel id → must be empty
+    expect(await listThreads(h.db, "c1", "o2")).toEqual([]);
+  });
+
+  it("rejects creating a thread in another org's channel (cross-tenant IDOR)", async () => {
+    await expect(createThread(h.db, { orgId: "o2", channelId: "c1", title: "x" })).rejects.toThrow(/channel not found/);
   });
 
   it("rejects a thread bound to a repo from another org", async () => {
@@ -42,7 +52,7 @@ describe("nav", () => {
   it("lists threads newest-first by createdAt", async () => {
     await h.db.insert(threads).values({ id: "told", orgId: "o1", channelId: "c1", title: "old", createdAt: new Date("2020-01-01T00:00:00Z") });
     await h.db.insert(threads).values({ id: "tnew", orgId: "o1", channelId: "c1", title: "new", createdAt: new Date("2024-01-01T00:00:00Z") });
-    const list = await listThreads(h.db, "c1");
+    const list = await listThreads(h.db, "c1", "o1");
     const ids = list.map((t) => t.id);
     expect(ids.indexOf("tnew")).toBeLessThan(ids.indexOf("told"));
   });

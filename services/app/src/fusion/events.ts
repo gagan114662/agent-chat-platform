@@ -69,13 +69,13 @@ export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
     // Move the run into "running" once work begins so the terminal outcome
     // transition (running -> merged/checks_failed/timeout) is legal.
     if (e.type === "sandbox_started") {
-      await transitionRun(db, ctx.runId, "running", {});
+      await transitionRun(db, ctx.runId, "running", {}, ctx.orgId);
     }
 
     if (isOutcome && e.type === "outcome") {
       await transitionRun(db, ctx.runId, e.outcome, {
         prNumber: e.prNumber, prUrl: e.prUrl, commitSha: e.commitSha,
-      });
+      }, ctx.orgId);
     }
   };
 }

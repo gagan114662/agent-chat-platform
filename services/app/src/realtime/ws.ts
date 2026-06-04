@@ -5,6 +5,7 @@ export function registerWs(
   app: FastifyInstance,
   pubsub: ThreadPubSub,
   resolveToken?: (token: string) => Promise<{ orgId: string; userId: string } | undefined>,
+  resolveThreadOrg?: (threadId: string) => Promise<string | undefined>,
 ) {
   app.get("/ws", { websocket: true }, async (socket, req) => {
     const { threadId, token } = req.query as { threadId?: string; token?: string };
@@ -12,6 +13,9 @@ export function registerWs(
     if (process.env.AUTH_REQUIRE_SESSION) {
       const p = token && resolveToken ? await resolveToken(token) : undefined;
       if (!p) { socket.close(1008, "unauthenticated"); return; }
+      // Cross-tenant guard: the subscribed thread must belong to the session's org.
+      const threadOrg = resolveThreadOrg ? await resolveThreadOrg(threadId) : undefined;
+      if (!threadOrg || threadOrg !== p.orgId) { socket.close(1008, "forbidden"); return; }
     }
     const unsub = pubsub.subscribe(threadId, (payload) => socket.send(JSON.stringify(payload.message)));
     socket.on("close", unsub);

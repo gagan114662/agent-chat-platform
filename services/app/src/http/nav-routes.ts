@@ -10,7 +10,7 @@ export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
 
   app.get("/channels/:id/threads", async (req) => {
     const { id } = req.params as { id: string };
-    return listThreads(d.db, id);
+    return listThreads(d.db, id, actor(req).orgId);
   });
 
   app.post("/channels/:id/threads", async (req, reply) => {
@@ -30,7 +30,7 @@ export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
   app.post("/channels", async (req, reply) => {
     const { name } = req.body as { name: string };
     const { orgId, userId } = actor(req);
-    if (!can(await roleOf(d.db, userId), "channel:create")) {
+    if (!can(await roleOf(d.db, userId, orgId), "channel:create")) {
       return reply.code(403).send({ error: "forbidden" });
     }
     if (!name?.trim()) return reply.code(400).send({ error: "name required" });
