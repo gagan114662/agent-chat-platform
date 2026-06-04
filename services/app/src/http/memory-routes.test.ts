@@ -45,6 +45,36 @@ describe("memory routes", () => {
     await app.close();
   });
 
+  it("POST /memory/consolidate dreams over related nodes; is org-scoped and idempotent; dream node visible via GET", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "O2" });
+    const app = makeApp();
+    await createNode(h.db, { orgId: "o1", kind: "decision", label: "Use Postgres LISTEN NOTIFY realtime" });
+    await createNode(h.db, { orgId: "o1", kind: "decision", label: "realtime notify via postgres listen" });
+    await createNode(h.db, { orgId: "o1", kind: "fact", label: "scrypt password hashing" });
+    // org-B node sharing terms must never be consolidated into org-A
+    await createNode(h.db, { orgId: "o2", kind: "decision", label: "Use Postgres LISTEN NOTIFY realtime notify" });
+
+    const res = await app.inject({ method: "POST", url: "/memory/consolidate", headers: { "x-org-id": "o1" } });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { created: number; clusters: number };
+    expect(body.created).toBeGreaterThanOrEqual(1);
+    expect(body.clusters).toBeGreaterThanOrEqual(1);
+
+    // the dream node is visible via GET /memory
+    const list = await app.inject({ method: "GET", url: "/memory", headers: { "x-org-id": "o1" } });
+    const dreams = (list.json() as { metadata: { dream?: boolean }; orgId: string }[]).filter((n) => n.metadata?.dream === true);
+    expect(dreams.length).toBe(1);
+
+    // org B has only one node → no cluster → nothing consolidated
+    const oB = await app.inject({ method: "POST", url: "/memory/consolidate", headers: { "x-org-id": "o2" } });
+    expect((oB.json() as { created: number }).created).toBe(0);
+
+    // idempotent: second POST creates nothing new
+    const again = await app.inject({ method: "POST", url: "/memory/consolidate", headers: { "x-org-id": "o1" } });
+    expect((again.json() as { created: number }).created).toBe(0);
+    await app.close();
+  });
+
   it("GET /memory/recall returns intent-relevant nodes, org-scoped; missing q → []", async () => {
     await h.db.insert(orgs).values({ id: "o2", name: "O2" });
     const app = makeApp();
