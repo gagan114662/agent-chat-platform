@@ -31,7 +31,7 @@ describe("ws fan-out", () => {
   }, 20_000);
 
   it("rejects an unauthenticated socket in strict mode", async () => {
-    process.env.AUTH_REQUIRE_SESSION = "true";
+    delete process.env.ACP_ALLOW_DEV_HEADERS;
     try {
       const pubsub = new ThreadPubSub(h.sql);
       await pubsub.start();
@@ -45,12 +45,12 @@ describe("ws fan-out", () => {
       expect(await closed).toBe(1008);
       await app.close();
     } finally {
-      delete process.env.AUTH_REQUIRE_SESSION;
+      process.env.ACP_ALLOW_DEV_HEADERS = "1";
     }
   }, 20000);
 
   it("rejects subscribing to a thread from another org (cross-tenant IDOR)", async () => {
-    process.env.AUTH_REQUIRE_SESSION = "true";
+    delete process.env.ACP_ALLOW_DEV_HEADERS;
     try {
       const pubsub = new ThreadPubSub(h.sql);
       await pubsub.start();
@@ -70,7 +70,7 @@ describe("ws fan-out", () => {
       expect(await closed).toBe(1008);
       await app.close();
     } finally {
-      delete process.env.AUTH_REQUIRE_SESSION;
+      process.env.ACP_ALLOW_DEV_HEADERS = "1";
     }
   }, 20000);
 });

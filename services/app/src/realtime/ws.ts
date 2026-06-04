@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ThreadPubSub } from "./pubsub.js";
+import { devHeadersAllowed } from "../auth/dev-mode.js";
 
 export function registerWs(
   app: FastifyInstance,
@@ -10,7 +11,7 @@ export function registerWs(
   app.get("/ws", { websocket: true }, async (socket, req) => {
     const { threadId, token } = req.query as { threadId?: string; token?: string };
     if (!threadId) { socket.close(1008, "threadId required"); return; }
-    if (process.env.AUTH_REQUIRE_SESSION) {
+    if (!devHeadersAllowed()) {
       const p = token && resolveToken ? await resolveToken(token) : undefined;
       if (!p) { socket.close(1008, "unauthenticated"); return; }
       // Cross-tenant guard: the subscribed thread must belong to the session's org.
