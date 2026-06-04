@@ -16,6 +16,7 @@ function describe(e: FusionEvent): string {
     case "branch_pushed": return `📤 pushed branch \`${e.branch}\` (${e.commitSha.slice(0, 7)})`;
     case "pr_opened": return `🔀 opened PR #${e.prNumber}`;
     case "checks": return `⏳ checks: ${e.status}`;
+    case "ci_fix_attempt": return `🔧 CI fix attempt ${e.attempt}: ${e.failure}`;
     case "outcome":
       if (e.outcome === "merged") return `✅ merged PR #${e.prNumber}`;
       if (e.outcome === "held_for_human") return `🔶 held for human review — PR #${e.prNumber}`;
@@ -27,7 +28,10 @@ function describe(e: FusionEvent): string {
 // must collapse to one row; distinct events (incl. each checks transition) stay
 // distinct. checks carries its status so pending vs success are separate events.
 function eventKey(e: FusionEvent): string {
-  return e.type === "checks" ? `checks:${e.status}` : e.type;
+  if (e.type === "checks") return `checks:${e.status}`;
+  // Each fix attempt is a distinct logical event so they don't collapse on replay.
+  if (e.type === "ci_fix_attempt") return `ci_fix_attempt:${e.attempt}`;
+  return e.type;
 }
 
 export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {

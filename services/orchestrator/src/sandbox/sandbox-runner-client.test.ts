@@ -20,6 +20,20 @@ describe("SandboxRunnerClient", () => {
     expect(res).toEqual({ branch: "feature/x", commitSha: "deadbeef" });
   });
 
+  it("posts /feedback and returns RunResult", async () => {
+    nock("http://runner:8090")
+      .post("/feedback", { repoUrl: "https://github.com/o/r.git", branch: "feature/x", notes: "ci: lint failed" })
+      .reply(200, { branch: "feature/x", commitSha: "fixsha" });
+
+    const client = new SandboxRunnerClient("http://runner:8090");
+    const res = await client.feedback({
+      repoUrl: "https://github.com/o/r.git",
+      branch: "feature/x",
+      notes: "ci: lint failed",
+    });
+    expect(res).toEqual({ branch: "feature/x", commitSha: "fixsha" });
+  });
+
   it("rejects with status and body on a non-200 response", async () => {
     nock("http://runner:8090").post("/run").reply(500, "boom");
 

@@ -15,7 +15,10 @@ beforeAll(() => {
 afterAll(() => { trace.disable(); });
 
 function deps(checks: ChecksStatus[]) {
-  const sandbox: SandboxRunner = { run: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "sha1" }) };
+  const sandbox: SandboxRunner = {
+    run: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "sha1" }),
+    feedback: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "fixsha" }),
+  };
   let i = 0;
   const github: GitHubService = {
     openPr: vi.fn().mockResolvedValue({ number: 7, url: "u" }),

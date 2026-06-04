@@ -7,6 +7,7 @@ import type { ChecksStatus } from "../types.js";
 function deps(checks: ChecksStatus[]) {
   const sandbox: SandboxRunner = {
     run: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "sha1" }),
+    feedback: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "fixsha" }),
   };
   let i = 0;
   const github: GitHubService = {

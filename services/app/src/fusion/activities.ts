@@ -29,14 +29,25 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
   const { db, sql } = makeDb();
   try {
     const github = new OctokitGitHubService(token);
-    const deps = { sandbox: new SandboxRunnerClient(input.sandboxUrl), github };
+    const sandbox = new SandboxRunnerClient(input.sandboxUrl);
+    const deps = { sandbox, github };
     const sink = makeFusionSink(db, sql, input.sink);
     const mergeGate = buildMergeGate(github, { owner: input.owner, repo: input.repo, autonomy: input.autonomy });
     const fusionInput = {
       owner: input.owner, repo: input.repo, repoUrl,
       baseBranch: input.baseBranch, intent: input.intent, branch: input.branch,
     };
-    const result = await runFusionTraced(deps, fusionInput, { pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink, mergeGate });
+    // Fix-on-red: on a red PR, re-run the agent on the same branch with the CI
+    // failure as feedback. Bounded by CI_FIX_ATTEMPTS (default 2; 0 disables).
+    const maxFixAttempts = Number(process.env.CI_FIX_ATTEMPTS ?? 2);
+    const ciFix = async ({ branch, failure }: { branch: string; failure: string }) => {
+      const res = await sandbox.feedback({ repoUrl, branch, notes: failure });
+      return { commitSha: res.commitSha };
+    };
+    const result = await runFusionTraced(deps, fusionInput, {
+      pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink, mergeGate,
+      maxFixAttempts, ciFix,
+    });
     await reportRunUsage(db, reporterFromEnv(), { orgId: input.sink.orgId, runId: input.sink.runId, outcome: result.outcome });
     await captureDecision(db, {
       orgId: input.sink.orgId, runId: input.sink.runId, agentId: input.sink.agentId, threadId: input.sink.threadId,

@@ -44,6 +44,22 @@ describe("fusion sink", () => {
     expect(tk.state).toBe("done");
   });
 
+  it("keeps distinct ci_fix_attempt events separate and renders them", async () => {
+    const { run } = await seedRun();
+    const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" });
+    await sink({ type: "ci_fix_attempt", attempt: 1, failure: "ci: lint failed" });
+    await sink({ type: "ci_fix_attempt", attempt: 1, failure: "ci: lint failed" }); // replay collapses
+    await sink({ type: "ci_fix_attempt", attempt: 2, failure: "ci: test failed" }); // distinct attempt
+
+    const evs = await h.db.select().from(runEvents).where(eq(runEvents.runId, run.id));
+    expect(evs.length).toBe(2);
+
+    const msgs = await listMessages(h.db, "t1", "o1");
+    const bodies = msgs.map((m) => m.body);
+    expect(bodies.some((b) => b.includes("CI fix attempt 1") && b.includes("ci: lint failed"))).toBe(true);
+    expect(bodies.some((b) => b.includes("CI fix attempt 2") && b.includes("ci: test failed"))).toBe(true);
+  });
+
   it("is idempotent on replay (same seq not double-written)", async () => {
     const { run } = await seedRun();
     const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" });
