@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { listChannels, listThreads, createThread, listRepos } from "./api.js";
+import { createChannel, searchMessages } from "./api.js";
 
 beforeEach(() => vi.restoreAllMocks());
 
@@ -30,5 +31,22 @@ describe("nav api", () => {
   it("listRepos parses the array", async () => {
     vi.stubGlobal("fetch", mockFetch([{ id: "r1", githubName: "r" }]));
     expect((await listRepos()).map((r) => r.id)).toEqual(["r1"]);
+  });
+});
+
+describe("channel + search api", () => {
+  it("createChannel posts the name", async () => {
+    const f = vi.fn(async () => ({ ok: true, status: 201, json: async () => ({ id: "cN", name: "random" }) })) as unknown as typeof fetch;
+    vi.stubGlobal("fetch", f);
+    const c = await createChannel("random");
+    expect(c.id).toBe("cN");
+    const init = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({ name: "random" });
+  });
+  it("searchMessages encodes the query", async () => {
+    const f = vi.fn(async () => ({ ok: true, json: async () => [] })) as unknown as typeof fetch;
+    vi.stubGlobal("fetch", f);
+    await searchMessages("login bug");
+    expect((f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("/search?q=login%20bug");
   });
 });

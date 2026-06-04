@@ -22,3 +22,12 @@ export interface Repo {
   id: string; orgId: string; workspaceId: string;
   githubOwner: string; githubName: string; defaultBranch: string; tokenEnvVar: string;
 }
+
+export interface SearchResult {
+  messageId: string;
+  threadId: string;
+  threadTitle: string;
+  body: string;
+  kind: MessageKind;
+  createdAt: string;
+}

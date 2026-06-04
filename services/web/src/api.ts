@@ -1,4 +1,4 @@
-import type { Message, Channel, Thread, Repo } from "./types.js";
+import type { Message, Channel, Thread, Repo, SearchResult } from "./types.js";
 import { DEV_HEADERS } from "./types.js";
 
 export async function listMessages(threadId: string): Promise<Message[]> {
@@ -42,5 +42,21 @@ export async function createThread(channelId: string, input: { title: string; re
 export async function listRepos(): Promise<Repo[]> {
   const res = await fetch(`/repos`, { headers: { ...DEV_HEADERS } });
   if (!res.ok) throw new Error(`listRepos ${res.status}`);
+  return res.json();
+}
+
+export async function createChannel(name: string): Promise<Channel> {
+  const res = await fetch(`/channels`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...DEV_HEADERS },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(`createChannel ${res.status}`);
+  return res.json();
+}
+
+export async function searchMessages(q: string): Promise<SearchResult[]> {
+  const res = await fetch(`/search?q=${encodeURIComponent(q)}`, { headers: { ...DEV_HEADERS } });
+  if (!res.ok) throw new Error(`searchMessages ${res.status}`);
   return res.json();
 }
