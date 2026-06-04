@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox-runner
+  labels: { app: acp-sandbox-runner }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: acp-sandbox-runner } }
+  template:
+    metadata: { labels: { app: acp-sandbox-runner } }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile: { type: RuntimeDefault }
+      # NOTE: production runs this pod on a gVisor/Kata RuntimeClass (kernel/microVM
+      # boundary for untrusted agent code). Set `runtimeClassName: gvisor` once the
+      # node runtime is installed.
+      containers:
+        - name: sandbox-runner
+          image: acp-sandbox-runner:dev
+          imagePullPolicy: Never
+          ports: [{ containerPort: 8090 }]
+          env: [{ name: SANDBOX_ADDR, value: ":8090" }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts: [{ name: work, mountPath: /tmp }]
+          resources:
+            requests: { cpu: "200m", memory: "256Mi" }
+            limits: { cpu: "2", memory: "2Gi" }
+      volumes: [{ name: work, emptyDir: {} }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: sandbox-runner }
+spec:
+  selector: { app: acp-sandbox-runner }
+  ports: [{ port: 8090, targetPort: 8090 }]
