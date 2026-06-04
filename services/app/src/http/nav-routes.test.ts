@@ -204,6 +204,43 @@ describe("nav routes", () => {
     await app.close();
   });
 
+  it("POST /workspaces/:id/ensure-assistant provisions @iris (admin); non-admin 403; cross-org 404 (#87)", async () => {
+    const app = makeApp();
+    const ok = await app.inject({
+      method: "POST", url: "/workspaces/w1/ensure-assistant",
+      headers: { "x-org-id": "o1", "x-user-id": "m1" },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().handle).toBe("iris");
+    expect(ok.json().adapter).toBe("claude-code");
+
+    // idempotent — second call returns the same agent, no error
+    const again = await app.inject({
+      method: "POST", url: "/workspaces/w1/ensure-assistant",
+      headers: { "x-org-id": "o1", "x-user-id": "m1" },
+    });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().id).toBe(ok.json().id);
+
+    // non-admin → 403
+    const denied = await app.inject({
+      method: "POST", url: "/workspaces/w1/ensure-assistant",
+      headers: { "x-org-id": "o1", "x-user-id": "reg" },
+    });
+    expect(denied.statusCode).toBe(403);
+
+    // cross-org admin → 404 (workspace not in their org)
+    await h.db.insert(orgs).values({ id: "o2", name: "O2" });
+    await h.db.insert(workspaces).values({ id: "w2", orgId: "o2", name: "W2" });
+    await h.db.insert(members).values({ id: "m2", orgId: "o2", workspaceId: "w2", displayName: "Other", role: "admin" });
+    const cross = await app.inject({
+      method: "POST", url: "/workspaces/w1/ensure-assistant",
+      headers: { "x-org-id": "o2", "x-user-id": "m2" },
+    });
+    expect(cross.statusCode).toBe(404);
+    await app.close();
+  });
+
   it("GET /search filters by body, org-scoped", async () => {
     const app = makeApp();
     // seed a thread + message to find

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { makeDb } from "./client.js";
 import { orgs, workspaces, channels, threads, agents, repos, members } from "./schema.js";
 import { hashPassword } from "../auth/password.js";
+import { ensureDefaultAssistant } from "../agents/default-assistant.js";
 
 const owner = process.env.E2E_REPO_OWNER ?? "gagan114662";
 const repo = process.env.E2E_REPO_NAME ?? "acp-e2e-fixture";
@@ -17,5 +18,7 @@ await db.insert(channels).values({ id: "c1", orgId: "o1", workspaceId: "w1", nam
 await db.insert(threads).values({ id: "t1", orgId: "o1", channelId: "c1", title: "Demo thread", repoId: "r1" })
   .onConflictDoUpdate({ target: threads.id, set: { channelId: "c1", repoId: "r1" } });
 await db.insert(agents).values({ id: "a1", orgId: "o1", workspaceId: "w1", handle: "coder", displayName: "Coder", adapter: "fake", config: {} }).onConflictDoNothing();
+// #87: every workspace gets a built-in @iris assistant out of the box (idempotent).
+await ensureDefaultAssistant(db, { orgId: "o1", workspaceId: "w1" });
 await sql.end();
 console.log("seeded");

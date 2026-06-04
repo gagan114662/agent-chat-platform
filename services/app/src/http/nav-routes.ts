@@ -1,8 +1,11 @@
 import type { FastifyInstance } from "fastify";
+import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
 import { listChannels, listThreads, listRepos, createThread, createChannel, renameChannel, setChannelArchived } from "../nav/nav.js";
 import { searchMessages } from "../search/search.js";
+import { ensureDefaultAssistant } from "../agents/default-assistant.js";
+import { workspaces } from "../db/schema.js";
 import { roleOf, can } from "../rbac/rbac.js";
 
 export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
@@ -69,6 +72,20 @@ export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
     if (!name?.trim()) return reply.code(400).send({ error: "name required" });
     const channel = await createChannel(d.db, { orgId, name: name.trim() });
     return reply.code(201).send(channel);
+  });
+
+  // #87: provision the built-in @iris assistant for a workspace (admin-gated,
+  // org-scoped, idempotent). Cross-org / unknown workspace → 404.
+  app.post("/workspaces/:id/ensure-assistant", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "channel:manage")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
+    const [ws] = await d.db.select().from(workspaces).where(and(eq(workspaces.id, id), eq(workspaces.orgId, orgId)));
+    if (!ws) return reply.code(404).send({ error: "workspace not found" });
+    const agent = await ensureDefaultAssistant(d.db, { orgId, workspaceId: id });
+    return agent;
   });
 
   app.get("/search", async (req) => {
