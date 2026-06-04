@@ -1,0 +1,1 @@
+ALTER TABLE "repos" ADD COLUMN "autonomy" text DEFAULT 'autopilot-merge' NOT NULL;

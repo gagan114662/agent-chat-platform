@@ -19,6 +19,7 @@ export const repos = pgTable("repos", {
   githubName: text("github_name").notNull(),
   defaultBranch: text("default_branch").notNull().default("main"),
   tokenEnvVar: text("token_env_var").notNull(),
+  autonomy: text("autonomy").notNull().default("autopilot-merge"), // 'monitor-only'|'resolve-ci'|'autopilot-merge'
 });
 
 export const members = pgTable("members", {

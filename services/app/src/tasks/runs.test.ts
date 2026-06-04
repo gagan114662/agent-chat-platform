@@ -19,4 +19,8 @@ describe("run state machine", () => {
   it("rejects skipping pending→merged", () => {
     expect(canTransition("pending", "merged")).toBe(false);
   });
+  it("allows running→held_for_human and treats it terminal", () => {
+    expect(canTransition("running", "held_for_human")).toBe(true);
+    expect(canTransition("held_for_human", "running")).toBe(false);
+  });
 });
