@@ -79,6 +79,8 @@ type Adapter interface {
 	Identify() Identity
 	Prepare(ctx context.Context, p PrepareContext) error
 	Run(ctx context.Context, repoDir, intent string, emit Emit) error
+	// Plan produces a read-only plan for the intent WITHOUT editing files.
+	Plan(ctx context.Context, repoDir, intent string) (string, error)
 	ApplyFeedback(ctx context.Context, notes string, emit Emit) error
 	Teardown(ctx context.Context) error
 }

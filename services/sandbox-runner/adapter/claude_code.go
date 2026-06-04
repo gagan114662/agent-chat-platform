@@ -30,10 +30,11 @@ func maxPromptBytes() int {
 type ClaudeCodeAdapter struct {
 	lookPath func(string) (string, error)
 	exec     func(ctx context.Context, dir, intent string, onLine func(string)) error
+	planExec func(ctx context.Context, dir, intent string) (string, error)
 }
 
 func NewClaudeCodeAdapter() *ClaudeCodeAdapter {
-	return &ClaudeCodeAdapter{lookPath: exec.LookPath, exec: runClaudeCLI}
+	return &ClaudeCodeAdapter{lookPath: exec.LookPath, exec: runClaudeCLI, planExec: runClaudePlanCLI}
 }
 
 func (*ClaudeCodeAdapter) Identify() Identity {
@@ -63,6 +64,23 @@ func (a *ClaudeCodeAdapter) Run(ctx context.Context, repoDir, intent string, emi
 	}
 	emit(Event{Type: EventDone, Message: "claude-code: finished"})
 	return nil
+}
+
+// Plan runs `claude -p <intent> --permission-mode plan` (read-only) in repoDir
+// and returns the captured stdout. Reuses the Plan-24 hardening: prompt-bound,
+// quarantine of repo-resident agent instructions, and filterChildEnv.
+func (a *ClaudeCodeAdapter) Plan(ctx context.Context, repoDir, intent string) (string, error) {
+	if len(intent) > maxPromptBytes() {
+		return "", fmt.Errorf("intent exceeds max prompt size")
+	}
+	if restore, err := quarantineRepoConfig(repoDir); err == nil {
+		defer restore()
+	}
+	text, err := a.planExec(ctx, repoDir, intent)
+	if err != nil {
+		return "", fmt.Errorf("claude-code plan failed: %w", err)
+	}
+	return text, nil
 }
 
 func (a *ClaudeCodeAdapter) ApplyFeedback(ctx context.Context, notes string, emit Emit) error {
@@ -103,4 +121,20 @@ func runClaudeCLI(ctx context.Context, dir, intent string, onLine func(string)) 
 	_ = pw.Close()
 	<-done
 	return runErr
+}
+
+// runClaudePlanCLI invokes `claude -p <intent> --permission-mode plan` in dir,
+// capturing the full combined stdout+stderr as the returned plan string.
+// Read-only: --permission-mode plan instructs the agent not to edit files.
+func runClaudePlanCLI(ctx context.Context, dir, intent string) (string, error) {
+	cmd := exec.CommandContext(ctx, "claude", "-p", intent, "--permission-mode", "plan")
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	cmd.Env = filterChildEnv(os.Environ())
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }

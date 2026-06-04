@@ -38,6 +38,11 @@ func (*FakeAdapter) Run(ctx context.Context, repoDir, intent string, emit Emit) 
 	return nil
 }
 
+// Plan returns a deterministic plan string without writing any files.
+func (*FakeAdapter) Plan(_ context.Context, _ string, intent string) (string, error) {
+	return "PLAN for: " + intent + "\n1. step one\n2. step two", nil
+}
+
 func (a *FakeAdapter) ApplyFeedback(ctx context.Context, notes string, emit Emit) error {
 	emit(Event{Type: EventLog, Message: "applying feedback: " + notes})
 	p := filepath.Join(a.repoDir, "FEEDBACK.md")

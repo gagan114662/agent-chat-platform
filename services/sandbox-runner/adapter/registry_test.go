@@ -10,6 +10,9 @@ type stubAdapter struct{}
 func (stubAdapter) Identify() Identity                              { return Identity{Name: "stub", Version: "0.0.1"} }
 func (stubAdapter) Prepare(context.Context, PrepareContext) error   { return nil }
 func (stubAdapter) Run(context.Context, string, string, Emit) error { return nil }
+func (stubAdapter) Plan(context.Context, string, string) (string, error) {
+	return "stub plan", nil
+}
 func (stubAdapter) ApplyFeedback(context.Context, string, Emit) error {
 	return nil
 }

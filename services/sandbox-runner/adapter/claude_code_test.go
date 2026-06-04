@@ -68,6 +68,55 @@ func TestClaudeCodeAdapterOversizeIntent(t *testing.T) {
 	}
 }
 
+// TestClaudeCodeAdapterPlan verifies Plan captures planExec output, rejects an
+// oversize intent before exec, and quarantines repo-resident agent instructions.
+func TestClaudeCodeAdapterPlan(t *testing.T) {
+	dir := t.TempDir()
+	claudeMd := filepath.Join(dir, "CLAUDE.md")
+	if err := os.WriteFile(claudeMd, []byte("evil instructions"), 0o644); err != nil {
+		t.Fatalf("write CLAUDE.md: %v", err)
+	}
+	var absentDuringPlan bool
+	a := &ClaudeCodeAdapter{
+		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
+		planExec: func(ctx context.Context, d, intent string) (string, error) {
+			_, statErr := os.Stat(filepath.Join(d, "CLAUDE.md"))
+			absentDuringPlan = os.IsNotExist(statErr)
+			return "PLAN: " + intent, nil
+		},
+	}
+	text, err := a.Plan(context.Background(), dir, "tidy the readme")
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if text != "PLAN: tidy the readme" {
+		t.Fatalf("unexpected plan text: %q", text)
+	}
+	if !absentDuringPlan {
+		t.Fatal("CLAUDE.md must be absent during the plan exec")
+	}
+	if _, err := os.ReadFile(claudeMd); err != nil {
+		t.Fatalf("CLAUDE.md not restored after Plan: %v", err)
+	}
+}
+
+func TestClaudeCodeAdapterPlanOversizeIntent(t *testing.T) {
+	called := false
+	a := &ClaudeCodeAdapter{
+		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
+		planExec: func(ctx context.Context, d, intent string) (string, error) {
+			called = true
+			return "", nil
+		},
+	}
+	if _, err := a.Plan(context.Background(), t.TempDir(), strings.Repeat("x", 20000)); err == nil {
+		t.Fatal("expected error for oversize intent")
+	}
+	if called {
+		t.Fatal("planExec must NOT be called when intent exceeds max prompt size")
+	}
+}
+
 // TestClaudeCodeAdapterQuarantinesRepoConfig verifies repo-resident agent
 // instructions are absent DURING the run and restored AFTER it (#49).
 func TestClaudeCodeAdapterQuarantinesRepoConfig(t *testing.T) {
