@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "./components/Sidebar.js";
 import { CommandPalette } from "./components/CommandPalette.js";
-import { buildCommands } from "./lib/commands.js";
+import { buildCommands, type Command } from "./lib/commands.js";
 import { ThreadView } from "./components/ThreadView.js";
 import { Composer } from "./components/Composer.js";
 import { SearchBar } from "./components/SearchBar.js";
@@ -31,6 +31,7 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
   const [unreads, setUnreads] = useState<Record<string, number>>({});
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [search, setSearch] = useState<{ q: string; nonce: number } | undefined>(undefined);
   const searchRef = useRef<HTMLInputElement>(null);
   const memory = useMemory();
 
@@ -57,9 +58,11 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
   };
 
   // Focus the header search input (used by the "Search messages…" command + /search).
+  // A query (from `/search <q>`) is pushed through state so SearchBar runs it.
   const focusSearch = (query?: string) => {
     searchRef.current?.focus();
-    if (query) searchRef.current!.value = query;
+    // Bump a nonce so SearchBar re-runs even when the same query repeats.
+    if (query) setSearch((prev) => ({ q: query, nonce: (prev?.nonce ?? 0) + 1 }));
   };
 
   // ⌘K / Ctrl+K toggles the command palette.
@@ -163,7 +166,7 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
             <p className="text-xs text-neutral-400">chat → sandboxed agent → PR → back to chat</p>
           </div>
           <div className="flex items-center gap-3">
-            <SearchBar onSearch={searchMessages} onSelect={setActiveThreadId} inputRef={searchRef} />
+            <SearchBar key={search?.nonce ?? 0} onSearch={searchMessages} onSelect={setActiveThreadId} inputRef={searchRef} initialQuery={search?.q} />
             <button onClick={onLogout} className="text-xs text-neutral-500 hover:text-neutral-800">Sign out ({userId})</button>
           </div>
         </header>
@@ -180,7 +183,7 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
           : view === "inbox"
             ? <InboxPanel inbox={inbox} onSelect={selectThread} />
             : activeThreadId
-              ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} />
+              ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} commands={commands} onSlashSearch={focusSearch} />
               : <div className="flex-1" />}
       </main>
       <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
@@ -214,7 +217,7 @@ function InboxPanel({ inbox, onSelect }: { inbox: InboxItem[]; onSelect: (id: st
 }
 
 // Separate component so the stream hook re-subscribes when the active thread changes.
-function ThreadConversation({ threadId, onActivity }: { threadId: string; onActivity?: () => void }) {
+function ThreadConversation({ threadId, onActivity, commands, onSlashSearch }: { threadId: string; onActivity?: () => void; commands?: Command[]; onSlashSearch?: (q: string) => void }) {
   const { messages, send, refetch } = useThreadStream(threadId, onActivity);
   const onApprove = (runId: string) => { approveRun(runId).then(refetch).catch(() => {}); };
   const onDecline = (runId: string) => { declineRun(runId).then(refetch).catch(() => {}); };
@@ -231,7 +234,7 @@ function ThreadConversation({ threadId, onActivity }: { threadId: string; onActi
   return (
     <>
       <ThreadView messages={messages} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} onLoadCheckpoints={onLoadCheckpoints} onRestoreCheckpoint={onRestoreCheckpoint} onApprovePlan={onApprovePlan} onRejectPlan={onRejectPlan} />
-      <Composer onSend={send} />
+      <Composer onSend={send} commands={commands} onSlashSearch={onSlashSearch} />
     </>
   );
 }
