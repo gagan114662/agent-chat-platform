@@ -133,6 +133,22 @@ export const runCheckpoints = pgTable("run_checkpoints", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// #55 incidents: a security/observability incident detected from ingested
+// telemetry (e.g. Cloudflare Logpush). The id is deterministic (`${orgId}:${key}`)
+// so re-ingesting the same batch collapses (idempotent). `taskId` links the Task
+// opened in the org's security thread (nullable when no thread is configured).
+export const incidents = pgTable("incidents", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  source: text("source").notNull(),            // e.g. "cloudflare"
+  severity: text("severity").notNull(),        // "low" | "medium" | "high"
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  raw: jsonb("raw").notNull().default({}),
+  taskId: text("task_id"),                     // nullable — set when a Task is opened
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull(),
