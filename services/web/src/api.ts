@@ -1,6 +1,15 @@
 import type { Message, Channel, Thread, Repo, SearchResult, Principal, MemoryGraph, MemoryStats, MemoryKind, MemoryScope, ChangedFile } from "./types.js";
 import { authHeaders } from "./auth.js";
 
+// Fetches a short-lived single-use WS ticket so the token never rides in the WS URL.
+// Returns null on any non-2xx (e.g. dev/no-session) so the WS still opens token-free.
+export async function getWsTicket(): Promise<string | null> {
+  const res = await fetch(`/ws-ticket`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) return null;
+  const { ticket } = (await res.json()) as { ticket?: string };
+  return ticket ?? null;
+}
+
 export async function listMessages(threadId: string): Promise<Message[]> {
   const res = await fetch(`/threads/${threadId}/messages`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`listMessages ${res.status}`);

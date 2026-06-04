@@ -3,6 +3,7 @@ import websocket from "@fastify/websocket";
 import { makeDb } from "./db/client.js";
 import { ThreadPubSub } from "./realtime/pubsub.js";
 import { registerWs } from "./realtime/ws.js";
+import { redeemWsTicket } from "./realtime/ws-tickets.js";
 import { registerRoutes } from "./http/routes.js";
 import { registerTaskRoutes } from "./http/task-routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
@@ -37,6 +38,7 @@ export async function buildServer() {
       const [t] = await db.select({ orgId: threads.orgId }).from(threads).where(eq(threads.id, threadId));
       return t?.orgId;
     },
+    redeemWsTicket,
   );
   const sandboxUrl = process.env.SANDBOX_URL ?? "http://localhost:8090";
   registerRoutes(app, { db, sql, temporal, sandboxUrl });

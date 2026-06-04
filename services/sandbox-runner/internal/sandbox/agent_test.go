@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,7 @@ func TestFakeAgentApply(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := FakeAgent{}
-	if err := a.Apply(dir, "add a greeting"); err != nil {
+	if err := a.Apply(context.Background(), dir, "add a greeting"); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 	b, err := os.ReadFile(filepath.Join(dir, "AGENT_CHANGES.md"))

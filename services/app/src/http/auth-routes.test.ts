@@ -49,7 +49,7 @@ describe("auth routes", () => {
   });
 
   it("strict mode requires a valid password", async () => {
-    process.env.AUTH_REQUIRE_SESSION = "true";
+    delete process.env.ACP_ALLOW_DEV_HEADERS;
     try {
       const { hashPassword } = await import("../auth/password.js");
       await h.db.update((await import("../db/schema.js")).members).set({ passwordHash: hashPassword("pw") }).where((await import("drizzle-orm")).eq((await import("../db/schema.js")).members.id, "m1"));
@@ -60,12 +60,12 @@ describe("auth routes", () => {
       expect(ok.statusCode).toBe(201);
       await app.close();
     } finally {
-      delete process.env.AUTH_REQUIRE_SESSION;
+      process.env.ACP_ALLOW_DEV_HEADERS = "1";
     }
   });
 
   it("strict mode rejects unauthenticated requests and hides /auth/members", async () => {
-    process.env.AUTH_REQUIRE_SESSION = "true";
+    delete process.env.ACP_ALLOW_DEV_HEADERS;
     try {
       const app = makeApp();
       const me = await app.inject({ method: "GET", url: "/auth/me" });
@@ -77,7 +77,7 @@ describe("auth routes", () => {
       expect(login.statusCode).not.toBe(401);
       await app.close();
     } finally {
-      delete process.env.AUTH_REQUIRE_SESSION;
+      process.env.ACP_ALLOW_DEV_HEADERS = "1";
     }
   });
 });

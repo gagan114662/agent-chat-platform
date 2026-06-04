@@ -61,7 +61,7 @@ func TestCommitAllAndPush(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sha, err := CommitAllAndPush(context.Background(), dest, "feature/test", "msg")
+	sha, err := CommitAllAndPush(context.Background(), dest, "feature/test", "msg", gitCred{})
 	if err != nil {
 		t.Fatalf("CommitAllAndPush: %v", err)
 	}
@@ -77,10 +77,10 @@ func TestCommitAllAndPush(t *testing.T) {
 }
 
 func TestCommitAllAndPushEmptyGuards(t *testing.T) {
-	if _, err := CommitAllAndPush(context.Background(), t.TempDir(), "", "m"); err == nil {
+	if _, err := CommitAllAndPush(context.Background(), t.TempDir(), "", "m", gitCred{}); err == nil {
 		t.Fatal("expected error for empty branch")
 	}
-	if _, err := CommitAllAndPush(context.Background(), t.TempDir(), "b", ""); err == nil {
+	if _, err := CommitAllAndPush(context.Background(), t.TempDir(), "b", "", gitCred{}); err == nil {
 		t.Fatal("expected error for empty message")
 	}
 }

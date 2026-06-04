@@ -37,6 +37,10 @@ func NewHandler() http.Handler {
 		if name == "" {
 			name = "fake"
 		}
+		if !adapterAuthorized(name) {
+			http.Error(w, "adapter not authorized: "+name, http.StatusForbidden)
+			return
+		}
 		factory, ok := adapter.DefaultRegistry().Get(name)
 		if !ok {
 			http.Error(w, "unknown adapter: "+name, http.StatusBadRequest)
@@ -81,6 +85,10 @@ func NewHandler() http.Handler {
 		name := req.Adapter
 		if name == "" {
 			name = "fake"
+		}
+		if !adapterAuthorized(name) {
+			http.Error(w, "adapter not authorized: "+name, http.StatusForbidden)
+			return
 		}
 		factory, ok := adapter.DefaultRegistry().Get(name)
 		if !ok {
