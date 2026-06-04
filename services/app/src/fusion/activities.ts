@@ -8,6 +8,7 @@ import { makeFusionSink, type SinkCtx } from "./events.js";
 import { buildMergeGate } from "./gate.js";
 import { reporterFromEnv } from "../billing/billing.js";
 import { reportRunUsage } from "../billing/report.js";
+import { captureDecision } from "../memory/capture.js";
 
 export interface RunFusionActivityInput {
   owner: string; repo: string; repoUrl: string; baseBranch: string;
@@ -26,6 +27,10 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
     const mergeGate = buildMergeGate(github, { owner: input.owner, repo: input.repo, autonomy: input.autonomy });
     const result = await runFusionTraced(deps, input, { pollMs: input.pollMs, maxPolls: input.maxPolls, onEvent: sink, mergeGate });
     await reportRunUsage(db, reporterFromEnv(), { orgId: input.sink.orgId, runId: input.sink.runId, outcome: result.outcome });
+    await captureDecision(db, {
+      orgId: input.sink.orgId, runId: input.sink.runId, agentId: input.sink.agentId, threadId: input.sink.threadId,
+      intent: input.intent, outcome: result.outcome, prNumber: result.prNumber,
+    });
     return result;
   } finally {
     await sql.end();

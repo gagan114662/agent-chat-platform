@@ -6,6 +6,7 @@ import { registerWs } from "./realtime/ws.js";
 import { registerRoutes } from "./http/routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
 import { registerDmRoutes } from "./http/dm-routes.js";
+import { registerMemoryRoutes } from "./http/memory-routes.js";
 import { registerAuth } from "./http/auth-routes.js";
 import { resolveSession } from "./auth/auth.js";
 import { startWorker } from "./fusion/worker.js";
@@ -26,6 +27,7 @@ export async function buildServer() {
   registerRoutes(app, { db, sql, temporal, sandboxUrl: process.env.SANDBOX_URL ?? "http://localhost:8090" });
   registerNavRoutes(app, { db });
   registerDmRoutes(app, { db });
+  registerMemoryRoutes(app, { db });
   return app;
 }
 

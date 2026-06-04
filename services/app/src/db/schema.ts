@@ -114,3 +114,23 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
+
+export const memoryNodes = pgTable("memory_nodes", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  kind: text("kind").notNull(),                 // 'decision'|'fact'|'preference'|'identity'|'artifact'
+  scope: text("scope").notNull().default("org"), // 'personal'|'project'|'team'|'org'
+  label: text("label").notNull(),
+  body: text("body").notNull().default(""),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const memoryEdges = pgTable("memory_edges", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  fromId: text("from_id").notNull(),
+  toId: text("to_id").notNull(),
+  relation: text("relation").notNull(),         // 'derived_from'|'relates_to'|'authored_by'|...
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ ux: uniqueIndex("memory_edges_ux").on(t.fromId, t.toId, t.relation) }));
