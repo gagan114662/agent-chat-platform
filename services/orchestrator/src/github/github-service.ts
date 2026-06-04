@@ -24,11 +24,22 @@ export interface FileContent {
   size: number;
 }
 
+export interface GitHubIssue {
+  number: number;
+  title: string;
+  body?: string;
+  state: string;
+  htmlUrl: string;
+}
+
 export interface GitHubService {
   openPr(input: OpenPrInput): Promise<PullRequest>;
   getChecksStatus(owner: string, repo: string, ref: string): Promise<ChecksStatus>;
   merge(owner: string, repo: string, prNumber: number): Promise<void>;
   getChangedFiles(owner: string, repo: string, prNumber: number): Promise<ChangedFile[]>;
+  // Lists a repo's issues (open by default). Pull requests are filtered out — the
+  // GitHub REST issues endpoint returns PRs too (they carry a `pull_request` key).
+  listIssues(owner: string, repo: string, opts?: { first?: number }): Promise<GitHubIssue[]>;
   // Reads a single file's content at a ref. Text files are decoded to utf8; binary
   // files (images/pdf/etc by extension) are returned as raw base64. Throws if the
   // file exceeds the size cap or the path is not a file.
