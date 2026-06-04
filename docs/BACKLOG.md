@@ -52,3 +52,31 @@ Legend: ✅ already have · 🔜 partial/foundation exists · ❌ not started.
 
 ---
 *Maintained alongside `HANDOVER.md`. New conductor.build releases → re-review and append here.*
+
+---
+
+# Gap analysis vs reload.chat (comms side we fuse)
+
+**Source:** https://reload.chat/ (reviewed 2026-06-04). reload.chat is the chat/coordination/**memory** side
+of the wedge. ✅ have · 🔜 partial · ❌ missing.
+
+## Have / partial
+- Channels, Threads ✅ (2.1a) · DMs ✅ (2.1c) · message search ✅ (2.1b)
+- `@mention` an agent → it executes ✅ (the fusion seam) · Tasks: create/assign/status ✅ (open/in_progress/done/blocked)
+- Agents as first-class principals ✅ · basic RBAC (admin/member) 🔜 · session auth ✅ (2.2a–c)
+- Adapter SDK (vendor-neutral contract) ✅ + real Claude Code (CLI) adapter ✅
+- 24/7 autonomous between decision points 🔜 (Temporal durability + `held_for_human`)
+
+## Missing — the real reload.chat differentiators we have NOT built
+- **Memory / typed context graph** ❌ — automatic capture of decisions/facts/preferences/identities/artifacts,
+  shared across humans+agents, persistent. We persist messages only. This is the biggest gap. (issue filed)
+- **Multi-agent coordination + agent↔agent mentions + task hand-off** ❌ — agents reassigning work to each
+  other in a channel. We run one agent per mention; no inter-agent coordination. (issue filed)
+- **Protocol agents (MCP / ACP / A2A / REST bridges)** ❌ — SDK contract exists; only the CLI adapter is real.
+  (overlaps BACKLOG P1 #9 MCP) (issue filed)
+- **Human-in-the-loop approvals (`@human` for sensitive actions)** ❌ — overlaps tool-approval / plan-mode
+  (issues #20/#21). Wire `needs_input`/`confidence` from the adapter contract into a thread approval.
+- **Agent pools / cross-team agent sharing** ❌ — pull agents from multiple teams into a channel. (issue filed)
+- **Richer RBAC** ❌ — read/write/**propagate** scoped to personal/project/team/org (we have admin/member). (issue filed)
+- **Task niceties** 🔜/❌ — "In Review" state; link tasks to memory/files for context hand-off.
+- **Command palette (⌘K), notifications/unread, retention tiers** ❌ (overlaps conductor backlog #10/#12).
