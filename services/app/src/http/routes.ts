@@ -11,15 +11,9 @@ import { openTaskForMention } from "../tasks/tasks.js";
 import { startRun } from "../fusion/bridge.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
 import { threads, repos } from "../db/schema.js";
+import { actor } from "./actor.js";
 
 export interface Deps { db: DB; sql: postgres.Sql; temporal: Client; sandboxUrl: string; }
-
-function actor(req: { headers: Record<string, unknown> }) {
-  return {
-    orgId: (req.headers["x-org-id"] as string) ?? "o1",
-    userId: (req.headers["x-user-id"] as string) ?? "m1",
-  };
-}
 
 export function registerRoutes(app: FastifyInstance, d: Deps) {
   app.get("/threads/:id/messages", async (req) => {

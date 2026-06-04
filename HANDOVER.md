@@ -9,16 +9,24 @@
 
 Building **agent-chat-platform**: a chat-driven AI agent execution platform (Slack-for-AI-agents
 fused with conductor.build-style sandboxed execution → GitHub PRs). The **design spec is
-complete and approved**, **Plan 1 is COMPLETE/merged/live-proven**, and **Plan 2.0a (backend) +
-2.0b (React UI) are BUILT, with PRs open.** The full chat→fusion→chat seam is implemented end to end.
+complete and approved**, **Plan 1 + Plan 2.0 (a backend + b UI) are COMPLETE and merged to `main`**
+(Plan 1 live-proven). **Plan 2.1a (channels & threads navigation) is BUILT (PR #4 open).** The full
+chat→fusion→chat seam plus multi-thread navigation is implemented.
 
 - **Repo:** https://github.com/gagan114662/agent-chat-platform (private, owner `gagan114662`)
 - **Local path:** `/Users/gaganarora/Desktop/my projects/agent-chat-platform`
-- **Open PRs (stacked):** **#2** `plan-2.0-chat-tasks` → `main` (2.0a backend); **#3** `plan-2.0b-web-ui`
-  → `plan-2.0-chat-tasks` (2.0b UI). Plan 1 already merged (`dc57e6a`).
-- **Next action:** review/merge **#2 then #3** (stacked order). To see the UI live, run the 2.0a stack
-  + `cd services/web && pnpm dev` (Vite proxies to `:8080`). Then continue Phase 2.1 (channel/thread
-  navigation, DMs, task board) or 2.2 (real auth/RBAC).
+- **`main`:** has Plan 1 + 2.0a + 2.0b merged. Suites green (orchestrator 14, app 19, web 7).
+- **Open PR:** **#4** `plan-2.1a-navigation` → `main` (nav). (PRs #2/#3 merged; #3 was auto-closed by
+  GitHub during the stacked merge but its code landed via local merge `ff99318`.)
+- **Next action:** review/merge **#4**, then continue Phase 2.1: **2.1b** (channel management, DMs,
+  message search, thread `createdAt`+ordering) or jump to **2.2** (real SSO/RBAC). To run live: bring up
+  the 2.0a stack (`services/app/README.md`) + `cd services/web && pnpm dev`.
+
+### Plan 2.1a — BUILT ✅ (PR #4)
+- Backend `nav` module + routes (`GET /channels`, `GET /channels/:id/threads`, `POST .../threads`,
+  `GET /repos`; dev-auth `actor` extracted to `src/http/actor.ts`). UI: data-driven `Sidebar` +
+  `NewThreadForm`; `App` fetches nav + holds `activeThreadId` (switching re-subscribes the WS stream).
+- **Verified:** app 27/27 (19 prior + 8 new), web 15/15, build clean. Additive; no schema change.
 
 ### Plan 2.0b — BUILT ✅ (PR #3)
 - `services/web` (`@acp/web`): React + Vite + TS + Tailwind v4. Renders the thread, posts messages, and

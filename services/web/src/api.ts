@@ -1,4 +1,4 @@
-import type { Message } from "./types.js";
+import type { Message, Channel, Thread, Repo } from "./types.js";
 import { DEV_HEADERS } from "./types.js";
 
 export async function listMessages(threadId: string): Promise<Message[]> {
@@ -14,5 +14,33 @@ export async function postMessage(threadId: string, body: string): Promise<{ mes
     body: JSON.stringify({ body }),
   });
   if (!res.ok) throw new Error(`postMessage ${res.status}`);
+  return res.json();
+}
+
+export async function listChannels(): Promise<Channel[]> {
+  const res = await fetch(`/channels`, { headers: { ...DEV_HEADERS } });
+  if (!res.ok) throw new Error(`listChannels ${res.status}`);
+  return res.json();
+}
+
+export async function listThreads(channelId: string): Promise<Thread[]> {
+  const res = await fetch(`/channels/${channelId}/threads`, { headers: { ...DEV_HEADERS } });
+  if (!res.ok) throw new Error(`listThreads ${res.status}`);
+  return res.json();
+}
+
+export async function createThread(channelId: string, input: { title: string; repoId?: string }): Promise<Thread> {
+  const res = await fetch(`/channels/${channelId}/threads`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...DEV_HEADERS },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`createThread ${res.status}`);
+  return res.json();
+}
+
+export async function listRepos(): Promise<Repo[]> {
+  const res = await fetch(`/repos`, { headers: { ...DEV_HEADERS } });
+  if (!res.ok) throw new Error(`listRepos ${res.status}`);
   return res.json();
 }

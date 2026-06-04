@@ -15,3 +15,10 @@ export interface Message {
 
 // Dev-auth stub headers the backend expects (Phase 2.2 replaces with real auth).
 export const DEV_HEADERS = { "x-org-id": "o1", "x-user-id": "m1" } as const;
+
+export interface Channel { id: string; orgId: string; workspaceId: string; name: string; }
+export interface Thread { id: string; orgId: string; channelId: string; title: string; repoId: string | null; }
+export interface Repo {
+  id: string; orgId: string; workspaceId: string;
+  githubOwner: string; githubName: string; defaultBranch: string; tokenEnvVar: string;
+}
