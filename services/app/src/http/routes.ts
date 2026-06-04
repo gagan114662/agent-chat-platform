@@ -48,6 +48,7 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
         repoUrl: `https://x-access-token:${token}@github.com/${repo.githubOwner}/${repo.githubName}.git`,
         baseBranch: repo.defaultBranch, intent: body, branch: `agent/${run.id}`,
         githubToken: token, sandboxUrl: d.sandboxUrl, pollMs: 5000, maxPolls: 24,
+        autonomy: (repo.autonomy as "monitor-only" | "resolve-ci" | "autopilot-merge"),
         sink: { orgId, threadId, runId: run.id, agentId: agent.id },
       });
       started.push(run.id);

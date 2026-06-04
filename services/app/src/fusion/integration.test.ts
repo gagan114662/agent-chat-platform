@@ -52,7 +52,7 @@ describe("chat fusion integration", () => {
           args: [{
             owner: "o", repo: "r", repoUrl: "x", baseBranch: "main", intent: "fix bug",
             branch: "agent/x", githubToken: "tok", sandboxUrl: "http://runner:8090",
-            pollMs: 0, maxPolls: 3, sink: { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" },
+            pollMs: 0, maxPolls: 3, autonomy: "autopilot-merge", sink: { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" },
           }],
         }),
       );
