@@ -15,10 +15,11 @@ export interface FusionInput {
   branch: string;
 }
 
-export type FusionOutcome = "merged" | "checks_failed" | "timeout" | "held_for_human";
+export type FusionOutcome = "merged" | "checks_failed" | "timeout" | "held_for_human" | "awaiting_plan";
 
 export type FusionEvent =
   | { type: "sandbox_started" }
+  | { type: "plan_proposed"; plan: string }
   | { type: "branch_pushed"; branch: string; commitSha: string }
   | { type: "pr_opened"; prNumber: number; prUrl: string }
   | { type: "checks"; status: "pending" | "success" | "failure" }
@@ -35,6 +36,12 @@ export interface FusionOptions {
   // Defaults keep today's behavior: maxFixAttempts 0 + no ciFix => no fix loop.
   maxFixAttempts?: number; // default 0
   ciFix?: (info: { branch: string; commitSha: string; prNumber: number; failure: string }) => Promise<{ commitSha: string }>;
+  // Plan mode (#20): when planMode is set, the run first produces a read-only plan
+  // and runs planGate to decide whether to proceed. If the gate is not approved,
+  // the run parks at outcome "awaiting_plan" (no edits, no PR). Defaults keep
+  // today's behavior: planMode false => no plan step.
+  planMode?: boolean;
+  planGate?: (info: { plan: string }) => Promise<{ approved: boolean }>;
 }
 
 export interface FusionResult {
@@ -54,6 +61,23 @@ export async function runFusion(
   opts: FusionOptions,
 ): Promise<FusionResult> {
   const emit = async (e: FusionEvent) => { if (opts.onEvent) await opts.onEvent(e); };
+
+  // Plan mode (#20): propose a read-only plan and gate on approval before any
+  // edits. If not approved, park at "awaiting_plan" (approval re-triggers a fresh
+  // execute run via startFusionRun — same shape as the merge-boundary gate).
+  if (opts.planMode) {
+    const { plan } = await deps.sandbox.plan({
+      repoUrl: input.repoUrl,
+      baseBranch: input.baseBranch,
+      intent: input.intent,
+    });
+    await emit({ type: "plan_proposed", plan });
+    const g = opts.planGate ? await opts.planGate({ plan }) : { approved: true };
+    if (!g.approved) {
+      await emit({ type: "outcome", outcome: "awaiting_plan" });
+      return { outcome: "awaiting_plan" };
+    }
+  }
 
   await emit({ type: "sandbox_started" });
   const run = await deps.sandbox.run({

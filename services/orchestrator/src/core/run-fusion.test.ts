@@ -8,6 +8,7 @@ function deps(checks: ChecksStatus[]) {
   const sandbox: SandboxRunner = {
     run: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "sha1" }),
     feedback: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "fixsha" }),
+    plan: vi.fn().mockResolvedValue({ plan: "PLAN" }),
   };
   let i = 0;
   const github: GitHubService = {
@@ -118,5 +119,34 @@ describe("runFusion", () => {
     });
     expect(out.outcome).toBe("checks_failed");
     expect(ciFix).toHaveBeenCalledTimes(2);
+  });
+
+  it("parks at awaiting_plan when planMode + gate declines (no edit run)", async () => {
+    const d = deps(["success"]);
+    const events: string[] = [];
+    const out = await runFusion(d, input, {
+      pollMs: 0, maxPolls: 5,
+      planMode: true,
+      planGate: async () => ({ approved: false }),
+      onEvent: (e) => { events.push(e.type); },
+    });
+    expect(out.outcome).toBe("awaiting_plan");
+    expect(d.sandbox.plan).toHaveBeenCalledTimes(1);
+    expect(d.sandbox.run).not.toHaveBeenCalled();
+    expect(d.github.openPr).not.toHaveBeenCalled();
+    expect(events).toEqual(["plan_proposed", "outcome"]);
+  });
+
+  it("proceeds to merge when planMode + gate approves", async () => {
+    const d = deps(["success"]);
+    const out = await runFusion(d, input, {
+      pollMs: 0, maxPolls: 5,
+      planMode: true,
+      planGate: async () => ({ approved: true }),
+    });
+    expect(out.outcome).toBe("merged");
+    expect(d.sandbox.plan).toHaveBeenCalledTimes(1);
+    expect(d.sandbox.run).toHaveBeenCalledTimes(1);
+    expect(d.github.merge).toHaveBeenCalled();
   });
 });

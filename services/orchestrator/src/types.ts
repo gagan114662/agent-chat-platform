@@ -17,6 +17,17 @@ export interface SandboxFeedbackRequest {
   adapter?: string;
 }
 
+export interface SandboxPlanRequest {
+  repoUrl: string;
+  baseBranch: string;
+  intent: string;
+  adapter?: string;
+}
+
+export interface PlanResult {
+  plan: string;
+}
+
 export type ChecksStatus = "pending" | "success" | "failure";
 
 export interface PullRequest {
