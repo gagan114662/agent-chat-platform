@@ -8,7 +8,7 @@ import { notify } from "../db/client.js";
 import { parseMentions } from "../chat/mentions.js";
 import { resolveMention, isPermittedOnRepo } from "../agents/agents.js";
 import { openTaskForMention } from "../tasks/tasks.js";
-import { startRun } from "../fusion/bridge.js";
+import { startFusionRun } from "../fusion/start.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
 import { threads, repos } from "../db/schema.js";
 import { actor } from "./actor.js";
@@ -49,12 +49,8 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
       const { run } = await openTaskForMention(d.db, {
         orgId, threadId, intent: body, agentId: agent.id, createdByKind: "human", createdById: userId,
       });
-      await startRun(d.temporal, run.workflowId, {
-        owner: repo.githubOwner, repo: repo.githubName,
-        baseBranch: repo.defaultBranch, intent: body, branch: `agent/${run.id}`,
-        tokenEnvVar: repo.tokenEnvVar, sandboxUrl: d.sandboxUrl, pollMs: 5000, maxPolls: 24,
-        autonomy: (repo.autonomy as "monitor-only" | "resolve-ci" | "autopilot-merge"),
-        sink: { orgId, threadId, runId: run.id, agentId: agent.id },
+      await startFusionRun(d.temporal, {
+        run, orgId, threadId, repo, agentId: agent.id, intent: body, sandboxUrl: d.sandboxUrl,
       });
       started.push(run.id);
     }
