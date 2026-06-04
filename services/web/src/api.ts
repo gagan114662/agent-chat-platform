@@ -103,6 +103,42 @@ export async function restoreCheckpoint(runId: string, cpId: string): Promise<{ 
   return res.json();
 }
 
+// #64 concurrent runs: fan a task out to N agents — starts one concurrent run per
+// agent. Returns the created run ids.
+export async function fanOutTask(taskId: string, agentIds: string[]): Promise<{ runs: string[] }> {
+  const res = await fetch(`/tasks/${taskId}/fan-out`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ agentIds }),
+  });
+  if (!res.ok) throw new Error(`fanOutTask ${res.status}`);
+  return res.json();
+}
+
+// #64 concurrent runs: a run competing on a task (sibling list shape).
+export interface TaskRun {
+  id: string;
+  state: string;
+  prNumber?: number | null;
+  prUrl?: string | null;
+  selected: boolean;
+}
+
+// #64 concurrent runs: list the runs competing on one task (siblings).
+export async function taskRuns(taskId: string): Promise<TaskRun[]> {
+  const res = await fetch(`/tasks/${taskId}/runs`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`taskRuns ${res.status}`);
+  const { runs } = (await res.json()) as { runs: TaskRun[] };
+  return runs;
+}
+
+// #64 concurrent runs: mark a run the winner among its task's siblings (exclusive).
+export async function selectRun(runId: string): Promise<{ run: TaskRun }> {
+  const res = await fetch(`/runs/${runId}/select`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`selectRun ${res.status}`);
+  return res.json();
+}
+
 export async function listChannels(): Promise<Channel[]> {
   const res = await fetch(`/channels`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`listChannels ${res.status}`);
