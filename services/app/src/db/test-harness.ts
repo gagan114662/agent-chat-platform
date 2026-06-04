@@ -4,7 +4,7 @@ import { makeDb } from "./client.js";
 const TABLES = [
   "sessions",
   "memory_edges", "memory_nodes",
-  "run_events", "runs", "tasks", "messages", "threads", "channels",
+  "run_checkpoints", "run_events", "runs", "tasks", "messages", "threads", "channels",
   "agents", "members", "repos", "workspaces", "orgs",
 ];
 
