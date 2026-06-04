@@ -18,11 +18,21 @@ export interface ReviewComment {
   line?: number;
 }
 
+export interface FileContent {
+  content: string;
+  encoding: "utf8" | "base64";
+  size: number;
+}
+
 export interface GitHubService {
   openPr(input: OpenPrInput): Promise<PullRequest>;
   getChecksStatus(owner: string, repo: string, ref: string): Promise<ChecksStatus>;
   merge(owner: string, repo: string, prNumber: number): Promise<void>;
   getChangedFiles(owner: string, repo: string, prNumber: number): Promise<ChangedFile[]>;
+  // Reads a single file's content at a ref. Text files are decoded to utf8; binary
+  // files (images/pdf/etc by extension) are returned as raw base64. Throws if the
+  // file exceeds the size cap or the path is not a file.
+  getFileContent(owner: string, repo: string, ref: string, path: string): Promise<FileContent>;
   // Summarizes the failing check/status contexts for a ref into a short string,
   // used as feedback notes for the agent on a fix-on-red attempt.
   getCheckFailureContext(owner: string, repo: string, ref: string): Promise<string>;

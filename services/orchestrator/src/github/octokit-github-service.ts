@@ -1,8 +1,23 @@
 import { Octokit } from "@octokit/rest";
-import type { GitHubService, OpenPrInput, ReviewComment } from "./github-service.js";
+import type { GitHubService, OpenPrInput, ReviewComment, FileContent } from "./github-service.js";
 import type { ChecksStatus, PullRequest } from "../types.js";
 import type { ChangedFile } from "../policy/risk.js";
 import { nodeFetch } from "../http/node-fetch.js";
+
+// 1 MiB cap — guards against pulling huge blobs into the thread/preview.
+const MAX_FILE_BYTES = 1024 * 1024;
+
+// File extensions we keep as raw base64 (binary) rather than decoding to utf8.
+const BINARY_EXTS = new Set([
+  "png", "jpg", "jpeg", "gif", "svg", "webp", "ico", "bmp",
+  "pdf", "zip", "gz", "tar", "woff", "woff2", "ttf", "otf", "eot",
+  "mp3", "mp4", "mov", "wav", "ogg", "webm",
+]);
+
+function isBinaryPath(path: string): boolean {
+  const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
+  return BINARY_EXTS.has(ext);
+}
 
 export class OctokitGitHubService implements GitHubService {
   private readonly octokit: Octokit;
@@ -65,6 +80,25 @@ export class OctokitGitHubService implements GitHubService {
       status: f.status,
       patch: f.patch,
     }));
+  }
+
+  async getFileContent(owner: string, repo: string, ref: string, path: string): Promise<FileContent> {
+    const res = await this.octokit.repos.getContent({ owner, repo, path, ref });
+    const data = res.data;
+    // A directory listing comes back as an array; we only serve single files.
+    if (Array.isArray(data) || data.type !== "file") {
+      throw new Error(`path is not a file: ${path}`);
+    }
+    if (data.size > MAX_FILE_BYTES) {
+      throw new Error(`file too large: ${path} (${data.size} bytes)`);
+    }
+    // GitHub returns base64 (with newlines) in `content` for files.
+    const b64 = (data.content ?? "").replace(/\n/g, "");
+    if (isBinaryPath(path)) {
+      return { content: b64, encoding: "base64", size: data.size };
+    }
+    const content = Buffer.from(b64, "base64").toString("utf8");
+    return { content, encoding: "utf8", size: data.size };
   }
 
   async updatePr(

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { Message, ChangedFile } from "../types.js";
+import type { FileContent } from "../api.js";
 import { DiffView } from "./DiffView.js";
+import { FilePreview } from "./FilePreview.js";
 
 const OUTCOME_STYLES: Record<string, string> = {
   merged: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -15,11 +17,12 @@ interface PrCardProps {
   onApprove?: (runId: string) => void;
   onDecline?: (runId: string) => void;
   onLoadDiff?: (runId: string) => Promise<ChangedFile[]>;
+  onOpenFile?: (runId: string, path: string) => Promise<FileContent>;
   onSyncComments?: (runId: string) => void;
   onUpdatePr?: (runId: string, patch: { title?: string; body?: string; base?: string }) => void;
 }
 
-export function PrCard({ message, onApprove, onDecline, onLoadDiff, onSyncComments, onUpdatePr }: PrCardProps) {
+export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr }: PrCardProps) {
   const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string; runId?: string; parentRunId?: string };
   const outcome = m.outcome ?? "merged";
   // #53 stacked PRs: when this run is a child of another, surface a small badge.
@@ -36,6 +39,22 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onSyncCommen
   const [diffOpen, setDiffOpen] = useState(false);
   const [diffFiles, setDiffFiles] = useState<ChangedFile[] | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
+
+  // File explorer / preview (#59): reuses the changed-file list fetched for the diff.
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState<FileContent | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
+
+  const openFile = (path: string) => {
+    if (!onOpenFile || !m.runId) return;
+    setOpenPath(path);
+    setFileContent(null);
+    setFileLoading(true);
+    onOpenFile(m.runId, path)
+      .then((f) => setFileContent(f))
+      .catch(() => setFileContent(null))
+      .finally(() => setFileLoading(false));
+  };
 
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -178,6 +197,33 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onSyncCommen
               Cancel
             </button>
           </div>
+        </div>
+      )}
+      {diffOpen && onOpenFile && (diffFiles?.length ?? 0) > 0 && (
+        <div className="mt-3 rounded-lg border border-neutral-200 bg-white/70 p-2">
+          <p className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Files</p>
+          <ul className="space-y-0.5">
+            {(diffFiles ?? []).map((f) => (
+              <li key={f.filename}>
+                <button
+                  type="button"
+                  onClick={() => openFile(f.filename)}
+                  className={`w-full truncate rounded px-2 py-1 text-left font-mono text-xs hover:bg-neutral-100 ${openPath === f.filename ? "bg-neutral-100 font-semibold text-neutral-900" : "text-neutral-700"}`}
+                >
+                  {f.filename}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {openPath && (
+            fileLoading ? (
+              <p className="mt-2 px-1 text-xs text-neutral-400">Loading file…</p>
+            ) : fileContent ? (
+              <FilePreview filename={openPath} content={fileContent.content} encoding={fileContent.encoding} />
+            ) : (
+              <p className="mt-2 px-1 text-xs text-neutral-400">Could not load file.</p>
+            )
+          )}
         </div>
       )}
       {diffOpen && <DiffView files={diffFiles ?? []} loading={diffLoading} />}

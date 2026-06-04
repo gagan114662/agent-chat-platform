@@ -13,6 +13,7 @@ import { registerAgentRoutes } from "./http/agent-routes.js";
 import { registerApprovalRoutes } from "./http/approval-routes.js";
 import { registerPlanRoutes } from "./http/plan-routes.js";
 import { registerDiffRoutes } from "./http/diff-routes.js";
+import { registerFileRoutes } from "./http/file-routes.js";
 import { registerCommentSyncRoutes } from "./http/comment-sync-routes.js";
 import { registerPrEditRoutes } from "./http/pr-edit-routes.js";
 import { registerAutonomyRoutes } from "./http/autonomy-routes.js";
@@ -68,6 +69,7 @@ export async function buildServer() {
   registerApprovalRoutes(app, { db });
   registerPlanRoutes(app, { db, sql, temporal, sandboxUrl });
   registerDiffRoutes(app, { db });
+  registerFileRoutes(app, { db });
   registerCommentSyncRoutes(app, { db, sql });
   registerPrEditRoutes(app, { db });
   registerAutonomyRoutes(app, { db, sql, temporal, sandboxUrl });

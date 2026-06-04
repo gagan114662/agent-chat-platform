@@ -77,6 +77,28 @@ describe("PrCard view diff", () => {
   });
 });
 
+describe("PrCard file explorer", () => {
+  const files: ChangedFile[] = [
+    { filename: "README.md", additions: 1, deletions: 0, status: "added", patch: "@@ -0,0 +1 @@\n+# Hi" },
+  ];
+
+  it("lists changed files as clickable buttons and opens a preview on click", async () => {
+    const onLoadDiff = vi.fn(async () => files);
+    const onOpenFile = vi.fn(async () => ({ content: "# Hi", encoding: "utf8" as const, size: 4 }));
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} />);
+    fireEvent.click(screen.getByRole("button", { name: /view diff/i }));
+    // The changed file appears in the explorer list (button) once the diff loads.
+    const fileBtn = await screen.findByRole("button", { name: "README.md" });
+    fireEvent.click(fileBtn);
+    expect(onOpenFile).toHaveBeenCalledWith("run1", "README.md");
+    // Markdown is rendered (heading), not raw text.
+    await waitFor(() => {
+      const hi = screen.getByText("Hi");
+      expect(hi.tagName).toBe("H1");
+    });
+  });
+});
+
 describe("PrCard edit", () => {
   it("shows an Edit toggle when a runId is present", () => {
     render(<PrCard message={{ ...base, body: "🔶 held — PR #7", metadata: { outcome: "held_for_human", prNumber: 7, runId: "run1" } } as Message} />);
