@@ -31,6 +31,7 @@ type ClaudeCodeAdapter struct {
 	lookPath func(string) (string, error)
 	exec     func(ctx context.Context, dir, intent string, onLine func(string)) error
 	planExec func(ctx context.Context, dir, intent string) (string, error)
+	repoDir  string // captured from Prepare so ApplyFeedback (no dir param) knows where to run
 }
 
 func NewClaudeCodeAdapter() *ClaudeCodeAdapter {
@@ -41,18 +42,27 @@ func (*ClaudeCodeAdapter) Identify() Identity {
 	return Identity{Name: "claude-code", Version: "cli", Capabilities: []Capability{CanEditCode, CanRunTests}}
 }
 
-func (a *ClaudeCodeAdapter) Prepare(_ context.Context, _ PrepareContext) error {
+func (a *ClaudeCodeAdapter) Prepare(_ context.Context, p PrepareContext) error {
 	if _, err := a.lookPath("claude"); err != nil {
 		return fmt.Errorf("claude CLI not found on PATH: %w", err)
 	}
+	a.repoDir = p.RepoDir // ApplyFeedback has no dir param; capture it here like FakeAdapter
 	return nil
 }
 
 func (a *ClaudeCodeAdapter) Run(ctx context.Context, repoDir, intent string, emit Emit) error {
-	if len(intent) > maxPromptBytes() {
-		return fmt.Errorf("intent exceeds max prompt size")
+	return a.runAgent(ctx, repoDir, intent, "claude-code: starting", "claude-code: finished", "claude-code run failed", emit)
+}
+
+// runAgent is the shared body for Run and ApplyFeedback: it bounds the prompt,
+// quarantines repo-resident agent instructions, provisions the built-in skills,
+// runs the agent (a.exec) streaming each line as an EventLog, and emits
+// start/done events. Both callers reuse the same Plan-24/29 hardening (DRY).
+func (a *ClaudeCodeAdapter) runAgent(ctx context.Context, repoDir, prompt, startMsg, doneMsg, failMsg string, emit Emit) error {
+	if len(prompt) > maxPromptBytes() {
+		return fmt.Errorf("prompt exceeds max prompt size")
 	}
-	emit(Event{Type: EventLog, Message: "claude-code: starting"})
+	emit(Event{Type: EventLog, Message: startMsg})
 	emit(Event{Type: EventProgress, Step: "agent", Pct: 10})
 	if restore, err := quarantineRepoConfig(repoDir); err == nil {
 		defer restore()
@@ -60,12 +70,12 @@ func (a *ClaudeCodeAdapter) Run(ctx context.Context, repoDir, intent string, emi
 	if cleanup, err := provisionBuiltinSkills(repoDir); err == nil {
 		defer cleanup()
 	}
-	if err := a.exec(ctx, repoDir, intent, func(line string) {
+	if err := a.exec(ctx, repoDir, prompt, func(line string) {
 		emit(Event{Type: EventLog, Message: line})
 	}); err != nil {
-		return fmt.Errorf("claude-code run failed: %w", err)
+		return fmt.Errorf("%s: %w", failMsg, err)
 	}
-	emit(Event{Type: EventDone, Message: "claude-code: finished"})
+	emit(Event{Type: EventDone, Message: doneMsg})
 	return nil
 }
 
@@ -89,13 +99,12 @@ func (a *ClaudeCodeAdapter) Plan(ctx context.Context, repoDir, intent string) (s
 	return text, nil
 }
 
+// ApplyFeedback runs the real agent with the feedback notes as the prompt
+// against the repo dir captured in Prepare — essentially Run with notes —
+// reusing the same hardening (prompt bound, quarantine, built-in skills,
+// env-scrub) via runAgent. No longer a no-op (#66).
 func (a *ClaudeCodeAdapter) ApplyFeedback(ctx context.Context, notes string, emit Emit) error {
-	if len(notes) > maxPromptBytes() {
-		return fmt.Errorf("notes exceed max prompt size")
-	}
-	emit(Event{Type: EventLog, Message: "claude-code: applying feedback"})
-	emit(Event{Type: EventDone, Message: "feedback applied"})
-	return nil
+	return a.runAgent(ctx, a.repoDir, notes, "claude-code: applying feedback", "feedback applied", "claude-code feedback failed", emit)
 }
 
 func (*ClaudeCodeAdapter) Teardown(context.Context) error { return nil }
