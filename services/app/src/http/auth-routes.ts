@@ -15,7 +15,7 @@ function bearer(req: FastifyRequest): string | undefined {
 // plus the /auth/* routes. Must be registered BEFORE other route registrars so the
 // preHandler covers them.
 export function registerAuth(app: FastifyInstance, d: { db: DB }) {
-  const PUBLIC_PATHS = new Set(["/auth/login", "/auth/members"]);
+  const PUBLIC_PATHS = new Set(["/auth/login", "/auth/members", "/healthz"]);
   app.addHook("preHandler", async (req, reply) => {
     const token = bearer(req);
     if (token) {

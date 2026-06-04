@@ -67,6 +67,46 @@ export async function buildServer() {
   registerCommentSyncRoutes(app, { db, sql });
   registerPrEditRoutes(app, { db });
   registerAutonomyRoutes(app, { db, sql, temporal, sandboxUrl });
+
+  // Public liveness/health probe (in PUBLIC_PATHS so the auth preHandler won't 401 it).
+  app.get("/healthz", async () => ({ ok: true }));
+
+  // Serve the built web SPA same-origin (single-server prod). API routes are
+  // registered first so they win; everything else falls back to index.html.
+  // Behind SERVE_WEB so dev + tests (which don't set it) are unaffected.
+  if (process.env.SERVE_WEB === "1") {
+    const webDist = process.env.WEB_DIST ?? new URL("../../web/dist", import.meta.url).pathname;
+    const { existsSync } = await import("node:fs");
+    if (existsSync(webDist)) {
+      const fastifyStatic = (await import("@fastify/static")).default;
+      await app.register(fastifyStatic, { root: webDist, wildcard: false });
+      app.setNotFoundHandler((req, reply) => {
+        // SPA fallback for non-API GETs; API 404s still return JSON.
+        if (
+          req.method === "GET" &&
+          !req.url.startsWith("/auth") &&
+          !req.url.startsWith("/threads") &&
+          !req.url.startsWith("/channels") &&
+          !req.url.startsWith("/runs") &&
+          !req.url.startsWith("/tasks") &&
+          !req.url.startsWith("/goals") &&
+          !req.url.startsWith("/orgs") &&
+          !req.url.startsWith("/agents") &&
+          !req.url.startsWith("/memory") &&
+          !req.url.startsWith("/dms") &&
+          !req.url.startsWith("/repos") &&
+          !req.url.startsWith("/search") &&
+          !req.url.startsWith("/principals") &&
+          !req.url.startsWith("/ws") &&
+          !req.url.startsWith("/ws-ticket") &&
+          !req.url.startsWith("/healthz")
+        ) {
+          return reply.sendFile("index.html");
+        }
+        return reply.code(404).send({ error: "not found" });
+      });
+    }
+  }
   return app;
 }
 

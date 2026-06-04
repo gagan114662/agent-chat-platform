@@ -1,0 +1,31 @@
+# Fly.io config for the single-origin app+web image (combined root Dockerfile).
+# Secrets (DATABASE_URL, ACP_ALLOW_DEV_HEADERS, GitHub token, TEMPORAL_ADDRESS,
+# SANDBOX_URL) are set via `fly secrets set` — NOT here. See DEPLOY.md.
+app = "acp-web"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  SERVE_WEB = "1"
+  WEB_DIST = "/app/services/web/dist"
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
