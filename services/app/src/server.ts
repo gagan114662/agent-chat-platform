@@ -14,6 +14,7 @@ import { registerApprovalRoutes } from "./http/approval-routes.js";
 import { registerPlanRoutes } from "./http/plan-routes.js";
 import { registerDiffRoutes } from "./http/diff-routes.js";
 import { registerCommentSyncRoutes } from "./http/comment-sync-routes.js";
+import { registerAutonomyRoutes } from "./http/autonomy-routes.js";
 import { registerAuth } from "./http/auth-routes.js";
 import { resolveSession } from "./auth/auth.js";
 import { eq } from "drizzle-orm";
@@ -63,6 +64,7 @@ export async function buildServer() {
   registerPlanRoutes(app, { db, sql, temporal, sandboxUrl });
   registerDiffRoutes(app, { db });
   registerCommentSyncRoutes(app, { db, sql });
+  registerAutonomyRoutes(app, { db, sql, temporal, sandboxUrl });
   return app;
 }
 
