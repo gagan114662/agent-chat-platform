@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels: { app: acp-app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: acp-app } }
+  template:
+    metadata: { labels: { app: acp-app } }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: acp-app:dev
+          imagePullPolicy: Never
+          ports: [{ containerPort: 8080 }]
+          envFrom: [{ secretRef: { name: acp-app-env } }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: app }
+spec:
+  selector: { app: acp-app }
+  ports: [{ port: 80, targetPort: 8080 }]
