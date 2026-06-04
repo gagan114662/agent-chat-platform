@@ -4,6 +4,7 @@ import { makeDb } from "./db/client.js";
 import { ThreadPubSub } from "./realtime/pubsub.js";
 import { registerWs } from "./realtime/ws.js";
 import { registerRoutes } from "./http/routes.js";
+import { registerTaskRoutes } from "./http/task-routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
 import { registerDmRoutes } from "./http/dm-routes.js";
 import { registerMemoryRoutes } from "./http/memory-routes.js";
@@ -35,7 +36,9 @@ export async function buildServer() {
       return t?.orgId;
     },
   );
-  registerRoutes(app, { db, sql, temporal, sandboxUrl: process.env.SANDBOX_URL ?? "http://localhost:8090" });
+  const sandboxUrl = process.env.SANDBOX_URL ?? "http://localhost:8090";
+  registerRoutes(app, { db, sql, temporal, sandboxUrl });
+  registerTaskRoutes(app, { db, sql, temporal, sandboxUrl });
   registerNavRoutes(app, { db });
   registerDmRoutes(app, { db });
   registerMemoryRoutes(app, { db });
