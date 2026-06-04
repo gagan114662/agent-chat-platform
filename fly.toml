@@ -1,7 +1,7 @@
 # Fly.io config for the single-origin app+web image (combined root Dockerfile).
 # Secrets (DATABASE_URL, ACP_ALLOW_DEV_HEADERS, GitHub token, TEMPORAL_ADDRESS,
 # SANDBOX_URL) are set via `fly secrets set` — NOT here. See DEPLOY.md.
-app = "acp-web"
+app = "acp-convene"
 primary_region = "iad"
 
 [build]
