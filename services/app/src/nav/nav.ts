@@ -7,9 +7,8 @@ export function listChannels(db: DB, orgId: string) {
   return db.select().from(channels).where(eq(channels.orgId, orgId)).orderBy(asc(channels.name));
 }
 
-// threads has no createdAt column (2.0a); order by id desc for a stable, roughly-newest-first list.
 export function listThreads(db: DB, channelId: string) {
-  return db.select().from(threads).where(eq(threads.channelId, channelId)).orderBy(desc(threads.id));
+  return db.select().from(threads).where(eq(threads.channelId, channelId)).orderBy(desc(threads.createdAt));
 }
 
 export function listRepos(db: DB, orgId: string) {

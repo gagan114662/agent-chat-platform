@@ -38,4 +38,12 @@ describe("nav", () => {
     const t = await createThread(h.db, { orgId: "o1", channelId: "c1", title: "chatty" });
     expect(t.repoId).toBeNull();
   });
+
+  it("lists threads newest-first by createdAt", async () => {
+    await h.db.insert(threads).values({ id: "told", orgId: "o1", channelId: "c1", title: "old", createdAt: new Date("2020-01-01T00:00:00Z") });
+    await h.db.insert(threads).values({ id: "tnew", orgId: "o1", channelId: "c1", title: "new", createdAt: new Date("2024-01-01T00:00:00Z") });
+    const list = await listThreads(h.db, "c1");
+    const ids = list.map((t) => t.id);
+    expect(ids.indexOf("tnew")).toBeLessThan(ids.indexOf("told"));
+  });
 });
