@@ -17,10 +17,11 @@ type PlanRequest struct {
 	RepoURL    string `json:"repoUrl"`
 	BaseBranch string `json:"baseBranch"`
 	Intent     string `json:"intent"`
-	Adapter    string `json:"adapter"`
-	Model      string `json:"model,omitempty"`
-	Provider   string `json:"provider,omitempty"`
-	WorkDir    string `json:"-"`
+	Adapter    string   `json:"adapter"`
+	Model      string   `json:"model,omitempty"`
+	Provider   string   `json:"provider,omitempty"`
+	McpServers []string `json:"mcpServers,omitempty"`
+	WorkDir    string   `json:"-"`
 }
 
 // PlanResult carries the agent's proposed plan text.
@@ -62,6 +63,9 @@ func (r PlanRequest) Validate() error {
 	if err := validModelProvider(r.Provider, "provider"); err != nil {
 		return err
 	}
+	if err := validMcpServers(r.McpServers); err != nil {
+		return err
+	}
 	return validRef(r.BaseBranch, "baseBranch")
 }
 
@@ -74,7 +78,7 @@ func Plan(ctx context.Context, req PlanRequest, ad adapter.Adapter, limits Limit
 	if err := checkRepoSize(req.WorkDir, limits.MaxRepoBytes); err != nil {
 		return PlanResult{}, err
 	}
-	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Intent, Model: req.Model, Provider: req.Provider}); err != nil {
+	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Intent, Model: req.Model, Provider: req.Provider, McpServers: req.McpServers}); err != nil {
 		return PlanResult{}, fmt.Errorf("prepare: %w", err)
 	}
 	text, err := ad.Plan(ctx, req.WorkDir, req.Intent)

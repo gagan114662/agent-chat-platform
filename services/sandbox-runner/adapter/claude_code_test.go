@@ -12,7 +12,7 @@ import (
 func TestClaudeCodeAdapter(t *testing.T) {
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, intent, model, provider string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
 			onLine("edited README.md")
 			return nil
 		},
@@ -51,7 +51,7 @@ func TestClaudeCodeAdapterInjectsBuiltinSkills(t *testing.T) {
 	var presentDuringExec bool
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, d, intent, model, provider string, onLine func(string)) error {
+		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, onLine func(string)) error {
 			_, statErr := os.Stat(skillPath)
 			presentDuringExec = statErr == nil
 			onLine("ran")
@@ -89,7 +89,7 @@ func TestClaudeCodeAdapterApplyFeedback(t *testing.T) {
 	var skillPresentDuringExec, claudeMdAbsentDuringExec bool
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, d, prompt, model, provider string, onLine func(string)) error {
+		exec: func(ctx context.Context, d, prompt, model, provider, mcpConfig string, onLine func(string)) error {
 			gotPrompt = prompt
 			_, skillErr := os.Stat(skillPath)
 			skillPresentDuringExec = skillErr == nil
@@ -150,7 +150,7 @@ func TestClaudeCodeAdapterApplyFeedbackOversize(t *testing.T) {
 	called := false
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, prompt, model, provider string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, prompt, model, provider, mcpConfig string, onLine func(string)) error {
 			called = true
 			return nil
 		},
@@ -173,7 +173,7 @@ func TestClaudeCodeAdapterModelProvider(t *testing.T) {
 	var gotModel, gotProvider string
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, intent, model, provider string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
 			gotModel, gotProvider = model, provider
 			onLine("ran")
 			return nil
@@ -195,7 +195,7 @@ func TestClaudeCodeAdapterModelProvider(t *testing.T) {
 	// No model configured => exec sees empty model (default: no --model flag).
 	b := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, intent, model, provider string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
 			gotModel = model
 			return nil
 		},
@@ -211,10 +211,97 @@ func TestClaudeCodeAdapterModelProvider(t *testing.T) {
 	}
 }
 
+// TestClaudeCodeAdapterProvisionsMcpConfig verifies that with an authorized MCP
+// server captured in Prepare, the run writes .mcp.json (present DURING exec),
+// the exec seam receives the config path so claudeArgs includes --mcp-config,
+// and the file is removed AFTER Run (clean committed tree).
+func TestClaudeCodeAdapterProvisionsMcpConfig(t *testing.T) {
+	dir := t.TempDir()
+	mcpPath := filepath.Join(dir, ".mcp.json")
+
+	var presentDuringExec bool
+	var gotMcpConfig string
+	a := &ClaudeCodeAdapter{
+		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
+		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, onLine func(string)) error {
+			_, statErr := os.Stat(mcpPath)
+			presentDuringExec = statErr == nil
+			gotMcpConfig = mcpConfig
+			onLine("ran")
+			return nil
+		},
+	}
+	if err := a.Prepare(context.Background(), PrepareContext{RepoDir: dir, McpServers: []string{"filesystem"}}); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if err := a.Run(context.Background(), dir, "do work", func(Event) {}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !presentDuringExec {
+		t.Fatal(".mcp.json must be present during the agent exec")
+	}
+	if gotMcpConfig != mcpPath {
+		t.Fatalf("exec must receive the .mcp.json path, got %q", gotMcpConfig)
+	}
+	// The argv built from this config must carry --mcp-config.
+	args := claudeArgs("do work", "", "acceptEdits", gotMcpConfig)
+	var hasFlag bool
+	for i, arg := range args {
+		if arg == "--mcp-config" && i+1 < len(args) && args[i+1] == mcpPath {
+			hasFlag = true
+		}
+	}
+	if !hasFlag {
+		t.Fatalf("expected --mcp-config %s in argv, got %v", mcpPath, args)
+	}
+	if _, err := os.Stat(mcpPath); !os.IsNotExist(err) {
+		t.Fatalf(".mcp.json must be gone after Run: %v", err)
+	}
+}
+
+// TestClaudeCodeAdapterNoMcpConfigByDefault verifies that with no MCP servers,
+// no .mcp.json is written and the exec seam sees an empty config (no
+// --mcp-config) — unchanged default behavior.
+func TestClaudeCodeAdapterNoMcpConfigByDefault(t *testing.T) {
+	dir := t.TempDir()
+	var gotMcpConfig string
+	a := &ClaudeCodeAdapter{
+		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
+		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, onLine func(string)) error {
+			gotMcpConfig = mcpConfig
+			return nil
+		},
+	}
+	if err := a.Prepare(context.Background(), PrepareContext{RepoDir: dir}); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if err := a.Run(context.Background(), dir, "do work", func(Event) {}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if gotMcpConfig != "" {
+		t.Fatalf("expected empty mcpConfig with no servers, got %q", gotMcpConfig)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".mcp.json")); !os.IsNotExist(err) {
+		t.Fatal(".mcp.json must NOT be written when no servers configured")
+	}
+	if args := claudeArgs("do work", "", "acceptEdits", ""); contains(args, "--mcp-config") {
+		t.Fatalf("expected NO --mcp-config flag with empty config, got %v", args)
+	}
+}
+
+func contains(s []string, v string) bool {
+	for _, x := range s {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
 // TestClaudeArgs verifies the CLI argv: --model appended only when set; provider
 // env mapped for bedrock/vertex and empty otherwise.
 func TestClaudeArgs(t *testing.T) {
-	withModel := claudeArgs("fix it", "claude-opus-4-8", "acceptEdits")
+	withModel := claudeArgs("fix it", "claude-opus-4-8", "acceptEdits", "")
 	var hasModelFlag bool
 	for i, arg := range withModel {
 		if arg == "--model" && i+1 < len(withModel) && withModel[i+1] == "claude-opus-4-8" {
@@ -224,7 +311,7 @@ func TestClaudeArgs(t *testing.T) {
 	if !hasModelFlag {
 		t.Fatalf("expected --model claude-opus-4-8 in argv, got %v", withModel)
 	}
-	noModel := claudeArgs("fix it", "", "acceptEdits")
+	noModel := claudeArgs("fix it", "", "acceptEdits", "")
 	for _, arg := range noModel {
 		if arg == "--model" {
 			t.Fatalf("expected NO --model flag with empty model, got %v", noModel)
@@ -257,7 +344,7 @@ func TestClaudeCodeAdapterOversizeIntent(t *testing.T) {
 	called := false
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, intent, model, provider string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
 			called = true
 			return nil
 		},
@@ -282,7 +369,7 @@ func TestClaudeCodeAdapterPlan(t *testing.T) {
 	var absentDuringPlan bool
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		planExec: func(ctx context.Context, d, intent, model, provider string) (string, error) {
+		planExec: func(ctx context.Context, d, intent, model, provider, mcpConfig string) (string, error) {
 			_, statErr := os.Stat(filepath.Join(d, "CLAUDE.md"))
 			absentDuringPlan = os.IsNotExist(statErr)
 			return "PLAN: " + intent, nil
@@ -307,7 +394,7 @@ func TestClaudeCodeAdapterPlanOversizeIntent(t *testing.T) {
 	called := false
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		planExec: func(ctx context.Context, d, intent, model, provider string) (string, error) {
+		planExec: func(ctx context.Context, d, intent, model, provider, mcpConfig string) (string, error) {
 			called = true
 			return "", nil
 		},
@@ -332,7 +419,7 @@ func TestClaudeCodeAdapterQuarantinesRepoConfig(t *testing.T) {
 	var absentDuringExec bool
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, d, intent, model, provider string, onLine func(string)) error {
+		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, onLine func(string)) error {
 			_, statErr := os.Stat(filepath.Join(d, "CLAUDE.md"))
 			absentDuringExec = os.IsNotExist(statErr)
 			onLine("ran")

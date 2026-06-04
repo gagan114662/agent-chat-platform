@@ -17,10 +17,11 @@ type FeedbackRequest struct {
 	RepoURL string `json:"repoUrl"`
 	Branch   string `json:"branch"`
 	Notes    string `json:"notes"`
-	Adapter  string `json:"adapter"`
-	Model    string `json:"model,omitempty"`
-	Provider string `json:"provider,omitempty"`
-	WorkDir  string `json:"-"`
+	Adapter    string   `json:"adapter"`
+	Model      string   `json:"model,omitempty"`
+	Provider   string   `json:"provider,omitempty"`
+	McpServers []string `json:"mcpServers,omitempty"`
+	WorkDir    string   `json:"-"`
 }
 
 // Validate checks the request before any git command is shelled out.
@@ -57,6 +58,9 @@ func (r FeedbackRequest) Validate() error {
 	if err := validModelProvider(r.Provider, "provider"); err != nil {
 		return err
 	}
+	if err := validMcpServers(r.McpServers); err != nil {
+		return err
+	}
 	return validRef(r.Branch, "branch")
 }
 
@@ -69,7 +73,7 @@ func Feedback(ctx context.Context, req FeedbackRequest, ad adapter.Adapter, limi
 	if err := checkRepoSize(req.WorkDir, limits.MaxRepoBytes); err != nil {
 		return RunResult{}, err
 	}
-	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Notes, Model: req.Model, Provider: req.Provider}); err != nil {
+	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Notes, Model: req.Model, Provider: req.Provider, McpServers: req.McpServers}); err != nil {
 		return RunResult{}, fmt.Errorf("prepare: %w", err)
 	}
 	noopEmit := func(adapter.Event) {}
