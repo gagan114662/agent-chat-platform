@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import type { Repo } from "../types.js";
 
-export function NewThreadForm({ repos, onCreate }: { repos: Repo[]; onCreate: (title: string, repoId?: string) => void }) {
+export function NewThreadForm({ repos, onCreate, inputRef }: { repos: Repo[]; onCreate: (title: string, repoId?: string) => void; inputRef?: RefObject<HTMLInputElement> }) {
   const [title, setTitle] = useState("");
   const [repoId, setRepoId] = useState("");
   const submit = () => {
@@ -14,6 +14,7 @@ export function NewThreadForm({ repos, onCreate }: { repos: Repo[]; onCreate: (t
   return (
     <div className="border-t border-[#e7e7f0] px-3 py-3">
       <input
+        ref={inputRef}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="New thread title"

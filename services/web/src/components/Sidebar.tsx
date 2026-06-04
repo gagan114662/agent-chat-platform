@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import type { Channel, Thread, Repo, Principal, InboxItem } from "../types.js";
 import { NewThreadForm } from "./NewThreadForm.js";
 import { NewDmPicker } from "./NewDmPicker.js";
@@ -7,6 +7,7 @@ export function Sidebar({
   channels, threads, dms, principals, repos, activeThreadId,
   unreads = {}, inbox = [], onOpenInbox,
   onSelectThread, onCreateThread, onCreateChannel, onStartDm, onOpenContext, canCreateChannel,
+  newThreadRef,
 }: {
   channels: Channel[];
   threads: Thread[];
@@ -23,6 +24,7 @@ export function Sidebar({
   onStartDm: (peerKind: "human" | "agent", peerId: string) => void;
   onOpenContext: () => void;
   canCreateChannel: boolean;
+  newThreadRef?: RefObject<HTMLInputElement>;
 }) {
   const [channelName, setChannelName] = useState("");
   const createChannel = () => {
@@ -97,7 +99,7 @@ export function Sidebar({
           <button onClick={createChannel} aria-label="create channel" className="rounded-lg bg-[#15151f] px-2 text-sm text-white hover:bg-black">+</button>
         </div>
       )}
-      <NewThreadForm repos={repos} onCreate={onCreateThread} />
+      <NewThreadForm repos={repos} onCreate={onCreateThread} inputRef={newThreadRef} />
       <div className="px-4 py-3 text-xs text-neutral-400">signed in as m1 · org o1 (dev stub)</div>
     </aside>
   );

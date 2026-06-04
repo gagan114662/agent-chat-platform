@@ -1,23 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import type { SearchResult } from "../types.js";
 
-export function SearchBar({ onSearch, onSelect }: {
+export function SearchBar({ onSearch, onSelect, inputRef, initialQuery }: {
   onSearch: (q: string) => Promise<SearchResult[]>;
   onSelect: (threadId: string) => void;
+  // Optional ref so the command registry's "focusSearch" action can focus this input.
+  inputRef?: RefObject<HTMLInputElement>;
+  // Optional initial query (used by the `/search <q>` slash command) — runs once on mount.
+  initialQuery?: string;
 }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery ?? "");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
 
-  const run = async () => {
-    const r = await onSearch(q);
+  const run = async (query = q) => {
+    const r = await onSearch(query);
     setResults(r);
     setOpen(true);
   };
 
+  // When given an initialQuery, run it immediately so `/search foo` shows results.
+  useEffect(() => {
+    if (initialQuery) { setQ(initialQuery); run(initialQuery); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
+
   return (
     <div className="relative">
       <input
+        ref={inputRef}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") run(); }}
