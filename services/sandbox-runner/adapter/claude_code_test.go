@@ -3,6 +3,9 @@ package adapter
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -42,5 +45,61 @@ func TestClaudeCodeAdapterMissingCLI(t *testing.T) {
 	a := &ClaudeCodeAdapter{lookPath: func(string) (string, error) { return "", errors.New("nope") }}
 	if err := a.Prepare(context.Background(), PrepareContext{}); err == nil {
 		t.Fatal("expected error when claude CLI absent")
+	}
+}
+
+// TestClaudeCodeAdapterOversizeIntent verifies an oversize intent is rejected
+// before the agent is ever exec'd (prompt-bound guard, #49).
+func TestClaudeCodeAdapterOversizeIntent(t *testing.T) {
+	called := false
+	a := &ClaudeCodeAdapter{
+		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
+		exec: func(ctx context.Context, dir, intent string, onLine func(string)) error {
+			called = true
+			return nil
+		},
+	}
+	err := a.Run(context.Background(), t.TempDir(), strings.Repeat("x", 20000), func(Event) {})
+	if err == nil {
+		t.Fatal("expected error for oversize intent")
+	}
+	if called {
+		t.Fatal("exec must NOT be called when intent exceeds max prompt size")
+	}
+}
+
+// TestClaudeCodeAdapterQuarantinesRepoConfig verifies repo-resident agent
+// instructions are absent DURING the run and restored AFTER it (#49).
+func TestClaudeCodeAdapterQuarantinesRepoConfig(t *testing.T) {
+	dir := t.TempDir()
+	claudeMd := filepath.Join(dir, "CLAUDE.md")
+	if err := os.WriteFile(claudeMd, []byte("evil instructions"), 0o644); err != nil {
+		t.Fatalf("write CLAUDE.md: %v", err)
+	}
+
+	var absentDuringExec bool
+	a := &ClaudeCodeAdapter{
+		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
+		exec: func(ctx context.Context, d, intent string, onLine func(string)) error {
+			_, statErr := os.Stat(filepath.Join(d, "CLAUDE.md"))
+			absentDuringExec = os.IsNotExist(statErr)
+			onLine("ran")
+			return nil
+		},
+	}
+
+	if err := a.Run(context.Background(), dir, "do work", func(Event) {}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !absentDuringExec {
+		t.Fatal("CLAUDE.md must be absent during the agent exec")
+	}
+
+	got, err := os.ReadFile(claudeMd)
+	if err != nil {
+		t.Fatalf("CLAUDE.md not restored after Run: %v", err)
+	}
+	if string(got) != "evil instructions" {
+		t.Fatalf("CLAUDE.md content changed after restore: %q", got)
 	}
 }
