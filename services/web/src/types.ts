@@ -28,6 +28,14 @@ export interface Thread {
   dmPeerId?: string | null;
 }
 
+export interface ChangedFile {
+  filename: string;
+  additions: number;
+  deletions: number;
+  status: string;
+  patch?: string; // unified diff hunks; omitted by GitHub for large/binary files
+}
+
 export interface Principal { kind: "human" | "agent"; id: string; name: string; }
 export interface Repo {
   id: string; orgId: string; workspaceId: string;

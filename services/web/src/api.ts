@@ -1,4 +1,4 @@
-import type { Message, Channel, Thread, Repo, SearchResult, Principal, MemoryGraph, MemoryStats, MemoryKind, MemoryScope } from "./types.js";
+import type { Message, Channel, Thread, Repo, SearchResult, Principal, MemoryGraph, MemoryStats, MemoryKind, MemoryScope, ChangedFile } from "./types.js";
 import { authHeaders } from "./auth.js";
 
 export async function listMessages(threadId: string): Promise<Message[]> {
@@ -25,6 +25,12 @@ export async function approveRun(runId: string): Promise<void> {
 export async function declineRun(runId: string): Promise<void> {
   const res = await fetch(`/runs/${runId}/decline`, { method: "POST", headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`declineRun ${res.status}`);
+}
+
+export async function runDiff(runId: string): Promise<ChangedFile[]> {
+  const res = await fetch(`/runs/${runId}/diff`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`runDiff ${res.status}`);
+  return res.json();
 }
 
 export async function listChannels(): Promise<Channel[]> {

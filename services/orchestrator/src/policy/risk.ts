@@ -3,6 +3,7 @@ export interface ChangedFile {
   additions: number;
   deletions: number;
   status: string; // 'added' | 'modified' | 'removed' | 'renamed'
+  patch?: string; // unified diff hunks (omitted by GitHub for large/binary files)
 }
 
 export interface RiskOptions { maxLines: number; maxFiles: number; maxNetNegative: number; }
