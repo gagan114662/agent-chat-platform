@@ -57,6 +57,9 @@ func (a *ClaudeCodeAdapter) Run(ctx context.Context, repoDir, intent string, emi
 	if restore, err := quarantineRepoConfig(repoDir); err == nil {
 		defer restore()
 	}
+	if cleanup, err := provisionBuiltinSkills(repoDir); err == nil {
+		defer cleanup()
+	}
 	if err := a.exec(ctx, repoDir, intent, func(line string) {
 		emit(Event{Type: EventLog, Message: line})
 	}); err != nil {
@@ -75,6 +78,9 @@ func (a *ClaudeCodeAdapter) Plan(ctx context.Context, repoDir, intent string) (s
 	}
 	if restore, err := quarantineRepoConfig(repoDir); err == nil {
 		defer restore()
+	}
+	if cleanup, err := provisionBuiltinSkills(repoDir); err == nil {
+		defer cleanup()
 	}
 	text, err := a.planExec(ctx, repoDir, intent)
 	if err != nil {
