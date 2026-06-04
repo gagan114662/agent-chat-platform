@@ -65,7 +65,7 @@ func Feedback(ctx context.Context, req FeedbackRequest, ad adapter.Adapter) (Run
 	if err := ad.ApplyFeedback(ctx, req.Notes, noopEmit); err != nil {
 		return RunResult{}, fmt.Errorf("feedback: %w", err)
 	}
-	sha, err := CommitAllAndPushExisting(ctx, req.WorkDir, req.Branch, "agent: address feedback")
+	sha, err := CommitAllAndPushExisting(ctx, req.WorkDir, req.Branch, "agent: address feedback", newGitCred(req.RepoURL))
 	if err != nil {
 		return RunResult{}, fmt.Errorf("commit/push: %w", err)
 	}

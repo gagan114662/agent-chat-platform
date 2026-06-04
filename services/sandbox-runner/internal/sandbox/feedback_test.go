@@ -22,7 +22,7 @@ func pushFeatureBranch(t *testing.T, src, branch string) {
 	if err := os.WriteFile(filepath.Join(dest, "AGENT_CHANGES.md"), []byte("x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CommitAllAndPush(context.Background(), dest, branch, "seed feature"); err != nil {
+	if _, err := CommitAllAndPush(context.Background(), dest, branch, "seed feature", gitCred{}); err != nil {
 		t.Fatal(err)
 	}
 }
