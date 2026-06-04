@@ -1,9 +1,15 @@
 import type { Message } from "../types.js";
 import { PrCard } from "./PrCard.js";
 
-export function MessageItem({ message }: { message: Message }) {
+interface MessageItemProps {
+  message: Message;
+  onApprove?: (runId: string) => void;
+  onDecline?: (runId: string) => void;
+}
+
+export function MessageItem({ message, onApprove, onDecline }: MessageItemProps) {
   if (message.kind === "pr_card") {
-    return <div className="px-4 py-1.5"><PrCard message={message} /></div>;
+    return <div className="px-4 py-1.5"><PrCard message={message} onApprove={onApprove} onDecline={onDecline} /></div>;
   }
   if (message.kind === "system") {
     return (

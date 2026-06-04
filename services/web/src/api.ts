@@ -17,6 +17,16 @@ export async function postMessage(threadId: string, body: string): Promise<{ mes
   return res.json();
 }
 
+export async function approveRun(runId: string): Promise<void> {
+  const res = await fetch(`/runs/${runId}/approve`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`approveRun ${res.status}`);
+}
+
+export async function declineRun(runId: string): Promise<void> {
+  const res = await fetch(`/runs/${runId}/decline`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`declineRun ${res.status}`);
+}
+
 export async function listChannels(): Promise<Channel[]> {
   const res = await fetch(`/channels`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`listChannels ${res.status}`);
