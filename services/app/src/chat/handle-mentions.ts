@@ -6,10 +6,11 @@ import { notify } from "../db/client.js";
 import { parseMentions } from "./mentions.js";
 import { createMessage } from "./messages.js";
 import { resolveMention, isPermittedOnRepo, agentModelConfig, agentMcp } from "../agents/agents.js";
+import { teamAgentIds } from "../teams/teams.js";
 import { openTaskForMention } from "../tasks/tasks.js";
 import { startFusionRun } from "../fusion/start.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
-import { threads, repos } from "../db/schema.js";
+import { threads, repos, agents } from "../db/schema.js";
 
 export interface MentionDeps { db: DB; sql: postgres.Sql; temporal: Client; sandboxUrl: string; }
 
@@ -49,16 +50,21 @@ export async function handleMentions(d: MentionDeps, m: MentionInput): Promise<s
   if (!thread) return [];
 
   const started: string[] = [];
-  for (const handle of parseMentions(m.body)) {
-    const agent = await resolveMention(d.db, m.orgId, handle);
-    if (!agent || !thread.repoId) continue;
+  const dedup = new Set<string>(); // an agent reached via both @agent and @team starts once
+  // Start a run for a single agent id, applying the same repo/token/permission +
+  // self-trigger guards used by direct @agent mentions. Returns the run id or null
+  // if the agent is filtered out (not found, self, not permitted, no token, etc.).
+  const startForAgent = async (agentId: string): Promise<string | null> => {
+    if (dedup.has(agentId)) return null;
     // No self-trigger: an agent author can't kick off a run for itself.
-    if (m.authorKind === "agent" && agent.id === m.authorId) continue;
-    if (!(await isPermittedOnRepo(d.db, agent.id, thread.repoId))) continue;
+    if (m.authorKind === "agent" && agentId === m.authorId) return null;
+    const [agent] = await d.db.select().from(agents).where(and(eq(agents.id, agentId), eq(agents.orgId, m.orgId)));
+    if (!agent || !thread.repoId) return null;
+    if (!(await isPermittedOnRepo(d.db, agent.id, thread.repoId))) return null;
     const [repo] = await d.db.select().from(repos).where(and(eq(repos.id, thread.repoId), eq(repos.orgId, m.orgId)));
-    if (!repo) continue; // dangling repoId (no FK constraint) — skip rather than 500
+    if (!repo) return null; // dangling repoId (no FK constraint) — skip rather than 500
     const token = process.env[repo.tokenEnvVar];
-    if (!token) continue;
+    if (!token) return null;
 
     const { run } = await openTaskForMention(d.db, {
       orgId: m.orgId, threadId: m.threadId, intent: m.body, agentId: agent.id,
@@ -71,7 +77,25 @@ export async function handleMentions(d: MentionDeps, m: MentionInput): Promise<s
       ...agentModelConfig(agent), // #58: per-agent model/provider from agents.config
       ...(agentMcp(agent) ? { mcpServers: agentMcp(agent) } : {}), // #57: per-agent MCP servers
     });
-    started.push(run.id);
+    dedup.add(agentId);
+    return run.id;
+  };
+
+  for (const handle of parseMentions(m.body)) {
+    const agent = await resolveMention(d.db, m.orgId, handle);
+    if (agent) {
+      // Direct @agent mention — unchanged behavior.
+      const id = await startForAgent(agent.id);
+      if (id) started.push(id);
+      continue;
+    }
+    // #79 @team fallback: the handle isn't an agent — try resolving it as a team
+    // (org-scoped, by name). If it's a team, fan a run out to each of its agent
+    // members, reusing the same per-agent path (depth+1, dedup, no self-trigger).
+    for (const agentId of await teamAgentIds(d.db, m.orgId, handle)) {
+      const id = await startForAgent(agentId);
+      if (id) started.push(id);
+    }
   }
   return started;
 }
