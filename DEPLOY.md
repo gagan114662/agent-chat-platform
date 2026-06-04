@@ -117,6 +117,27 @@ fly deploy --app acp-web
 
 ---
 
+## Step 3 — Cloudflare Logpush ingestion (post-deploy, #55)
+
+The app exposes a secret-guarded ingestion endpoint
+`POST /ingest/cloudflare/:orgId` that parses Cloudflare Logpush NDJSON, detects
+WAF/audit incidents, and opens Tasks (idempotent, org-scoped). Set the machine
+secret and point live Logpush jobs at it post-deploy:
+
+```sh
+ACP_INGEST_SECRET=$(openssl rand -hex 32)
+fly secrets set ACP_INGEST_SECRET="$ACP_INGEST_SECRET" --app acp-web
+# Optional default security thread for Tasks when ?threadId= is omitted:
+fly secrets set INCIDENT_THREAD_ID=<thread-id> --app acp-web
+fly deploy --app acp-web
+```
+
+Full live-wiring (Logpush job creation with `CLOUDFLARE_API_TOKEN`, destination
+header config, ownership challenge, verification) is in
+[`docs/integrations/cloudflare-logpush.md`](docs/integrations/cloudflare-logpush.md).
+
+---
+
 ## Local single-origin smoke test
 
 ```sh
