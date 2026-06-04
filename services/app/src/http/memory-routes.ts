@@ -3,6 +3,7 @@ import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
 import { createNode, listNodes, neighbors, searchNodes, counts, graph, recallForIntent, type NodeKind, type Scope } from "../memory/memory.js";
 import { consolidate } from "../memory/dreaming.js";
+import { roleOf, can } from "../rbac/rbac.js";
 
 export function registerMemoryRoutes(app: FastifyInstance, d: { db: DB }) {
   app.get("/memory", async (req) => {
@@ -30,9 +31,13 @@ export function registerMemoryRoutes(app: FastifyInstance, d: { db: DB }) {
     return consolidate(d.db, orgId);
   });
   app.post("/memory", async (req, reply) => {
-    const { orgId } = actor(req);
+    const { orgId, userId } = actor(req);
     const b = req.body as { kind: NodeKind; label: string; body?: string; scope?: Scope; metadata?: Record<string, unknown> };
     if (!b?.kind || !b?.label) return reply.code(400).send({ error: "kind and label required" });
+    // #29: creating an org-scoped memory node requires admin; narrower scopes are open to members.
+    if (b.scope === "org" && !can(await roleOf(d.db, userId, orgId), "memory:write:org")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
     return reply.code(201).send(await createNode(d.db, { orgId, ...b }));
   });
 }

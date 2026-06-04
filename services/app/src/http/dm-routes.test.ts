@@ -37,6 +37,25 @@ describe("dm routes", () => {
     await app.close();
   });
 
+  it("POST /dms by a viewer is 403; a member succeeds (#29)", async () => {
+    await h.db.insert(members).values({ id: "vw", orgId: "o1", workspaceId: "w1", displayName: "Viewer", role: "viewer" });
+    const app = makeApp();
+    const denied = await app.inject({
+      method: "POST", url: "/dms",
+      headers: { "x-org-id": "o1", "x-user-id": "vw", "content-type": "application/json" },
+      payload: { peerKind: "agent", peerId: "a1" },
+    });
+    expect(denied.statusCode).toBe(403);
+    // a member (m1, default role) can start a DM
+    const ok = await app.inject({
+      method: "POST", url: "/dms",
+      headers: { "x-org-id": "o1", "x-user-id": "m1", "content-type": "application/json" },
+      payload: { peerKind: "agent", peerId: "a1" },
+    });
+    expect(ok.statusCode).toBe(201);
+    await app.close();
+  });
+
   it("POST /dms with unknown principal 400s", async () => {
     const app = makeApp();
     const res = await app.inject({ method: "POST", url: "/dms", headers: { "x-org-id": "o1", "content-type": "application/json" }, payload: { peerKind: "human", peerId: "ghost" } });

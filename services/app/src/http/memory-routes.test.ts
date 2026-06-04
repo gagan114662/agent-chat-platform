@@ -3,7 +3,7 @@ import Fastify from "fastify";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { registerMemoryRoutes } from "./memory-routes.js";
 import { createNode, createEdge } from "../memory/memory.js";
-import { orgs } from "../db/schema.js";
+import { orgs, workspaces, members } from "../db/schema.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
@@ -21,6 +21,35 @@ describe("memory routes", () => {
     expect(stats.json()).toEqual({ nodes: 1, edges: 0 });
     await app.close();
   });
+  it("POST /memory with scope=org requires admin: member 403, admin 201 (#29)", async () => {
+    await h.db.insert(workspaces).values({ id: "w1", orgId: "o1", name: "W" });
+    await h.db.insert(members).values({ id: "mb", orgId: "o1", workspaceId: "w1", displayName: "Member", role: "member" });
+    await h.db.insert(members).values({ id: "adm", orgId: "o1", workspaceId: "w1", displayName: "Admin", role: "admin" });
+    const app = makeApp();
+    // member creating an org-scoped node → 403
+    const denied = await app.inject({
+      method: "POST", url: "/memory",
+      headers: { "x-org-id": "o1", "x-user-id": "mb", "content-type": "application/json" },
+      payload: { kind: "fact", label: "org policy", scope: "org" },
+    });
+    expect(denied.statusCode).toBe(403);
+    // member CAN create a narrower-scoped node
+    const okNarrow = await app.inject({
+      method: "POST", url: "/memory",
+      headers: { "x-org-id": "o1", "x-user-id": "mb", "content-type": "application/json" },
+      payload: { kind: "fact", label: "team note", scope: "team" },
+    });
+    expect(okNarrow.statusCode).toBe(201);
+    // admin CAN create an org-scoped node
+    const okOrg = await app.inject({
+      method: "POST", url: "/memory",
+      headers: { "x-org-id": "o1", "x-user-id": "adm", "content-type": "application/json" },
+      payload: { kind: "fact", label: "org policy", scope: "org" },
+    });
+    expect(okOrg.statusCode).toBe(201);
+    await app.close();
+  });
+
   it("GET /memory/:id/neighbors does not return another org's neighbors (cross-tenant IDOR)", async () => {
     const app = makeApp();
     const a = await createNode(h.db, { orgId: "o1", kind: "decision", label: "merge PR 7" });

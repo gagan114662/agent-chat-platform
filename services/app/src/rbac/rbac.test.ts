@@ -21,6 +21,29 @@ describe("rbac", () => {
     expect(can("member", "thread:create")).toBe(true);
     expect(can("member", "message:post")).toBe(true);
   });
+
+  it("admin retains every prior capability plus the new ones (backward-compat)", () => {
+    const adminActions: Action[] = [
+      "channel:create", "channel:delete", "thread:create", "message:post", "dm:start",
+      "agent:share", "memory:write:org",
+    ];
+    for (const a of adminActions) expect(can("admin", a)).toBe(true);
+  });
+
+  it("viewer is read-only — denied on every write action", () => {
+    const writes: Action[] = ["channel:create", "thread:create", "message:post", "dm:start", "agent:share", "memory:write:org"];
+    for (const a of writes) expect(can("viewer", a)).toBe(false);
+  });
+
+  it("member matrix: writes yes, channel/agent/org-memory no", () => {
+    expect(can("member", "message:post")).toBe(true);
+    expect(can("member", "thread:create")).toBe(true);
+    expect(can("member", "dm:start")).toBe(true);
+    expect(can("member", "channel:create")).toBe(false);
+    expect(can("member", "agent:share")).toBe(false);
+    expect(can("member", "memory:write:org")).toBe(false);
+    expect(can("admin", "memory:write:org")).toBe(true);
+  });
   it("roleOf reads the member role, defaults to member for unknown", async () => {
     expect(await roleOf(h.db, "adm", "o1")).toBe("admin");
     expect(await roleOf(h.db, "reg", "o1")).toBe("member");
