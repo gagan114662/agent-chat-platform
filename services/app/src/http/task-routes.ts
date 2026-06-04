@@ -54,8 +54,10 @@ export function registerTaskRoutes(app: FastifyInstance, d: TaskDeps) {
         await startFusionRun(d.temporal, {
           run, orgId, threadId: task.threadId, repo, agentId,
           intent: task.title, sandboxUrl: d.sandboxUrl,
-          // stacked: base the child PR on the parent's branch.
+          // stacked: base the child PR on the parent's branch + carry the parent id
+          // into the outcome metadata so the web PR card shows a stacked badge.
           baseBranchOverride: parentRunId ? `agent/${parentRunId}` : undefined,
+          parentRunId,
         });
       }
     }

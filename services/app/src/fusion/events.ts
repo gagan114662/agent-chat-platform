@@ -7,7 +7,7 @@ import { createMessage } from "../chat/messages.js";
 import { transitionRun } from "../tasks/tasks.js";
 import type { FusionEvent } from "@acp/orchestrator/core/run-fusion.js";
 
-export interface SinkCtx { orgId: string; threadId: string; runId: string; agentId: string; mentionDepth?: number; }
+export interface SinkCtx { orgId: string; threadId: string; runId: string; agentId: string; mentionDepth?: number; parentRunId?: string; }
 export const THREAD_CHANNEL = "thread_messages";
 
 function describe(e: FusionEvent): string {
@@ -72,7 +72,9 @@ export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
     if (isOutcome) kind = "pr_card";
     if (isPlan) kind = "plan_card";
     let metadata: Record<string, unknown> = e as any;
-    if (isOutcome) metadata = { ...(e as any), runId: ctx.runId };
+    // #53 stacked PRs: attach parentRunId to the outcome (pr_card) metadata so the
+    // web PR card can render a "⬑ stacked on <parent>" badge. Absent → flat (no badge).
+    if (isOutcome) metadata = { ...(e as any), runId: ctx.runId, ...(ctx.parentRunId ? { parentRunId: ctx.parentRunId } : {}) };
     if (isPlan) metadata = { runId: ctx.runId, kind: "plan" };
     const msg = await createMessage(db, {
       id: `${ctx.runId}:${mySeq}`,

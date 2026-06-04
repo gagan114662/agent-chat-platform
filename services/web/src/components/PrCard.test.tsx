@@ -38,6 +38,19 @@ describe("PrCard approve/decline", () => {
   });
 });
 
+describe("PrCard stacked badge", () => {
+  it("shows a stacked-on badge when metadata.parentRunId is present", () => {
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1", parentRunId: "r-parent" } } as Message} />);
+    expect(screen.getByText(/stacked on/i)).toBeInTheDocument();
+    expect(screen.getByText(/r-parent/)).toBeInTheDocument();
+  });
+
+  it("shows no stacked badge when parentRunId is absent", () => {
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} />);
+    expect(screen.queryByText(/stacked on/i)).toBeNull();
+  });
+});
+
 describe("PrCard view diff", () => {
   const files: ChangedFile[] = [
     { filename: "src/a.ts", additions: 2, deletions: 1, status: "modified", patch: "@@ -1,2 +1,3 @@\n context\n-removed\n+added line" },

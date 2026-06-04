@@ -19,8 +19,10 @@ interface PrCardProps {
 }
 
 export function PrCard({ message, onApprove, onDecline, onLoadDiff, onSyncComments }: PrCardProps) {
-  const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string; runId?: string };
+  const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string; runId?: string; parentRunId?: string };
   const outcome = m.outcome ?? "merged";
+  // #53 stacked PRs: when this run is a child of another, surface a small badge.
+  const parentRunId = typeof m.parentRunId === "string" ? m.parentRunId : undefined;
   // Only treat https:// URLs as links — never render javascript:/data:/etc. as an href.
   const safePrUrl = m.prUrl && m.prUrl.startsWith("https://") ? m.prUrl : undefined;
   // A held_for_human card with a runId is human-actionable: offer Approve / Decline.
@@ -55,6 +57,11 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onSyncCommen
           ) : (
             <span className="text-sm font-medium text-neutral-800">PR #{m.prNumber}</span>
           )
+        )}
+        {parentRunId && (
+          <span className="rounded-full border border-neutral-300 bg-white/60 px-2 py-0.5 text-[11px] font-medium text-neutral-600">
+            ⬑ stacked on {parentRunId}
+          </span>
         )}
       </div>
       <p className="mt-1 text-sm">{message.body}</p>

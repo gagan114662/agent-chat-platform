@@ -31,6 +31,9 @@ export interface StartFusionRunInput {
   // repo default branch — so a child (hand-off) run stacks on its parent's branch
   // (`agent/<parentRunId>`). Defaults to the repo default branch (flat behavior).
   baseBranchOverride?: string;
+  // #53 stacked PRs: the parent run id, threaded into the sink so the outcome
+  // (pr_card) metadata carries it and the web card can show a stacked badge.
+  parentRunId?: string;
 }
 
 // Shared starter: builds the RunFusionActivityInput and kicks off the fusion workflow.
@@ -43,6 +46,6 @@ export async function startFusionRun(temporal: Client, i: StartFusionRunInput) {
     tokenEnvVar: i.repo.tokenEnvVar, sandboxUrl: i.sandboxUrl, pollMs: 5000, maxPolls: 24,
     autonomy: (i.repo.autonomy as "monitor-only" | "resolve-ci" | "autopilot-merge"),
     planMode: i.planMode ?? false,
-    sink: { orgId: i.orgId, threadId: i.threadId, runId: i.run.id, agentId: i.agentId, mentionDepth: i.mentionDepth ?? 0 },
+    sink: { orgId: i.orgId, threadId: i.threadId, runId: i.run.id, agentId: i.agentId, mentionDepth: i.mentionDepth ?? 0, ...(i.parentRunId ? { parentRunId: i.parentRunId } : {}) },
   });
 }
