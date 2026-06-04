@@ -79,6 +79,47 @@ describe("OctokitGitHubService", () => {
     expect(sentBody).toEqual({ title: "x" });
   });
 
+  it("reads a text file's content (base64 decoded to utf8)", async () => {
+    const text = "# Hello\n\nworld\n";
+    const b64 = Buffer.from(text, "utf8").toString("base64");
+    nock(api)
+      .get("/repos/o/r/contents/README.md")
+      .query({ ref: "sha" })
+      .reply(200, { type: "file", encoding: "base64", content: b64, size: text.length });
+    const svc = new OctokitGitHubService("tok");
+    const file = await svc.getFileContent("o", "r", "sha", "README.md");
+    expect(file).toEqual({ content: text, encoding: "utf8", size: text.length });
+  });
+
+  it("reads a binary file's content as raw base64", async () => {
+    const b64 = Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString("base64");
+    nock(api)
+      .get("/repos/o/r/contents/logo.png")
+      .query({ ref: "sha" })
+      .reply(200, { type: "file", encoding: "base64", content: b64, size: 4 });
+    const svc = new OctokitGitHubService("tok");
+    const file = await svc.getFileContent("o", "r", "sha", "logo.png");
+    expect(file).toEqual({ content: b64, encoding: "base64", size: 4 });
+  });
+
+  it("rejects files larger than the size cap", async () => {
+    nock(api)
+      .get("/repos/o/r/contents/big.txt")
+      .query({ ref: "sha" })
+      .reply(200, { type: "file", encoding: "base64", content: "", size: 2 * 1024 * 1024 });
+    const svc = new OctokitGitHubService("tok");
+    await expect(svc.getFileContent("o", "r", "sha", "big.txt")).rejects.toThrow(/too large/i);
+  });
+
+  it("rejects a path that is not a file (e.g. a directory)", async () => {
+    nock(api)
+      .get("/repos/o/r/contents/src")
+      .query({ ref: "sha" })
+      .reply(200, [{ type: "file", name: "a.ts" }]);
+    const svc = new OctokitGitHubService("tok");
+    await expect(svc.getFileContent("o", "r", "sha", "src")).rejects.toThrow(/not a file/i);
+  });
+
   it("lists changed files for a PR", async () => {
     const patch = "@@ -1,2 +1,3 @@\n context\n-removed\n+added\n+added2";
     nock(api).get("/repos/o/r/pulls/7/files").reply(200, [
