@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -46,12 +47,25 @@ func gitOutput(ctx context.Context, dir string, args ...string) (string, error) 
 	return strings.TrimSpace(string(out)), nil
 }
 
-// CloneInto clones repoURL at branch into dest. The credential (if repoURL embeds
-// a userinfo password) is derived internally so the secret never appears in argv.
+// CloneInto clones repoURL at branch into dest (full clone). The credential (if
+// repoURL embeds a userinfo password) is derived internally so the secret never
+// appears in argv. Preserved for backward compatibility; delegates to CloneIntoDepth.
 func CloneInto(ctx context.Context, repoURL, branch, dest string) error {
+	return CloneIntoDepth(ctx, repoURL, branch, dest, 0)
+}
+
+// CloneIntoDepth clones repoURL at branch into dest. When depth > 0 it performs a
+// shallow clone (--depth N --no-tags) to bound fetch size; depth <= 0 is a full
+// clone (current behavior). The credential (if repoURL embeds a userinfo password)
+// is derived internally so the secret never appears in argv.
+func CloneIntoDepth(ctx context.Context, repoURL, branch, dest string, depth int) error {
 	c := newGitCred(repoURL)
+	args := append(append([]string{}, c.args...), "clone", "--single-branch", "--branch", branch)
+	if depth > 0 {
+		args = append(args, "--depth", strconv.Itoa(depth), "--no-tags")
+	}
 	// "--" terminates option parsing so repoURL/dest can never be read as flags.
-	args := append(append([]string{}, c.args...), "clone", "--single-branch", "--branch", branch, "--", c.cleanURL, dest)
+	args = append(args, "--", c.cleanURL, dest)
 	return gitRunEnv(ctx, "", c.env, args...)
 }
 
