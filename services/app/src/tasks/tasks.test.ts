@@ -1,17 +1,22 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { openTaskForMention, transitionRun } from "./tasks.js";
-import { orgs, workspaces, channels, threads, agents } from "../db/schema.js";
+import { openTaskForMention, transitionRun, reassignTask } from "./tasks.js";
+import { orgs, workspaces, channels, threads, agents, runs } from "../db/schema.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
 beforeEach(async () => {
   await h.reset();
   await h.db.insert(orgs).values({ id: "o1", name: "Org" });
+  await h.db.insert(orgs).values({ id: "o2", name: "Org B" });
   await h.db.insert(workspaces).values({ id: "w1", orgId: "o1", name: "WS" });
+  await h.db.insert(workspaces).values({ id: "w2", orgId: "o2", name: "WS B" });
   await h.db.insert(channels).values({ id: "c1", orgId: "o1", workspaceId: "w1", name: "g" });
   await h.db.insert(threads).values({ id: "t1", orgId: "o1", channelId: "c1", title: "T", repoId: "r1" });
   await h.db.insert(agents).values({ id: "a1", orgId: "o1", workspaceId: "w1", handle: "coder", displayName: "C", adapter: "fake", config: {} });
+  await h.db.insert(agents).values({ id: "a2", orgId: "o1", workspaceId: "w1", handle: "reviewer", displayName: "Reviewer", adapter: "fake", config: {} });
+  await h.db.insert(agents).values({ id: "b2", orgId: "o2", workspaceId: "w2", handle: "intruder", displayName: "Intruder", adapter: "fake", config: {} });
 });
 
 describe("tasks", () => {
@@ -46,5 +51,44 @@ describe("tasks", () => {
     });
     // org B tries to transition org A's run by id → run not found, state unchanged
     await expect(transitionRun(h.db, run.id, "running", {}, "o2")).rejects.toThrow(/run not found/);
+  });
+});
+
+describe("reassignTask", () => {
+  it("hands a task to another in-org agent + creates a fresh pending run", async () => {
+    const { task } = await openTaskForMention(h.db, {
+      orgId: "o1", threadId: "t1", intent: "fix bug", agentId: "a1", createdByKind: "human", createdById: "m1",
+    });
+    const { task: reassigned, run } = await reassignTask(h.db, {
+      orgId: "o1", taskId: task.id, agentId: "a2", byKind: "human", byId: "m1",
+    });
+    expect(reassigned.assigneeKind).toBe("agent");
+    expect(reassigned.assigneeId).toBe("a2");
+    expect(reassigned.state).toBe("in_progress");
+    expect(run.state).toBe("pending");
+    expect(run.taskId).toBe(task.id);
+    expect(run.workflowId).toBe(`run-${run.id}`);
+    // a fresh run row exists for the task (original + new)
+    const all = await h.db.select().from(runs).where(eq(runs.taskId, task.id));
+    expect(all.length).toBe(2);
+  });
+
+  it("rejects a cross-org agent (cross-tenant IDOR)", async () => {
+    const { task } = await openTaskForMention(h.db, {
+      orgId: "o1", threadId: "t1", intent: "fix bug", agentId: "a1", createdByKind: "human", createdById: "m1",
+    });
+    await expect(reassignTask(h.db, {
+      orgId: "o1", taskId: task.id, agentId: "b2", byKind: "human", byId: "m1",
+    })).rejects.toThrow(/agent not found/);
+  });
+
+  it("rejects reassigning a task owned by another org (cross-tenant IDOR)", async () => {
+    const { task } = await openTaskForMention(h.db, {
+      orgId: "o1", threadId: "t1", intent: "fix bug", agentId: "a1", createdByKind: "human", createdById: "m1",
+    });
+    // org B tries to reassign org A's task by id → task not found
+    await expect(reassignTask(h.db, {
+      orgId: "o2", taskId: task.id, agentId: "b2", byKind: "human", byId: "m1",
+    })).rejects.toThrow(/task not found/);
   });
 });

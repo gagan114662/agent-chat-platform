@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
-import { tasks, runs } from "../db/schema.js";
+import { tasks, runs, agents } from "../db/schema.js";
 import { canTransition, isTerminal, type RunState } from "./runs.js";
 
 export interface OpenTaskInput {
@@ -25,6 +25,39 @@ export async function openTaskForMention(db: DB, i: OpenTaskInput) {
     id: runId, orgId: i.orgId, taskId, state: "pending", workflowId: `run-${runId}`,
   }).returning();
   return { task, run };
+}
+
+export interface ReassignInput {
+  orgId: string;
+  taskId: string;
+  agentId: string;
+  byKind: "human" | "agent";
+  byId: string;
+}
+
+// Hand a task to another agent: re-point the assignee and spin a fresh pending Run
+// for the new owner. Both task and agent are loaded org-scoped (#14 pattern) so a
+// cross-org task id or agent id can never be reassigned/leaked.
+export async function reassignTask(db: DB, i: ReassignInput) {
+  const [existing] = await db.select().from(tasks)
+    .where(and(eq(tasks.id, i.taskId), eq(tasks.orgId, i.orgId)));
+  if (!existing) throw new Error(`task not found: ${i.taskId}`);
+
+  const [agent] = await db.select().from(agents)
+    .where(and(eq(agents.id, i.agentId), eq(agents.orgId, i.orgId)));
+  if (!agent) throw new Error(`agent not found: ${i.agentId}`);
+
+  const [task] = await db.update(tasks)
+    .set({ assigneeKind: "agent", assigneeId: i.agentId, state: "in_progress" })
+    .where(and(eq(tasks.id, i.taskId), eq(tasks.orgId, i.orgId)))
+    .returning();
+
+  const runId = randomUUID();
+  const [run] = await db.insert(runs).values({
+    id: runId, orgId: i.orgId, taskId: i.taskId, state: "pending", workflowId: `run-${runId}`,
+  }).returning();
+
+  return { task, run, agent };
 }
 
 export interface RunFields {
