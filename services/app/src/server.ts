@@ -29,6 +29,7 @@ import { registerIngestRoutes } from "./http/ingest-routes.js";
 import { registerLogIngestRoutes } from "./http/log-ingest-routes.js";
 import { registerWebhookRoutes } from "./http/webhook-routes.js";
 import { registerAuth } from "./http/auth-routes.js";
+import { registerApiKeyRoutes } from "./http/apikey-routes.js";
 import { resolveSession } from "./auth/auth.js";
 import { eq } from "drizzle-orm";
 import { threads } from "./db/schema.js";
@@ -95,6 +96,7 @@ export async function buildServer() {
   registerIngestRoutes(app, { db, sql });
   registerLogIngestRoutes(app, { db, sql });
   registerWebhookRoutes(app, { db, sql });
+  registerApiKeyRoutes(app, { db });
 
   // Public liveness/health probe (in PUBLIC_PATHS so the auth preHandler won't 401 it).
   app.get("/healthz", async () => ({ ok: true }));
