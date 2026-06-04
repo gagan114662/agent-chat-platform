@@ -7,7 +7,7 @@ import { createMessage } from "../chat/messages.js";
 import { transitionRun } from "../tasks/tasks.js";
 import type { FusionEvent } from "@acp/orchestrator/core/run-fusion.js";
 
-export interface SinkCtx { orgId: string; threadId: string; runId: string; agentId: string; }
+export interface SinkCtx { orgId: string; threadId: string; runId: string; agentId: string; mentionDepth?: number; }
 export const THREAD_CHANNEL = "thread_messages";
 
 function describe(e: FusionEvent): string {

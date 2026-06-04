@@ -22,6 +22,11 @@ export interface StartFusionRunInput {
   // Plan mode (#20): when true, the run proposes a read-only plan and parks at
   // awaiting_plan_approval instead of executing. Defaults false (execute now).
   planMode?: boolean;
+  // #27 mention loop guard: the depth of this run in an agent↔agent mention chain.
+  // A human-triggered run is depth 0; a run started by an agent's @mention carries
+  // the parent's depth + 1. Threaded into the sink ctx so when this run later
+  // authors a coordinating @mention it can pass its own depth (bounded by MAX_DEPTH).
+  mentionDepth?: number;
 }
 
 // Shared starter: builds the RunFusionActivityInput and kicks off the fusion workflow.
@@ -34,6 +39,6 @@ export async function startFusionRun(temporal: Client, i: StartFusionRunInput) {
     tokenEnvVar: i.repo.tokenEnvVar, sandboxUrl: i.sandboxUrl, pollMs: 5000, maxPolls: 24,
     autonomy: (i.repo.autonomy as "monitor-only" | "resolve-ci" | "autopilot-merge"),
     planMode: i.planMode ?? false,
-    sink: { orgId: i.orgId, threadId: i.threadId, runId: i.run.id, agentId: i.agentId },
+    sink: { orgId: i.orgId, threadId: i.threadId, runId: i.run.id, agentId: i.agentId, mentionDepth: i.mentionDepth ?? 0 },
   });
 }
