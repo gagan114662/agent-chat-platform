@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { DB } from "../db/client.js";
-import { createSession, resolveSession, deleteSession, listMembersForLogin } from "../auth/auth.js";
+import { createSession, resolveSession, deleteSession, listMembersForLogin, verifyCredentials } from "../auth/auth.js";
 import { roleOf } from "../rbac/rbac.js";
 
 function bearer(req: FastifyRequest): string | undefined {
@@ -23,7 +23,13 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
   app.get("/auth/members", async () => listMembersForLogin(d.db));
 
   app.post("/auth/login", async (req, reply) => {
-    const { memberId } = req.body as { memberId: string };
+    const { memberId, password } = req.body as { memberId: string; password?: string };
+    const strict = !!process.env.AUTH_REQUIRE_SESSION;
+    if (strict) {
+      if (!password || !(await verifyCredentials(d.db, memberId, password))) {
+        return reply.code(401).send({ error: "invalid credentials" });
+      }
+    }
     try {
       const { token, member } = await createSession(d.db, memberId);
       return reply.code(201).send({ token, member });

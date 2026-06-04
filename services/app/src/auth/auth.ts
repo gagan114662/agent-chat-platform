@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { members, sessions } from "../db/schema.js";
+import { verifyPassword } from "./password.js";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -29,4 +30,11 @@ export async function deleteSession(db: DB, token: string) {
 export async function listMembersForLogin(db: DB) {
   const ms = await db.select().from(members);
   return ms.map((m) => ({ id: m.id, displayName: m.displayName, orgId: m.orgId }));
+}
+
+// Returns the member if the password matches their stored hash; undefined otherwise.
+export async function verifyCredentials(db: DB, memberId: string, password: string) {
+  const [m] = await db.select().from(members).where(eq(members.id, memberId));
+  if (!m || !m.passwordHash) return undefined;
+  return verifyPassword(password, m.passwordHash) ? m : undefined;
 }

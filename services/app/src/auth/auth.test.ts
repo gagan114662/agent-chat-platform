@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { createSession, resolveSession, deleteSession, listMembersForLogin } from "./auth.js";
+import { createSession, resolveSession, deleteSession, listMembersForLogin, verifyCredentials } from "./auth.js";
 import { orgs, workspaces, members, sessions } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 
@@ -36,5 +36,13 @@ describe("auth", () => {
   });
   it("lists members for the login picker", async () => {
     expect((await listMembersForLogin(h.db)).map((m) => m.id)).toContain("m1");
+  });
+  it("verifyCredentials accepts the right password, rejects wrong / passwordless", async () => {
+    const { hashPassword } = await import("./password.js");
+    await h.db.update((await import("../db/schema.js")).members).set({ passwordHash: hashPassword("pw") }).where((await import("drizzle-orm")).eq((await import("../db/schema.js")).members.id, "m1"));
+    expect(await verifyCredentials(h.db, "m1", "pw")).toBeTruthy();
+    expect(await verifyCredentials(h.db, "m1", "nope")).toBeUndefined();
+    await h.db.insert((await import("../db/schema.js")).members).values({ id: "np", orgId: "o1", workspaceId: "w1", displayName: "NoPw" });
+    expect(await verifyCredentials(h.db, "np", "x")).toBeUndefined();
   });
 });
