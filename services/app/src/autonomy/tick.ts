@@ -5,6 +5,7 @@ import type { DB } from "../db/client.js";
 import { tasks, threads, repos, runs, agents } from "../db/schema.js";
 import { startFusionRun, type StartFusionRunInput } from "../fusion/start.js";
 import { agentModelConfig, agentMcp } from "../agents/agents.js";
+import { detectAlerts, recordAlerts } from "./alerts.js";
 
 // `start` is injectable so the tick can run with a FAKE temporal in tests (and so the
 // production path stays identical to the mention/hand-off starter). It defaults to the
@@ -18,7 +19,7 @@ export interface TickDeps {
   sandboxUrl: string;
   start?: StartRun;
 }
-export interface TickResult { dispatched: string[]; skipped: number; reason: string; }
+export interface TickResult { dispatched: string[]; skipped: number; reason: string; alerts: number; }
 
 // One self-prompting iteration for an org: find OPEN tasks that are ready to run
 // (assigned to an agent, thread has a repo with a resolvable token, NOT monitor-only,
@@ -62,5 +63,11 @@ export async function tick(d: TickDeps, args: { orgId: string; budgetMax?: numbe
     });
     dispatched.push(runId);
   }
-  return { dispatched, skipped, reason: `budget ${budget}, ${open.length} open tasks` };
+  // #93: after the dispatch pass, scan the org's run/CI state and record alerts
+  // (idempotent) so the self-prompting loop surfaces them each iteration. A
+  // configured ALERT_THREAD_ID (or none) controls posting; recording is bounded
+  // by what detectAlerts finds.
+  const detected = await detectAlerts(d.db, args.orgId);
+  const alerts = await recordAlerts(d.db, d.sql, { orgId: args.orgId }, detected);
+  return { dispatched, skipped, reason: `budget ${budget}, ${open.length} open tasks`, alerts };
 }
