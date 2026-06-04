@@ -9,6 +9,7 @@ const TABLES = [
   "memory_edges", "memory_nodes",
   "log_events",
   "incidents",
+  "task_relations", "task_comments",
   "run_checkpoints", "run_events", "runs", "tasks", "messages", "threads", "channels",
   "agents", "members", "repos", "workspaces", "orgs",
 ];

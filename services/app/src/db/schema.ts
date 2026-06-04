@@ -84,9 +84,36 @@ export const tasks = pgTable("tasks", {
   state: text("state").notNull().default("open"),
   assigneeKind: text("assignee_kind"),
   assigneeId: text("assignee_id"),
+  // #81 richer tasks: priority (none|low|medium|high|urgent) + a nullable due date.
+  // Defaulted/nullable so existing task-create paths (openTaskForMention/bulk) stay untouched.
+  priority: text("priority").notNull().default("none"),
+  dueDate: timestamp("due_date", { withTimezone: true }),
   createdByKind: text("created_by_kind").notNull(),
   createdById: text("created_by_id").notNull(),
 });
+
+// #81 task_comments: an org-scoped comment on a task, authored by a human or agent.
+export const taskComments = pgTable("task_comments", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  taskId: text("task_id").notNull(),
+  authorKind: text("author_kind").notNull(), // 'human' | 'agent'
+  authorId: text("author_id").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// #81 task_relations: a directed link between two org tasks. `relation` is one of
+// blocks|related|duplicate. The unique (orgId,fromTaskId,toTaskId,relation) index
+// makes addTaskRelation idempotent (re-adding the same link is a no-op).
+export const taskRelations = pgTable("task_relations", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  fromTaskId: text("from_task_id").notNull(),
+  toTaskId: text("to_task_id").notNull(),
+  relation: text("relation").notNull(), // 'blocks' | 'related' | 'duplicate'
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ ux: uniqueIndex("task_relations_ux").on(t.orgId, t.fromTaskId, t.toTaskId, t.relation) }));
 
 export const goals = pgTable("goals", {
   id: text("id").primaryKey(),
