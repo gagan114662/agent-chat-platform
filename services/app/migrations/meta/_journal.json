@@ -120,6 +120,13 @@
       "when": 1781140000000,
       "tag": "0016_run_selected",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1781230000000,
+      "tag": "0017_log_events",
+      "breakpoints": true
     }
   ]
 }
