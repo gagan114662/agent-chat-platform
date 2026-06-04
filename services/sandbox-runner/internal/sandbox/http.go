@@ -57,5 +57,45 @@ func NewHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(res)
 	})
+	mux.HandleFunc("POST /feedback", func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // cap request body at 1 MiB
+		var req FeedbackRequest
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			http.Error(w, redactCreds(err.Error()), http.StatusBadRequest)
+			return
+		}
+		if err := req.Validate(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		work, err := os.MkdirTemp("", "sbx-fb-*")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer os.RemoveAll(work)
+		req.WorkDir = filepath.Join(work, "repo")
+
+		name := req.Adapter
+		if name == "" {
+			name = "fake"
+		}
+		factory, ok := adapter.DefaultRegistry().Get(name)
+		if !ok {
+			http.Error(w, "unknown adapter: "+name, http.StatusBadRequest)
+			return
+		}
+		ad := factory()
+
+		res, err := Feedback(r.Context(), req, ad)
+		if err != nil {
+			http.Error(w, redactCreds(err.Error()), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(res)
+	})
 	return mux
 }

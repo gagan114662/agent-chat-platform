@@ -34,3 +34,28 @@ func TestFakeAdapter(t *testing.T) {
 		t.Fatalf("expected file_changed + done events, got %v", events)
 	}
 }
+
+func TestFakeAdapterApplyFeedbackWritesFile(t *testing.T) {
+	a := NewFakeAdapter()
+	dir := t.TempDir()
+	if err := a.Prepare(context.Background(), PrepareContext{RepoDir: dir}); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	var events []EventType
+	err := a.ApplyFeedback(context.Background(), "ci: lint failed", func(e Event) { events = append(events, e.Type) })
+	if err != nil {
+		t.Fatalf("ApplyFeedback: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "FEEDBACK.md"))
+	if err != nil || !strings.Contains(string(b), "ci: lint failed") {
+		t.Fatalf("expected FEEDBACK.md with notes, got %q err %v", b, err)
+	}
+	var hasFile, hasDone bool
+	for _, e := range events {
+		hasFile = hasFile || e == EventFileChanged
+		hasDone = hasDone || e == EventDone
+	}
+	if !hasFile || !hasDone {
+		t.Fatalf("expected file_changed + done events, got %v", events)
+	}
+}
