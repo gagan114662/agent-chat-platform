@@ -59,13 +59,13 @@ func validRef(ref, field string) error {
 
 // Run clones, applies the agent, commits and pushes a branch.
 func Run(ctx context.Context, req RunRequest, agent Agent) (RunResult, error) {
-	if err := CloneInto(req.RepoURL, req.BaseBranch, req.WorkDir); err != nil {
+	if err := CloneInto(ctx, req.RepoURL, req.BaseBranch, req.WorkDir); err != nil {
 		return RunResult{}, fmt.Errorf("clone: %w", err)
 	}
 	if err := agent.Apply(req.WorkDir, req.Intent); err != nil {
 		return RunResult{}, fmt.Errorf("agent: %w", err)
 	}
-	sha, err := CommitAllAndPush(req.WorkDir, req.Branch, "agent: "+req.Intent)
+	sha, err := CommitAllAndPush(ctx, req.WorkDir, req.Branch, "agent: "+req.Intent)
 	if err != nil {
 		return RunResult{}, fmt.Errorf("commit/push: %w", err)
 	}

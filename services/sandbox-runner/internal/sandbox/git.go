@@ -1,14 +1,15 @@
 package sandbox
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
 )
 
 // gitRun runs git in dir and returns combined output on error.
-func gitRun(dir string, args ...string) error {
-	cmd := exec.Command("git", args...)
+func gitRun(ctx context.Context, dir string, args ...string) error {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -19,8 +20,8 @@ func gitRun(dir string, args ...string) error {
 }
 
 // gitOutput runs git in dir and returns trimmed stdout, wrapping errors like gitRun.
-func gitOutput(dir string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
+func gitOutput(ctx context.Context, dir string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -35,30 +36,36 @@ func gitOutput(dir string, args ...string) (string, error) {
 }
 
 // CloneInto clones repoURL at branch into dest.
-func CloneInto(repoURL, branch, dest string) error {
-	return gitRun("", "clone", "--branch", branch, "--single-branch", repoURL, dest)
+func CloneInto(ctx context.Context, repoURL, branch, dest string) error {
+	return gitRun(ctx, "", "clone", "--branch", branch, "--single-branch", repoURL, dest)
 }
 
 // CommitAllAndPush stages all changes, commits on a new branch, pushes it,
 // and returns the commit SHA.
-func CommitAllAndPush(repoDir, branch, message string) (string, error) {
-	if err := gitRun(repoDir, "config", "user.email", "agent@agent-chat.dev"); err != nil {
+func CommitAllAndPush(ctx context.Context, repoDir, branch, message string) (string, error) {
+	if branch == "" {
+		return "", fmt.Errorf("branch required")
+	}
+	if message == "" {
+		return "", fmt.Errorf("message required")
+	}
+	if err := gitRun(ctx, repoDir, "config", "user.email", "agent@agent-chat.dev"); err != nil {
 		return "", err
 	}
-	if err := gitRun(repoDir, "config", "user.name", "agent-chat"); err != nil {
+	if err := gitRun(ctx, repoDir, "config", "user.name", "agent-chat"); err != nil {
 		return "", err
 	}
-	if err := gitRun(repoDir, "checkout", "-b", branch); err != nil {
+	if err := gitRun(ctx, repoDir, "checkout", "-b", branch); err != nil {
 		return "", err
 	}
-	if err := gitRun(repoDir, "add", "-A"); err != nil {
+	if err := gitRun(ctx, repoDir, "add", "-A"); err != nil {
 		return "", err
 	}
-	if err := gitRun(repoDir, "commit", "-m", message); err != nil {
+	if err := gitRun(ctx, repoDir, "commit", "-m", message); err != nil {
 		return "", err
 	}
-	if err := gitRun(repoDir, "push", "origin", branch); err != nil {
+	if err := gitRun(ctx, repoDir, "push", "origin", branch); err != nil {
 		return "", err
 	}
-	return gitOutput(repoDir, "rev-parse", "HEAD")
+	return gitOutput(ctx, repoDir, "rev-parse", "HEAD")
 }
