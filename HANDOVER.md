@@ -8,13 +8,12 @@
 ## TL;DR — where we are
 
 Building **agent-chat-platform**: a chat-driven AI agent execution platform (Slack-for-AI-agents
-fused with conductor.build-style sandboxed execution → GitHub PRs). **The entire software-buildable
-roadmap is COMPLETE and merged to `main`** (13 PRs, #1–#13). Plan 1 was live-proven against real GitHub.
+fused with conductor.build-style sandboxed execution → GitHub PRs). **The full roadmap + frontend are COMPLETE and merged** (32 PRs). Plan 1, the chat→fusion loop, the real Claude Code agent, K8s isolation, Stripe billing, and Honeycomb traces are all **live-proven**.
 
 - **Repo:** https://github.com/gagan114662/agent-chat-platform (private, owner `gagan114662`)
 - **Local path:** `/Users/gaganarora/Desktop/my projects/agent-chat-platform`
 - **`main` — all green:** Go (3 pkgs build/vet/test), orchestrator **31**, app **57**, web **30**, all tsc clean, web build ok.
-- **No open PRs.** Everything below is merged.
+- **No open PRs.** PRs #1–#32 merged. Beyond the table below: #14 real Claude Code adapter (live), #15 merge-policy gate (4b), #16 K8s namespace-per-org (live on OrbStack), #25 Stripe metering (live test-mode), #30 OTLP→Honeycomb (live, acp-app dataset), #31 app restyle, #32 landing site, #24 verification skills.
 
 ### Shipped (all merged to `main`)
 | PR | Plan | What |
@@ -32,20 +31,18 @@ roadmap is COMPLETE and merged to `main`** (13 PRs, #1–#13). Plan 1 was live-p
 | #12 | 5 | Open adapter SDK + registry |
 | #13 | 6 | OpenTelemetry tracing for the fusion run |
 
-### Remaining — INFRA-BOUND or WIRING follow-ups (not software-buildable in a local sandbox)
-These need a cluster / external provider / a cross-cutting rewrite and were deliberately NOT built:
+### Remaining (genuinely not yet built)
+Most of the old infra-bound list is now DONE & live (K8s #16, OTLP→Honeycomb #30, billing #25, real agent #14, 4b gate #15, sandbox hardening #10). Still open:
 - **Postgres RLS enforcement** — `FORCE ROW LEVEL SECURITY` keyed on `org_id` requires routing every
   query through an org-scoped GUC transaction; it would break the current query path. Needs its own
   data-layer plan (app-level `org_id` filtering is in place today).
-- **K8s namespace isolation + gVisor/Kata runtime** (Plan 3 infra) — needs a real cluster + node runtime.
-- **NATS event backbone + presence** (2.3) — needs a NATS server (Docker daemon won't boot in this sandbox;
-  realtime currently uses Postgres `LISTEN/NOTIFY`, which works for one process).
-- **Real OAuth/SSO** (2.2c) — needs an external IdP (password login + opaque sessions are built).
-- **Trace export + metrics + dashboards/billing** (Plan 6) — need an OTLP collector/Honeycomb + meter
-  provider + billing provider (in-process tracing spans are built).
-- **WIRING follow-ups (software, deferrable):** 4b — wire the risk/policy/QA engine into the app activity
-  (a `repos.autonomy` column + `held_for_human` thread card); real browser-QA execution via the `/browse`
-  harness; registry-driven adapter selection in `Run`; real CLI-wrapping adapters (Claude Code/Codex/…).
+- **Postgres RLS enforcement** (above) — still a cross-cutting data-layer rewrite.
+- **gVisor/Kata runtime** — K8s manifests have the RuntimeClass hook; needs the node runtime installed.
+- **NATS event backbone + presence** — realtime uses Postgres `LISTEN/NOTIFY` today.
+- **Real OAuth/SSO** — needs an external IdP (password login + opaque sessions are built).
+- **Metrics + dashboards** — traces export to Honeycomb; a MeterProvider + dashboards are next.
+- **Feature backlog** — GitHub issues #17–#29 (diff viewer, CI fix-on-red, PR-comment sync, plan-mode,
+  multi-agent coordination, **memory/context graph**, …); see `docs/BACKLOG.md`.
 
 To run the whole stack live: `services/app/README.md` (Postgres + Temporal + sandbox-runner) + `cd services/web && pnpm dev`. Set `AUTH_REQUIRE_SESSION=true` (with seeded passwords) for enforced auth.
 
