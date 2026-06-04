@@ -15,7 +15,7 @@ CI to merge — orchestrated by Temporal, surfaced over WebSocket.
 4. **Account takeover** — session tokens, the auth fallback, WS auth.
 
 ## Trust boundaries
-- **Untrusted → sandbox-runner:** `repoUrl`, `branch`, `intent`, `adapter` arrive over HTTP and become `git`/`claude` argv + filesystem paths. The repo *contents* are untrusted (a malicious repo runs through `claude --permission-mode acceptEdits`).
+- **Untrusted → sandbox-runner:** `repoUrl`, `branch`, `intent`, `adapter` arrive over HTTP and become `git`/`claude` argv + filesystem paths. The repo *contents* are untrusted (a malicious repo runs through `claude --permission-mode acceptEdits`). Mitigated by #49 (repo-config quarantine + prompt bound + child-env scrub) — but the container remains the hard boundary (mandatory; see `services/sandbox-runner/SECURITY.md`).
 - **Untrusted → app HTTP/WS:** every route input; `actor(req)` decides the tenant.
 - **app → GitHub (Octokit):** PAT-bearing; nodeFetch shim.
 - **app/orchestrator → Temporal:** workflow args (PAT must NOT be in them — resolved inside the activity).
@@ -44,6 +44,7 @@ CI to merge — orchestrated by Temporal, surfaced over WebSocket.
 - #37 fail-closed auth (dev-header fallback should be opt-in, not opt-out).
 - #38 adapter authorization (default-deny `claude-code`).
 - #39 thread ctx into agent (cancellation) · PAT out of git argv · short-lived WS tickets.
+- #49 agent prompt/repo-content trust — **mitigated (Plan 24):** repo-resident agent-instruction files quarantined during runs (diff unaffected), `intent`/`notes` length-bounded, platform secrets scrubbed from the agent's child env (claude auth preserved). Residual: a hijacked agent is still RCE *inside* the container — container mandatory (`services/sandbox-runner/SECURITY.md`).
 
 These three are addressed in Plan 20 (`docs/plans/2026-06-04-plan-20-security-hardening-ii.md`). A
 fresh scan should verify they're closed and look for what's *not* yet tracked.
