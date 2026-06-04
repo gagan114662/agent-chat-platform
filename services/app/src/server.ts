@@ -7,6 +7,7 @@ import { registerRoutes } from "./http/routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
 import { registerDmRoutes } from "./http/dm-routes.js";
 import { registerAuth } from "./http/auth-routes.js";
+import { resolveSession } from "./auth/auth.js";
 import { startWorker } from "./fusion/worker.js";
 import { makeTemporalClient } from "./fusion/bridge.js";
 
@@ -20,7 +21,7 @@ export async function buildServer() {
   const app = Fastify({ logger: true });
   await app.register(websocket);
   registerAuth(app, { db });
-  registerWs(app, pubsub);
+  registerWs(app, pubsub, (token) => resolveSession(db, token));
   registerRoutes(app, { db, sql, temporal, sandboxUrl: process.env.SANDBOX_URL ?? "http://localhost:8090" });
   registerNavRoutes(app, { db });
   registerDmRoutes(app, { db });

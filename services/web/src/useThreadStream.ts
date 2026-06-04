@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { Message } from "./types.js";
 import { listMessages, postMessage } from "./api.js";
+import { getToken } from "./auth.js";
 
 function wsUrl(threadId: string): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  return `${proto}://${location.host}/ws?threadId=${encodeURIComponent(threadId)}`;
+  const token = getToken();
+  const q = `threadId=${encodeURIComponent(threadId)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
+  return `${proto}://${location.host}/ws?${q}`;
 }
 
 export function useThreadStream(threadId: string) {
