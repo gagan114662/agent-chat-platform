@@ -21,7 +21,7 @@ import { resolveSession } from "./auth/auth.js";
 import { eq } from "drizzle-orm";
 import { threads } from "./db/schema.js";
 import { startWorker } from "./fusion/worker.js";
-import { makeTemporalClient } from "./fusion/bridge.js";
+import { lazyTemporalClient } from "./fusion/bridge.js";
 import { startTelemetry, stopTelemetry } from "./telemetry/otel-init.js";
 
 // pino redaction so credentials never reach the logs (defense-in-depth on top
@@ -38,8 +38,12 @@ export async function buildServer() {
   const { db, sql } = makeDb();
   const pubsub = new ThreadPubSub(sql);
   await pubsub.start();
-  const temporal = await makeTemporalClient();
-  await startWorker();
+  // Lazy Temporal: connect on first run-dispatch, not at boot — the app serves
+  // chat/auth/memory/tasks/UI even if Temporal is down. The worker is started
+  // fire-and-forget so a missing Temporal can't block (or crash) boot; runs
+  // simply won't execute until Temporal is reachable.
+  const temporal = lazyTemporalClient();
+  startWorker().catch((err) => console.warn("[acp] temporal worker not started (runs won't execute until Temporal is reachable):", String(err)));
 
   const app = Fastify({ logger: loggerOptions });
   await app.register(websocket);
