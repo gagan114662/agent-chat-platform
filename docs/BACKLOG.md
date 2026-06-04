@@ -80,3 +80,5 @@ of the wedge. ✅ have · 🔜 partial · ❌ missing.
 - **Richer RBAC** ❌ — read/write/**propagate** scoped to personal/project/team/org (we have admin/member). (issue filed)
 - **Task niceties** 🔜/❌ — "In Review" state; link tasks to memory/files for context hand-off.
 - **Command palette (⌘K), notifications/unread, retention tiers** ❌ (overlaps conductor backlog #10/#12).
+
+- **Security scan** — run [vercel-labs/deepsec](https://github.com/vercel-labs/deepsec) for bugs+vulns; triage+fix (GH issue filed). Focus: auth bypass, secret/token leak paths, untrusted-code sandbox, cross-tenant access (RLS not yet enforced), web XSS, dep audit.
