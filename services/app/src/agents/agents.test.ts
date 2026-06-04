@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { resolveMention, isPermittedOnRepo } from "./agents.js";
+import { resolveMention, isPermittedOnRepo, agentModelConfig } from "./agents.js";
 import { orgs, workspaces, agents, repos } from "../db/schema.js";
 
 const h = testDb();
@@ -21,6 +21,20 @@ describe("agents", () => {
   });
   it("returns undefined for unknown handle", async () => {
     expect(await resolveMention(h.db, "o1", "ghost")).toBeUndefined();
+  });
+
+  it("reads model/provider off a seeded agent's config (#58)", async () => {
+    await h.db.insert(agents).values({
+      id: "a-model", orgId: "o1", workspaceId: "w1", handle: "opus", displayName: "Opus",
+      adapter: "claude-code", config: { model: "claude-sonnet-4-6", provider: "bedrock" },
+    });
+    const a = await resolveMention(h.db, "o1", "opus");
+    expect(agentModelConfig(a)).toEqual({ model: "claude-sonnet-4-6", provider: "bedrock" });
+  });
+
+  it("an agent with empty config yields no model/provider (default, #58)", async () => {
+    const a = await resolveMention(h.db, "o1", "coder");
+    expect(agentModelConfig(a)).toEqual({});
   });
   it("permits an agent on a repo in the same workspace", async () => {
     expect(await isPermittedOnRepo(h.db, "a1", "r1")).toBe(true);
@@ -48,5 +62,23 @@ describe("agents", () => {
     await h.db.insert(repos).values({ id: "rOther", orgId: "o2", workspaceId: "w9", githubOwner: "o", githubName: "y", defaultBranch: "main", tokenEnvVar: "E2E_GITHUB_TOKEN" });
     await h.db.update(agents).set({ shared: true }).where(eq(agents.id, "a1"));
     expect(await isPermittedOnRepo(h.db, "a1", "rOther")).toBe(false);
+  });
+});
+
+describe("agentModelConfig (#58)", () => {
+  it("returns {} for null/absent/empty config", () => {
+    expect(agentModelConfig(null)).toEqual({});
+    expect(agentModelConfig(undefined)).toEqual({});
+    expect(agentModelConfig({})).toEqual({});
+    expect(agentModelConfig({ config: {} })).toEqual({});
+  });
+  it("surfaces only string model/provider values", () => {
+    expect(agentModelConfig({ config: { model: "m", provider: "bedrock" } })).toEqual({ model: "m", provider: "bedrock" });
+    expect(agentModelConfig({ config: { model: "m" } })).toEqual({ model: "m" });
+  });
+  it("ignores non-string / empty values (no argv/env injection from a malformed config)", () => {
+    expect(agentModelConfig({ config: { model: 123, provider: ["x"] } })).toEqual({});
+    expect(agentModelConfig({ config: { model: "", provider: "" } })).toEqual({});
+    expect(agentModelConfig({ config: "not-an-object" })).toEqual({});
   });
 });

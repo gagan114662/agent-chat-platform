@@ -162,6 +162,34 @@ describe("runFusion", () => {
     );
   });
 
+  it("threads model/provider from the input into the sandbox run (#58)", async () => {
+    const d = deps(["success"]);
+    await runFusion(d, { ...input, model: "claude-sonnet-4-6", provider: "bedrock" }, { pollMs: 0, maxPolls: 5 });
+    expect(d.sandbox.run).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "claude-sonnet-4-6", provider: "bedrock" }),
+    );
+  });
+
+  it("threads model into the plan run when planMode is set (#58)", async () => {
+    const d = deps(["success"]);
+    await runFusion(d, { ...input, model: "claude-sonnet-4-6" }, {
+      pollMs: 0, maxPolls: 5,
+      planMode: true,
+      planGate: async () => ({ approved: true }),
+    });
+    expect(d.sandbox.plan).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "claude-sonnet-4-6" }),
+    );
+  });
+
+  it("passes no model/provider when the input omits them (default unchanged, #58)", async () => {
+    const d = deps(["success"]);
+    await runFusion(d, input, { pollMs: 0, maxPolls: 5 });
+    const call = (d.sandbox.run as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.model).toBeUndefined();
+    expect(call.provider).toBeUndefined();
+  });
+
   it("proceeds to merge when planMode + gate approves", async () => {
     const d = deps(["success"]);
     const out = await runFusion(d, input, {

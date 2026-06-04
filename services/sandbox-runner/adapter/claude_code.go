@@ -29,9 +29,11 @@ func maxPromptBytes() int {
 // streaming its output as typed log events. exec/lookPath are injectable for tests.
 type ClaudeCodeAdapter struct {
 	lookPath func(string) (string, error)
-	exec     func(ctx context.Context, dir, intent string, onLine func(string)) error
-	planExec func(ctx context.Context, dir, intent string) (string, error)
+	exec     func(ctx context.Context, dir, intent, model, provider string, onLine func(string)) error
+	planExec func(ctx context.Context, dir, intent, model, provider string) (string, error)
 	repoDir  string // captured from Prepare so ApplyFeedback (no dir param) knows where to run
+	model    string // captured from Prepare; "" = the CLI default (no --model flag)
+	provider string // captured from Prepare; "" = default Anthropic (no provider env)
 }
 
 func NewClaudeCodeAdapter() *ClaudeCodeAdapter {
@@ -47,6 +49,8 @@ func (a *ClaudeCodeAdapter) Prepare(_ context.Context, p PrepareContext) error {
 		return fmt.Errorf("claude CLI not found on PATH: %w", err)
 	}
 	a.repoDir = p.RepoDir // ApplyFeedback has no dir param; capture it here like FakeAdapter
+	a.model = p.Model     // optional --model selection (validated upstream in Validate())
+	a.provider = p.Provider
 	return nil
 }
 
@@ -70,7 +74,7 @@ func (a *ClaudeCodeAdapter) runAgent(ctx context.Context, repoDir, prompt, start
 	if cleanup, err := provisionBuiltinSkills(repoDir); err == nil {
 		defer cleanup()
 	}
-	if err := a.exec(ctx, repoDir, prompt, func(line string) {
+	if err := a.exec(ctx, repoDir, prompt, a.model, a.provider, func(line string) {
 		emit(Event{Type: EventLog, Message: line})
 	}); err != nil {
 		return fmt.Errorf("%s: %w", failMsg, err)
@@ -92,7 +96,7 @@ func (a *ClaudeCodeAdapter) Plan(ctx context.Context, repoDir, intent string) (s
 	if cleanup, err := provisionBuiltinSkills(repoDir); err == nil {
 		defer cleanup()
 	}
-	text, err := a.planExec(ctx, repoDir, intent)
+	text, err := a.planExec(ctx, repoDir, intent, a.model, a.provider)
 	if err != nil {
 		return "", fmt.Errorf("claude-code plan failed: %w", err)
 	}
@@ -109,14 +113,39 @@ func (a *ClaudeCodeAdapter) ApplyFeedback(ctx context.Context, notes string, emi
 
 func (*ClaudeCodeAdapter) Teardown(context.Context) error { return nil }
 
+// claudeArgs builds the claude CLI argv for a prompt, appending --model when a
+// (validated) model is selected. mode is the --permission-mode value.
+func claudeArgs(intent, model, mode string) []string {
+	args := []string{"-p", intent, "--permission-mode", mode}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	return args
+}
+
+// providerEnv maps a (validated) provider selection to the child env that the
+// claude CLI reads to switch backends. Default ("" / Anthropic) and unknown
+// providers add nothing. Credentials themselves stay deployment env.
+func providerEnv(provider string) []string {
+	switch provider {
+	case "bedrock":
+		return []string{"CLAUDE_CODE_USE_BEDROCK=1"}
+	case "vertex":
+		return []string{"CLAUDE_CODE_USE_VERTEX=1"}
+	default:
+		return nil
+	}
+}
+
 // runClaudeCLI invokes `claude -p <intent> --permission-mode acceptEdits` in dir,
-// streaming combined stdout+stderr line-by-line to onLine.
-func runClaudeCLI(ctx context.Context, dir, intent string, onLine func(string)) error {
-	cmd := exec.CommandContext(ctx, "claude", "-p", intent, "--permission-mode", "acceptEdits")
+// streaming combined stdout+stderr line-by-line to onLine. When model is set it
+// appends `--model <model>`; provider selects the backend via provider env.
+func runClaudeCLI(ctx context.Context, dir, intent, model, provider string, onLine func(string)) error {
+	cmd := exec.CommandContext(ctx, "claude", claudeArgs(intent, model, "acceptEdits")...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Env = filterChildEnv(os.Environ())
+	cmd.Env = append(filterChildEnv(os.Environ()), providerEnv(provider)...)
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw
 	cmd.Stderr = pw
@@ -141,12 +170,12 @@ func runClaudeCLI(ctx context.Context, dir, intent string, onLine func(string)) 
 // runClaudePlanCLI invokes `claude -p <intent> --permission-mode plan` in dir,
 // capturing the full combined stdout+stderr as the returned plan string.
 // Read-only: --permission-mode plan instructs the agent not to edit files.
-func runClaudePlanCLI(ctx context.Context, dir, intent string) (string, error) {
-	cmd := exec.CommandContext(ctx, "claude", "-p", intent, "--permission-mode", "plan")
+func runClaudePlanCLI(ctx context.Context, dir, intent, model, provider string) (string, error) {
+	cmd := exec.CommandContext(ctx, "claude", claudeArgs(intent, model, "plan")...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Env = filterChildEnv(os.Environ())
+	cmd.Env = append(filterChildEnv(os.Environ()), providerEnv(provider)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err

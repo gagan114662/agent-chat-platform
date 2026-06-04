@@ -24,6 +24,40 @@ func TestRunRequestValidate(t *testing.T) {
 	}
 }
 
+// TestRunRequestValidateModelProvider verifies the optional model/provider are
+// accepted when well-formed, ignored when empty (default), and rejected when
+// they could be reinterpreted as a CLI flag or carry shell metacharacters.
+func TestRunRequestValidateModelProvider(t *testing.T) {
+	base := func() RunRequest {
+		return RunRequest{RepoURL: "https://github.com/o/r.git", BaseBranch: "main", Intent: "x", Branch: "feature/x"}
+	}
+	// Empty = default, accepted.
+	if err := base().Validate(); err != nil {
+		t.Fatalf("no model/provider rejected: %v", err)
+	}
+	// Well-formed values accepted.
+	ok := base()
+	ok.Model, ok.Provider = "claude-opus-4-8", "bedrock"
+	if err := ok.Validate(); err != nil {
+		t.Fatalf("valid model/provider rejected: %v", err)
+	}
+	// Injection attempts rejected.
+	bad := []RunRequest{}
+	for _, v := range []string{"-x", "a b", "a;rm -rf /", "a\tb"} {
+		m := base()
+		m.Model = v
+		bad = append(bad, m)
+		p := base()
+		p.Provider = v
+		bad = append(bad, p)
+	}
+	for i, r := range bad {
+		if err := r.Validate(); err == nil {
+			t.Fatalf("bad model/provider %d accepted: model=%q provider=%q", i, r.Model, r.Provider)
+		}
+	}
+}
+
 func TestRunRequestValidateFileSchemeGated(t *testing.T) {
 	r := RunRequest{RepoURL: "file:///tmp/repo", BaseBranch: "main", Intent: "x", Branch: "b"}
 	// Default (prod): file:// is rejected.

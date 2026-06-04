@@ -2,8 +2,9 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { Client } from "@temporalio/client";
 import type postgres from "postgres";
 import type { DB } from "../db/client.js";
-import { tasks, threads, repos, runs } from "../db/schema.js";
+import { tasks, threads, repos, runs, agents } from "../db/schema.js";
 import { startFusionRun, type StartFusionRunInput } from "../fusion/start.js";
+import { agentModelConfig } from "../agents/agents.js";
 
 // `start` is injectable so the tick can run with a FAKE temporal in tests (and so the
 // production path stays identical to the mention/hand-off starter). It defaults to the
@@ -44,6 +45,9 @@ export async function tick(d: TickDeps, args: { orgId: string; budgetMax?: numbe
     if (existing.length > 0) { skipped++; continue; }
     // ACT: open a run for the task + start fusion. Reuse the task→run + starter.
     const runId = `run-${t.id}-${dispatched.length}`;
+    // #58: resolve the assignee agent so its config.model/provider threads through.
+    const [agent] = await d.db.select().from(agents)
+      .where(and(eq(agents.id, t.assigneeId), eq(agents.orgId, args.orgId)));
     await d.db.insert(runs).values({ id: runId, orgId: args.orgId, taskId: t.id, state: "pending", workflowId: `wf-${runId}` });
     await d.db.update(tasks).set({ state: "in_progress" }).where(and(eq(tasks.id, t.id), eq(tasks.orgId, args.orgId)));
     await start(d.temporal, {
@@ -53,6 +57,7 @@ export async function tick(d: TickDeps, args: { orgId: string; budgetMax?: numbe
         defaultBranch: repo.defaultBranch, tokenEnvVar: repo.tokenEnvVar, autonomy: repo.autonomy,
       },
       agentId: t.assigneeId, intent: t.title, sandboxUrl: d.sandboxUrl,
+      ...agentModelConfig(agent), // #58: per-agent model/provider from agents.config
     });
     dispatched.push(runId);
   }

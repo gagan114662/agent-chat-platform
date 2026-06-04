@@ -34,6 +34,10 @@ export interface RunFusionActivityInput {
   // (the planGate below always declines the first pass — approval comes via the
   // approve-plan route, which starts a fresh execute run with planMode off).
   planMode?: boolean;
+  // #58 per-agent model/provider selection, threaded into the sandbox run/plan
+  // and the ciFix feedback. Optional; empty = the sandbox default (today's behavior).
+  model?: string;
+  provider?: string;
   sink: SinkCtx;
 }
 
@@ -56,12 +60,14 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
     const fusionInput = {
       owner: input.owner, repo: input.repo, repoUrl,
       baseBranch: input.baseBranch, intent: agentIntent, branch: input.branch,
+      // #58: thread the per-agent model/provider selection (undefined = default).
+      model: input.model, provider: input.provider,
     };
     // Fix-on-red: on a red PR, re-run the agent on the same branch with the CI
     // failure as feedback. Bounded by CI_FIX_ATTEMPTS (default 2; 0 disables).
     const maxFixAttempts = Number(process.env.CI_FIX_ATTEMPTS ?? 2);
     const ciFix = async ({ branch, failure }: { branch: string; failure: string }) => {
-      const res = await sandbox.feedback({ repoUrl, branch, notes: failure });
+      const res = await sandbox.feedback({ repoUrl, branch, notes: failure, model: input.model, provider: input.provider });
       return { commitSha: res.commitSha };
     };
     // Plan mode: the first pass only PROPOSES a plan and parks. The planGate

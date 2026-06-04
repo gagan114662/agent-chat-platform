@@ -15,10 +15,12 @@ import (
 // (e.g. failing CI). It re-clones the branch, applies feedback, commits + pushes.
 type FeedbackRequest struct {
 	RepoURL string `json:"repoUrl"`
-	Branch  string `json:"branch"`
-	Notes   string `json:"notes"`
-	Adapter string `json:"adapter"`
-	WorkDir string `json:"-"`
+	Branch   string `json:"branch"`
+	Notes    string `json:"notes"`
+	Adapter  string `json:"adapter"`
+	Model    string `json:"model,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	WorkDir  string `json:"-"`
 }
 
 // Validate checks the request before any git command is shelled out.
@@ -49,6 +51,12 @@ func (r FeedbackRequest) Validate() error {
 	if r.Notes == "" {
 		return errors.New("notes required")
 	}
+	if err := validModelProvider(r.Model, "model"); err != nil {
+		return err
+	}
+	if err := validModelProvider(r.Provider, "provider"); err != nil {
+		return err
+	}
 	return validRef(r.Branch, "branch")
 }
 
@@ -61,7 +69,7 @@ func Feedback(ctx context.Context, req FeedbackRequest, ad adapter.Adapter, limi
 	if err := checkRepoSize(req.WorkDir, limits.MaxRepoBytes); err != nil {
 		return RunResult{}, err
 	}
-	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Notes}); err != nil {
+	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Notes, Model: req.Model, Provider: req.Provider}); err != nil {
 		return RunResult{}, fmt.Errorf("prepare: %w", err)
 	}
 	noopEmit := func(adapter.Event) {}

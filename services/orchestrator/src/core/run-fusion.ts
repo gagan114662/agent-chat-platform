@@ -13,6 +13,10 @@ export interface FusionInput {
   baseBranch: string;
   intent: string;
   branch: string;
+  // Optional per-agent model/provider selection (#58), threaded into the sandbox
+  // run/plan (and, via the app's ciFix closure, feedback). Empty = sandbox default.
+  model?: string;
+  provider?: string;
 }
 
 export type FusionOutcome = "merged" | "checks_failed" | "timeout" | "held_for_human" | "awaiting_plan";
@@ -70,6 +74,8 @@ export async function runFusion(
       repoUrl: input.repoUrl,
       baseBranch: input.baseBranch,
       intent: input.intent,
+      model: input.model,
+      provider: input.provider,
     });
     await emit({ type: "plan_proposed", plan });
     const g = opts.planGate ? await opts.planGate({ plan }) : { approved: true };
@@ -85,6 +91,8 @@ export async function runFusion(
     baseBranch: input.baseBranch,
     intent: input.intent,
     branch: input.branch,
+    model: input.model,
+    provider: input.provider,
   });
   await emit({ type: "branch_pushed", branch: run.branch, commitSha: run.commitSha });
 

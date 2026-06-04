@@ -15,6 +15,8 @@ type RunRequest struct {
 	Intent     string `json:"intent"`
 	Branch     string `json:"branch"`
 	Adapter    string `json:"adapter"`
+	Model      string `json:"model,omitempty"`
+	Provider   string `json:"provider,omitempty"`
 	WorkDir    string `json:"-"`
 }
 
@@ -56,7 +58,30 @@ func (r RunRequest) Validate() error {
 	if err := validRef(r.BaseBranch, "baseBranch"); err != nil {
 		return err
 	}
+	if err := validModelProvider(r.Model, "model"); err != nil {
+		return err
+	}
+	if err := validModelProvider(r.Provider, "provider"); err != nil {
+		return err
+	}
 	return validRef(r.Branch, "branch")
+}
+
+// validModelProvider gates the optional model/provider selectors. They become
+// argv (--model <value>) / env, so reject anything that could be reinterpreted
+// as a CLI flag (leading '-') or carry whitespace/metacharacters. Empty is OK
+// (the default — no flag, no provider env).
+func validModelProvider(v, field string) error {
+	if v == "" {
+		return nil
+	}
+	if strings.HasPrefix(v, "-") {
+		return fmt.Errorf("%s must not start with '-'", field)
+	}
+	if strings.ContainsAny(v, " \t\n\r;|&$`\\\"'") {
+		return fmt.Errorf("%s contains illegal characters", field)
+	}
+	return nil
 }
 
 func validRef(ref, field string) error {
