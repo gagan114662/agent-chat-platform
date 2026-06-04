@@ -18,11 +18,23 @@ chat→fusion→chat seam plus multi-thread navigation is implemented.
 - **`main`:** has Plan 1 + 2.0a + 2.0b merged. Suites green (orchestrator 14, app 19, web 7).
 - **`main`:** Plan 1 + 2.0a + 2.0b + **2.1a** merged (PRs #1–#4). #3 was auto-closed during the stacked
   merge but its code landed via local merge `ff99318`.
-- **Open PR:** **#6** `plan-2.1c-dms` → `main` (direct messages). (#5 merged.)
-- **Next action:** review/merge **#6** — that completes **Phase 2.1** (a nav + b breadth + c DMs).
-  Then **Phase 2.2** (real SSO + human/agent RBAC, replacing the dev-header stub) or **2.3**
-  (NATS event backbone, presence, Postgres RLS enforcement, K8s). To run live: 2.0a stack
-  (`services/app/README.md`) + `cd services/web && pnpm dev`.
+- **Phase 2.1 merged** (a nav + b breadth + c DMs). **Phase 2.2a (session auth) BUILT — PR #7 open.**
+- **Open PR:** **#7** `plan-2.2a-auth` → `main` (session-based auth backbone).
+- **Next action:** review/merge **#7**, then **2.2b** (RBAC: human/agent permission checks on routes) and
+  **2.2c** (passwords/SSO + **lock down the dev-header fallback** — see gap below). Then **2.3** (NATS,
+  presence, Postgres RLS, K8s). To run live: 2.0a stack (`services/app/README.md`) + `cd services/web && pnpm dev`
+  (the UI now shows a login screen; sign in as a seeded member).
+
+### Plan 2.2a — BUILT ✅ (PR #7)
+- Opaque server-side sessions (migration `0003_kind_lila_cheney.sql`): `POST /auth/login|logout`,
+  `GET /auth/me|members`; preHandler resolves `Bearer <token>` → `req.principal`; `actor()` returns it
+  or the dev-header fallback. Web: `authHeaders()` (bearer), `useAuth`, `LoginScreen`, `App` gate.
+- **Verified:** app 48/48, web 29/29, build clean; security-reviewed (opaque token, expiry+logout
+  revocation, preHandler covers all routes, web gate blocks on 401). Existing header-path tests intact.
+- **⚠️ Enforcement gap (deferred to 2.2c):** the dev-header fallback means an unauthenticated request
+  still resolves to `o1/m1` — routes are NOT yet enforced. Session takes precedence when present.
+  `GET /auth/members` is unauthenticated + cross-org (dev picker). WS endpoint isn't bearer-authed. Lock
+  these down in 2.2c (reject unauth in prod; scope `/auth/members`; authenticate WS).
 
 ### Plan 2.1c — BUILT ✅ (PR #6)
 - Schema (migration `0002_messy_the_hand.sql`): `threads.channelId` nullable + `kind`/`dmPeerKind`/`dmPeerId`.
