@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
-import { createNode, listNodes, neighbors, searchNodes, counts, graph, type NodeKind, type Scope } from "../memory/memory.js";
+import { createNode, listNodes, neighbors, searchNodes, counts, graph, recallForIntent, type NodeKind, type Scope } from "../memory/memory.js";
 
 export function registerMemoryRoutes(app: FastifyInstance, d: { db: DB }) {
   app.get("/memory", async (req) => {
@@ -9,6 +9,13 @@ export function registerMemoryRoutes(app: FastifyInstance, d: { db: DB }) {
     const { kind, scope, q } = req.query as { kind?: NodeKind; scope?: Scope; q?: string };
     if (q) return searchNodes(d.db, orgId, q);
     return listNodes(d.db, orgId, { kind, scope });
+  });
+  app.get("/memory/recall", async (req) => {
+    const { orgId } = actor(req);
+    const { q, limit } = req.query as { q?: string; limit?: string };
+    if (!q) return [];
+    const n = limit ? Number(limit) : NaN;
+    return recallForIntent(d.db, orgId, q, Number.isFinite(n) && n > 0 ? n : 5);
   });
   app.get("/memory/stats", async (req) => counts(d.db, actor(req).orgId));
   app.get("/memory/graph", async (req) => {

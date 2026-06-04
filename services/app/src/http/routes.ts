@@ -5,12 +5,9 @@ import type postgres from "postgres";
 import type { Client } from "@temporalio/client";
 import { createMessage, listMessages } from "../chat/messages.js";
 import { notify } from "../db/client.js";
-import { parseMentions } from "../chat/mentions.js";
-import { resolveMention, isPermittedOnRepo } from "../agents/agents.js";
-import { openTaskForMention } from "../tasks/tasks.js";
-import { startFusionRun } from "../fusion/start.js";
+import { handleMentions } from "../chat/handle-mentions.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
-import { threads, repos } from "../db/schema.js";
+import { threads } from "../db/schema.js";
 import { actor } from "./actor.js";
 
 export interface Deps { db: DB; sql: postgres.Sql; temporal: Client; sandboxUrl: string; }
@@ -36,25 +33,11 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
     const msg = await createMessage(d.db, { orgId, threadId, authorKind: "human", authorId: userId, body });
     await notify(d.sql, THREAD_CHANNEL, { threadId, message: msg });
 
-    const started: string[] = [];
-    for (const handle of parseMentions(body)) {
-      const agent = await resolveMention(d.db, orgId, handle);
-      if (!agent || !thread?.repoId) continue;
-      if (!(await isPermittedOnRepo(d.db, agent.id, thread.repoId))) continue;
-      const [repo] = await d.db.select().from(repos).where(and(eq(repos.id, thread.repoId), eq(repos.orgId, orgId)));
-      if (!repo) continue; // dangling repoId (no FK constraint) — skip rather than 500
-      const token = process.env[repo.tokenEnvVar];
-      if (!token) continue;
-
-      const { run } = await openTaskForMention(d.db, {
-        orgId, threadId, intent: body, agentId: agent.id, createdByKind: "human", createdById: userId,
-      });
-      await startFusionRun(d.temporal, {
-        run, orgId, threadId, repo, agentId: agent.id, intent: body, sandboxUrl: d.sandboxUrl,
-        planMode: repo.planMode, // #20: plan-first when the repo opts in
-      });
-      started.push(run.id);
-    }
+    // #27: the mention loop is now the shared, depth-aware handleMentions. A human
+    // author is depth 0 → children run at depth 1 (behavior identical to before).
+    const started = await handleMentions(d, {
+      orgId, threadId, body, authorKind: "human", authorId: userId, depth: 0,
+    });
     return reply.code(201).send({ message: msg, startedRuns: started });
   });
 }

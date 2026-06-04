@@ -44,4 +44,29 @@ describe("memory routes", () => {
     expect(body.edges.map((e) => e.relation)).toEqual(["authored_by"]);
     await app.close();
   });
+
+  it("GET /memory/recall returns intent-relevant nodes, org-scoped; missing q → []", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "O2" });
+    const app = makeApp();
+    await createNode(h.db, { orgId: "o1", kind: "decision", label: "Use Postgres LISTEN/NOTIFY for realtime" });
+    await createNode(h.db, { orgId: "o1", kind: "fact", label: "Auth uses scrypt" });
+    await createNode(h.db, { orgId: "o2", kind: "decision", label: "Use Postgres LISTEN/NOTIFY realtime auth" });
+
+    const res = await app.inject({ method: "GET", url: "/memory/recall?q=add%20realtime%20notify%20to%20the%20auth%20flow", headers: { "x-org-id": "o1" } });
+    expect(res.statusCode).toBe(200);
+    const labels = res.json().map((n: { label: string }) => n.label);
+    expect(labels).toContain("Use Postgres LISTEN/NOTIFY for realtime");
+    expect(labels).toContain("Auth uses scrypt");
+    // cross-org isolation: org-B node never appears
+    expect(res.json().every((n: { orgId: string }) => n.orgId === "o1")).toBe(true);
+
+    // org B sees none of org A's nodes
+    const isolated = await app.inject({ method: "GET", url: "/memory/recall?q=realtime%20notify", headers: { "x-org-id": "o2" } });
+    expect(isolated.json().map((n: { label: string }) => n.label)).toEqual(["Use Postgres LISTEN/NOTIFY realtime auth"]);
+
+    // missing q → []
+    const empty = await app.inject({ method: "GET", url: "/memory/recall", headers: { "x-org-id": "o1" } });
+    expect(empty.json()).toEqual([]);
+    await app.close();
+  });
 });

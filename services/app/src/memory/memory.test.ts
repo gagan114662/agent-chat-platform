@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { createNode, createEdge, listNodes, neighbors, searchNodes, counts, graph } from "./memory.js";
+import { createNode, createEdge, listNodes, neighbors, searchNodes, counts, graph, recallForIntent, formatRecall } from "./memory.js";
 import { orgs } from "../db/schema.js";
 
 const h = testDb();
@@ -50,5 +50,40 @@ describe("memory", () => {
     const narrowed = await graph(h.db, "o1", { kind: "decision" });
     expect(narrowed.nodes.map((n) => n.id)).toEqual([a.id]);
     expect(narrowed.edges).toEqual([]);
+  });
+
+  it("recallForIntent returns intent-relevant decision/fact (not artifact), org-scoped", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "O2" });
+    const dec = await createNode(h.db, { orgId: "o1", kind: "decision", label: "Use Postgres LISTEN/NOTIFY for realtime" });
+    const fact = await createNode(h.db, { orgId: "o1", kind: "fact", label: "Auth uses scrypt" });
+    await createNode(h.db, { orgId: "o1", kind: "artifact", label: "realtime notify diagram" });
+    // org-B node mentioning the same terms must never leak into org-A recall
+    await createNode(h.db, { orgId: "o2", kind: "decision", label: "Use Postgres LISTEN/NOTIFY realtime auth" });
+
+    const hits = await recallForIntent(h.db, "o1", "add realtime notify to the auth flow");
+    const ids = hits.map((n) => n.id);
+    expect(ids).toContain(dec.id);
+    expect(ids).toContain(fact.id);
+    // artifact kind excluded by default
+    expect(hits.every((n) => n.kind !== "artifact")).toBe(true);
+    // the decision hits more terms (realtime + notify) → ranked at/above the fact
+    expect(ids.indexOf(dec.id)).toBeLessThanOrEqual(ids.indexOf(fact.id));
+    // org-scoped: no org-B node appears
+    expect(hits.every((n) => n.orgId === "o1")).toBe(true);
+    expect(hits.length).toBe(2);
+  });
+
+  it("recallForIntent returns [] for empty or too-short intents", async () => {
+    await createNode(h.db, { orgId: "o1", kind: "decision", label: "Use Postgres" });
+    expect(await recallForIntent(h.db, "o1", "")).toEqual([]);
+    expect(await recallForIntent(h.db, "o1", "a to is of")).toEqual([]); // all terms <4 chars
+  });
+
+  it("formatRecall builds a preamble block (or empty string)", async () => {
+    expect(formatRecall([])).toBe("");
+    const dec = await createNode(h.db, { orgId: "o1", kind: "decision", label: "Use LISTEN/NOTIFY", body: "for realtime" });
+    const out = formatRecall([dec]);
+    expect(out).toContain("## Relevant prior context");
+    expect(out).toContain("- (decision) Use LISTEN/NOTIFY: for realtime");
   });
 });

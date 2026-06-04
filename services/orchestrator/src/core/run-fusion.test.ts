@@ -137,6 +137,30 @@ describe("runFusion", () => {
     expect(events).toEqual(["plan_proposed", "outcome"]);
   });
 
+  it("PR title is the clean first line of the intent (multi-line intent → single-line title)", async () => {
+    const d = deps(["success"]);
+    const multiLine = {
+      ...input,
+      intent: "add realtime notify to the auth flow\n\n## Relevant prior context\n- (decision) Use Postgres LISTEN/NOTIFY",
+    };
+    await runFusion(d, multiLine, { pollMs: 0, maxPolls: 5 });
+    expect(d.github.openPr).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "agent: add realtime notify to the auth flow" }),
+    );
+    // body keeps the full (multi-line) intent
+    expect(d.github.openPr).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.stringContaining("## Relevant prior context") }),
+    );
+  });
+
+  it("PR title for a single-line intent is unchanged", async () => {
+    const d = deps(["success"]);
+    await runFusion(d, input, { pollMs: 0, maxPolls: 5 });
+    expect(d.github.openPr).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "agent: do it" }),
+    );
+  });
+
   it("proceeds to merge when planMode + gate approves", async () => {
     const d = deps(["success"]);
     const out = await runFusion(d, input, {
