@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { listChannels, listThreads, listRepos, createThread } from "./nav.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel } from "./nav.js";
 import { orgs, workspaces, channels, threads, repos } from "../db/schema.js";
 
 const h = testDb();
@@ -45,5 +45,12 @@ describe("nav", () => {
     const list = await listThreads(h.db, "c1");
     const ids = list.map((t) => t.id);
     expect(ids.indexOf("tnew")).toBeLessThan(ids.indexOf("told"));
+  });
+
+  it("creates a channel in the org's workspace", async () => {
+    const c = await createChannel(h.db, { orgId: "o1", name: "random" });
+    expect(c.name).toBe("random");
+    expect(c.workspaceId).toBe("w1");
+    expect((await listChannels(h.db, "o1")).map((x) => x.name)).toContain("random");
   });
 });
