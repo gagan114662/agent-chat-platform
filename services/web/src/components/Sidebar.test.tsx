@@ -45,4 +45,18 @@ describe("Sidebar", () => {
     render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={false} />);
     expect(screen.queryByPlaceholderText(/new channel/i)).not.toBeInTheDocument();
   });
+  it("shows an unread badge for a thread with unread > 0, and none otherwise (#61)", () => {
+    render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} unreads={{ t1: 2 }} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);
+    const t1Badge = screen.getByLabelText("2 unread in Demo thread");
+    expect(t1Badge).toHaveTextContent("2");
+    expect(screen.queryByLabelText(/unread in Second thread/)).not.toBeInTheDocument();
+  });
+  it("renders an Activity inbox affordance that lists mentions (#61)", () => {
+    const onOpenInbox = vi.fn();
+    render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} inbox={[{ threadId: "t1", title: "Demo thread", latestAt: "2024-01-01T00:00:00Z" }]} onOpenInbox={onOpenInbox} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);
+    const activity = screen.getByRole("button", { name: /activity/i });
+    expect(activity).toHaveTextContent("1");
+    fireEvent.click(activity);
+    expect(onOpenInbox).toHaveBeenCalled();
+  });
 });

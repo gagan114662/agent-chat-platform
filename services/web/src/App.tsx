@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Sidebar } from "./components/Sidebar.js";
 import { ThreadView } from "./components/ThreadView.js";
 import { Composer } from "./components/Composer.js";
@@ -6,8 +6,8 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan } from "./api.js";
-import type { Channel, Thread, Repo, Principal } from "./types.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox } from "./api.js";
+import type { Channel, Thread, Repo, Principal, InboxItem } from "./types.js";
 import { useAuth } from "./useAuth.js";
 import { LoginScreen } from "./components/LoginScreen.js";
 
@@ -25,10 +25,26 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
   const [dms, setDms] = useState<Thread[]>([]);
   const [principals, setPrincipals] = useState<Principal[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [view, setView] = useState<"thread" | "context">("thread");
+  const [view, setView] = useState<"thread" | "context" | "inbox">("thread");
+  const [unreads, setUnreads] = useState<Record<string, number>>({});
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
   const memory = useMemory();
 
-  const selectThread = (id: string) => { setActiveThreadId(id); setView("thread"); };
+  // #61: refetch unread counts + mentions inbox (on mount, after WS messages, after mark-read).
+  const refreshNotifications = useCallback(() => {
+    Promise.all([getUnreads(), getInbox()]).then(([u, ib]) => {
+      setUnreads(Object.fromEntries(u.map((c) => [c.threadId, c.unread])));
+      setInbox(ib);
+    }).catch(() => {});
+  }, []);
+
+  // Opening a thread marks it read, optimistically clears its badge, then refetches.
+  const selectThread = (id: string) => {
+    setActiveThreadId(id);
+    setView("thread");
+    setUnreads((prev) => { const next = { ...prev }; delete next[id]; return next; });
+    markThreadRead(id).then(refreshNotifications).catch(() => {});
+  };
 
   // Load channels + repos once, then threads for each channel.
   useEffect(() => {
@@ -42,7 +58,8 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
       setThreads(all);
       setActiveThreadId((cur) => cur ?? all[0]?.id ?? null);
     })().catch(() => {});
-  }, []);
+    refreshNotifications();
+  }, [refreshNotifications]);
 
   const onCreateThread = async (title: string, repoId?: string) => {
     const channelId = channels[0]?.id;
@@ -72,6 +89,9 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
         principals={principals}
         repos={repos}
         activeThreadId={activeThreadId}
+        unreads={unreads}
+        inbox={inbox}
+        onOpenInbox={() => setView("inbox")}
         onSelectThread={selectThread}
         onCreateThread={onCreateThread}
         onCreateChannel={onCreateChannel}
@@ -85,7 +105,9 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
             <h1 className="text-sm font-semibold text-neutral-800">
               {view === "context"
                 ? "Context Explorer"
-                : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
+                : view === "inbox"
+                  ? "Activity"
+                  : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
             </h1>
             <p className="text-xs text-neutral-400">chat → sandboxed agent → PR → back to chat</p>
           </div>
@@ -104,17 +126,44 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
               onKindChange={memory.setKind}
               loading={memory.loading}
             />
-          : activeThreadId
-            ? <ThreadConversation threadId={activeThreadId} />
-            : <div className="flex-1" />}
+          : view === "inbox"
+            ? <InboxPanel inbox={inbox} onSelect={selectThread} />
+            : activeThreadId
+              ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} />
+              : <div className="flex-1" />}
       </main>
     </div>
   );
 }
 
+// Lists threads where you were @mentioned and haven't read since (#61).
+function InboxPanel({ inbox, onSelect }: { inbox: InboxItem[]; onSelect: (id: string) => void }) {
+  return (
+    <div className="flex-1 overflow-y-auto p-4">
+      {inbox.length === 0 ? (
+        <p className="text-sm text-neutral-400">Nothing new. You're all caught up.</p>
+      ) : (
+        <ul className="space-y-2">
+          {inbox.map((i) => (
+            <li key={i.threadId}>
+              <button
+                onClick={() => onSelect(i.threadId)}
+                className="block w-full rounded-lg border border-[#e7e7f0] bg-white px-3 py-2 text-left hover:bg-neutral-50"
+              >
+                <div className="text-sm font-medium text-neutral-800">{i.title}</div>
+                <div className="text-xs text-neutral-400">you were mentioned</div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // Separate component so the stream hook re-subscribes when the active thread changes.
-function ThreadConversation({ threadId }: { threadId: string }) {
-  const { messages, send, refetch } = useThreadStream(threadId);
+function ThreadConversation({ threadId, onActivity }: { threadId: string; onActivity?: () => void }) {
+  const { messages, send, refetch } = useThreadStream(threadId, onActivity);
   const onApprove = (runId: string) => { approveRun(runId).then(refetch).catch(() => {}); };
   const onDecline = (runId: string) => { declineRun(runId).then(refetch).catch(() => {}); };
   const onLoadDiff = (runId: string) => runDiff(runId);

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { listChannels, listThreads, createThread, listRepos } from "./api.js";
 import { createChannel, searchMessages } from "./api.js";
 import { listPrincipals, listDms, startDm } from "./api.js";
+import { getUnreads, markThreadRead, getInbox } from "./api.js";
 
 beforeEach(() => vi.restoreAllMocks());
 
@@ -49,6 +50,25 @@ describe("channel + search api", () => {
     vi.stubGlobal("fetch", f);
     await searchMessages("login bug");
     expect((f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("/search?q=login%20bug");
+  });
+});
+
+describe("notifications api", () => {
+  it("getUnreads parses the array", async () => {
+    vi.stubGlobal("fetch", mockFetch([{ threadId: "t1", unread: 2 }]));
+    expect(await getUnreads()).toEqual([{ threadId: "t1", unread: 2 }]);
+  });
+  it("markThreadRead POSTs to the thread read path", async () => {
+    const f = mockFetch({ ok: true });
+    vi.stubGlobal("fetch", f);
+    await markThreadRead("t1");
+    expect((f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("/threads/t1/read");
+    const init = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+  });
+  it("getInbox parses the array", async () => {
+    vi.stubGlobal("fetch", mockFetch([{ threadId: "t1", title: "T", latestAt: "2024-01-01T00:00:00Z" }]));
+    expect((await getInbox()).map((i) => i.threadId)).toEqual(["t1"]);
   });
 });
 

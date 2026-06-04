@@ -1,4 +1,4 @@
-import type { Message, Channel, Thread, Repo, SearchResult, Principal, MemoryGraph, MemoryStats, MemoryKind, MemoryScope, ChangedFile, Checkpoint } from "./types.js";
+import type { Message, Channel, Thread, Repo, SearchResult, Principal, MemoryGraph, MemoryStats, MemoryKind, MemoryScope, ChangedFile, Checkpoint, UnreadCount, InboxItem } from "./types.js";
 import { authHeaders } from "./auth.js";
 
 // Fetches a short-lived single-use WS ticket so the token never rides in the WS URL.
@@ -175,6 +175,24 @@ export async function memoryGraph(filter: { kind?: MemoryKind; scope?: MemorySco
   if (filter.scope) qs.set("scope", filter.scope);
   const res = await fetch(`/memory/graph?${qs}`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`memoryGraph ${res.status}`);
+  return res.json();
+}
+
+// #61 notifications: per-user unread counts, mark-read, mentions inbox.
+export async function getUnreads(): Promise<UnreadCount[]> {
+  const res = await fetch(`/unreads`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getUnreads ${res.status}`);
+  return res.json();
+}
+
+export async function markThreadRead(threadId: string): Promise<void> {
+  const res = await fetch(`/threads/${threadId}/read`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`markThreadRead ${res.status}`);
+}
+
+export async function getInbox(): Promise<InboxItem[]> {
+  const res = await fetch(`/inbox`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getInbox ${res.status}`);
   return res.json();
 }
 

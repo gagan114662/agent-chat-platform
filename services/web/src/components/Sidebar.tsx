@@ -1,10 +1,11 @@
 import { useState } from "react";
-import type { Channel, Thread, Repo, Principal } from "../types.js";
+import type { Channel, Thread, Repo, Principal, InboxItem } from "../types.js";
 import { NewThreadForm } from "./NewThreadForm.js";
 import { NewDmPicker } from "./NewDmPicker.js";
 
 export function Sidebar({
   channels, threads, dms, principals, repos, activeThreadId,
+  unreads = {}, inbox = [], onOpenInbox,
   onSelectThread, onCreateThread, onCreateChannel, onStartDm, onOpenContext, canCreateChannel,
 }: {
   channels: Channel[];
@@ -13,6 +14,9 @@ export function Sidebar({
   principals: Principal[];
   repos: Repo[];
   activeThreadId: string | null;
+  unreads?: Record<string, number>;
+  inbox?: InboxItem[];
+  onOpenInbox?: () => void;
   onSelectThread: (id: string) => void;
   onCreateThread: (title: string, repoId?: string) => void;
   onCreateChannel: (name: string) => void;
@@ -27,19 +31,42 @@ export function Sidebar({
     onCreateChannel(n);
     setChannelName("");
   };
-  const threadButton = (t: Thread) => (
-    <button
-      key={t.id}
-      onClick={() => onSelectThread(t.id)}
-      className={`block w-full rounded-lg px-2 py-1.5 text-left ${t.id === activeThreadId ? "bg-[#15151f] font-medium text-white" : "text-neutral-600 hover:bg-neutral-100"}`}
-    >
-      {t.title}
-    </button>
-  );
+  const threadButton = (t: Thread) => {
+    const unread = unreads[t.id] ?? 0;
+    return (
+      <button
+        key={t.id}
+        onClick={() => onSelectThread(t.id)}
+        className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left ${t.id === activeThreadId ? "bg-[#15151f] font-medium text-white" : "text-neutral-600 hover:bg-neutral-100"}`}
+      >
+        <span className={`truncate ${unread > 0 && t.id !== activeThreadId ? "font-semibold text-neutral-900" : ""}`}>{t.title}</span>
+        {unread > 0 && (
+          <span
+            aria-label={`${unread} unread in ${t.title}`}
+            className="ml-2 shrink-0 rounded-full bg-[#5b5bd6] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
+          >
+            {unread}
+          </span>
+        )}
+      </button>
+    );
+  };
+  const inboxCount = inbox.length;
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-[#e7e7f0] bg-white">
       <div className="px-4 py-4 text-sm font-semibold text-neutral-800">Demo Workspace</div>
       <nav className="flex-1 overflow-y-auto px-2 text-sm text-neutral-600">
+        <button
+          onClick={onOpenInbox}
+          className="mb-1 flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+        >
+          <span>🔔 Activity</span>
+          {inboxCount > 0 && (
+            <span className="ml-2 shrink-0 rounded-full bg-[#5b5bd6] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+              {inboxCount}
+            </span>
+          )}
+        </button>
         <button
           onClick={onOpenContext}
           className="mb-2 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"

@@ -7,6 +7,7 @@ import { redeemWsTicket } from "./realtime/ws-tickets.js";
 import { registerRoutes } from "./http/routes.js";
 import { registerTaskRoutes } from "./http/task-routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
+import { registerNotifyRoutes } from "./http/notify-routes.js";
 import { registerDmRoutes } from "./http/dm-routes.js";
 import { registerMemoryRoutes } from "./http/memory-routes.js";
 import { registerAgentRoutes } from "./http/agent-routes.js";
@@ -67,6 +68,7 @@ export async function buildServer() {
   registerRoutes(app, { db, sql, temporal, sandboxUrl });
   registerTaskRoutes(app, { db, sql, temporal, sandboxUrl });
   registerNavRoutes(app, { db });
+  registerNotifyRoutes(app, { db });
   registerDmRoutes(app, { db });
   registerMemoryRoutes(app, { db });
   registerAgentRoutes(app, { db });
@@ -110,6 +112,8 @@ export async function buildServer() {
           !req.url.startsWith("/dms") &&
           !req.url.startsWith("/repos") &&
           !req.url.startsWith("/search") &&
+          !req.url.startsWith("/unreads") &&
+          !req.url.startsWith("/inbox") &&
           !req.url.startsWith("/principals") &&
           !req.url.startsWith("/ws") &&
           !req.url.startsWith("/ws-ticket") &&

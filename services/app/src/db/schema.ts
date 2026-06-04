@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, jsonb, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, jsonb, boolean, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
 
 export const orgs = pgTable("orgs", {
   id: text("id").primaryKey(),
@@ -148,6 +148,17 @@ export const incidents = pgTable("incidents", {
   taskId: text("task_id"),                     // nullable — set when a Task is opened
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// #61 read-state: per-user, per-thread read marker. `lastReadAt` is the
+// timestamp the user last read the thread; messages with createdAt > lastReadAt
+// are unread. No row for a (org,user,thread) → everything is unread. Org+user
+// scoped. PRIMARY KEY (orgId, userId, threadId) makes mark-read an upsert.
+export const readState = pgTable("read_state", {
+  orgId: text("org_id").notNull(),
+  userId: text("user_id").notNull(),
+  threadId: text("thread_id").notNull(),
+  lastReadAt: timestamp("last_read_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ pk: primaryKey({ columns: [t.orgId, t.userId, t.threadId] }) }));
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
