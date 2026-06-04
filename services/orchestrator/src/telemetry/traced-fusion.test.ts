@@ -15,13 +15,17 @@ beforeAll(() => {
 afterAll(() => { trace.disable(); });
 
 function deps(checks: ChecksStatus[]) {
-  const sandbox: SandboxRunner = { run: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "sha1" }) };
+  const sandbox: SandboxRunner = {
+    run: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "sha1" }),
+    feedback: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "fixsha" }),
+  };
   let i = 0;
   const github: GitHubService = {
     openPr: vi.fn().mockResolvedValue({ number: 7, url: "u" }),
     getChecksStatus: vi.fn().mockImplementation(async () => checks[Math.min(i++, checks.length - 1)]),
     merge: vi.fn().mockResolvedValue(undefined),
     getChangedFiles: vi.fn().mockResolvedValue([]),
+    getCheckFailureContext: vi.fn().mockResolvedValue("ci: lint failed"),
   };
   return { sandbox, github };
 }

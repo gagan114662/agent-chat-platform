@@ -40,6 +40,22 @@ describe("OctokitGitHubService", () => {
     await expect(svc.merge("o", "r", 7)).rejects.toThrow(/not mergeable/);
   });
 
+  it("summarizes failing check contexts", async () => {
+    nock(api).get("/repos/o/r/commits/abc/status").reply(200, {
+      state: "failure",
+      statuses: [
+        { context: "ci/lint", state: "failure" },
+        { context: "ci/test", state: "success" },
+        { context: "ci/build", state: "error" },
+      ],
+    });
+    const svc = new OctokitGitHubService("tok");
+    const ctx = await svc.getCheckFailureContext("o", "r", "abc");
+    expect(ctx).toContain("ci/lint");
+    expect(ctx).toContain("ci/build");
+    expect(ctx).not.toContain("ci/test");
+  });
+
   it("lists changed files for a PR", async () => {
     nock(api).get("/repos/o/r/pulls/7/files").reply(200, [
       { filename: "src/a.ts", additions: 3, deletions: 1, status: "modified" },

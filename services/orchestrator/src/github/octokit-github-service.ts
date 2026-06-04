@@ -45,6 +45,17 @@ export class OctokitGitHubService implements GitHubService {
     }
   }
 
+  async getCheckFailureContext(owner: string, repo: string, ref: string): Promise<string> {
+    const res = await this.octokit.repos.getCombinedStatusForRef({ owner, repo, ref });
+    const failing = res.data.statuses
+      .filter((s) => s.state === "failure" || s.state === "error")
+      .map((s) => s.context);
+    if (failing.length === 0) {
+      return `CI failed for ${ref} (no failing status contexts reported)`;
+    }
+    return `CI failed: ${failing.join(", ")}`;
+  }
+
   async getChangedFiles(owner: string, repo: string, prNumber: number): Promise<ChangedFile[]> {
     const res = await this.octokit.pulls.listFiles({ owner, repo, pull_number: prNumber });
     return res.data.map((f) => ({

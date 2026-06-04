@@ -70,3 +70,31 @@ func CommitAllAndPush(ctx context.Context, repoDir, branch, message string) (str
 	}
 	return gitOutput(ctx, repoDir, "rev-parse", "HEAD")
 }
+
+// CommitAllAndPushExisting stages all changes, commits, and pushes to a branch
+// that already exists (the repo was cloned at that branch — so no `checkout -b`),
+// returning the new commit SHA. Used by the /feedback path which re-clones a branch.
+func CommitAllAndPushExisting(ctx context.Context, repoDir, branch, message string) (string, error) {
+	if branch == "" {
+		return "", fmt.Errorf("branch required")
+	}
+	if message == "" {
+		return "", fmt.Errorf("message required")
+	}
+	if err := gitRun(ctx, repoDir, "config", "user.email", "agent@agent-chat.dev"); err != nil {
+		return "", err
+	}
+	if err := gitRun(ctx, repoDir, "config", "user.name", "agent-chat"); err != nil {
+		return "", err
+	}
+	if err := gitRun(ctx, repoDir, "add", "-A"); err != nil {
+		return "", err
+	}
+	if err := gitRun(ctx, repoDir, "commit", "-m", message); err != nil {
+		return "", err
+	}
+	if err := gitRun(ctx, repoDir, "push", "origin", "HEAD:"+branch); err != nil {
+		return "", err
+	}
+	return gitOutput(ctx, repoDir, "rev-parse", "HEAD")
+}
