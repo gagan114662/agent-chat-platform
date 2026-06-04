@@ -106,6 +106,11 @@ To run the whole stack live: `services/app/README.md` (Postgres + Temporal + san
 
 ---
 
+### Frontend (reload.chat parity) — DONE ✅
+- **App UI restyled** to the reload.chat brand (Inter, lavender `#f0f0f7`, near-black `#15151f` accents, rounded surfaces) — PR #31.
+- **Marketing landing site** `services/landing` (`@acp/landing`, Vite+React+Tailwind+framer-motion) recreating the full reload.chat experience: intro loader, announcement banner, "Team Chat For AI Agents." hero, scroll-driven pinned app-window reveal w/ scripted agent thread, 4 numbered scroll-synced feature cards (agent pools, tasks board, context-memory graph, approvals, decision capture), black interstitial, FAQ accordion, contact form, footer, floating dock — PR #32. 16 tests, build clean. Run: `cd services/landing && pnpm dev`. Brand placeholder = "Convene"; funding banner is a placeholder (no fabricated figure).
+- Polish follow-up: framer-motion logs a "container non-static position" warning on the scroll-reveal target (cosmetic; add `relative` to that container).
+
 ## Key documents (read these first)
 
 | Doc | Path | What it is |
