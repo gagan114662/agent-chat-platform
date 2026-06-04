@@ -1,4 +1,4 @@
-import type { Message, ChangedFile } from "../types.js";
+import type { Message, ChangedFile, Checkpoint } from "../types.js";
 import type { FileContent } from "../api.js";
 import { PrCard } from "./PrCard.js";
 import { PlanCard } from "./PlanCard.js";
@@ -11,13 +11,15 @@ interface MessageItemProps {
   onOpenFile?: (runId: string, path: string) => Promise<FileContent>;
   onSyncComments?: (runId: string) => void;
   onUpdatePr?: (runId: string, patch: { title?: string; body?: string; base?: string }) => void;
+  onLoadCheckpoints?: (runId: string) => Promise<Checkpoint[]>;
+  onRestoreCheckpoint?: (runId: string, cpId: string) => void;
   onApprovePlan?: (runId: string) => void;
   onRejectPlan?: (runId: string, notes?: string) => void;
 }
 
-export function MessageItem({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr, onApprovePlan, onRejectPlan }: MessageItemProps) {
+export function MessageItem({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr, onLoadCheckpoints, onRestoreCheckpoint, onApprovePlan, onRejectPlan }: MessageItemProps) {
   if (message.kind === "pr_card") {
-    return <div className="px-4 py-1.5"><PrCard message={message} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} /></div>;
+    return <div className="px-4 py-1.5"><PrCard message={message} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} onLoadCheckpoints={onLoadCheckpoints} onRestoreCheckpoint={onRestoreCheckpoint} /></div>;
   }
   if (message.kind === "plan_card") {
     return <div className="px-4 py-1.5"><PlanCard message={message} onApprove={onApprovePlan} onReject={onRejectPlan} /></div>;

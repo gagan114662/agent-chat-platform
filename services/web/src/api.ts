@@ -1,4 +1,4 @@
-import type { Message, Channel, Thread, Repo, SearchResult, Principal, MemoryGraph, MemoryStats, MemoryKind, MemoryScope, ChangedFile } from "./types.js";
+import type { Message, Channel, Thread, Repo, SearchResult, Principal, MemoryGraph, MemoryStats, MemoryKind, MemoryScope, ChangedFile, Checkpoint } from "./types.js";
 import { authHeaders } from "./auth.js";
 
 // Fetches a short-lived single-use WS ticket so the token never rides in the WS URL.
@@ -81,6 +81,25 @@ export async function updatePr(runId: string, patch: { title?: string; body?: st
     body: JSON.stringify(patch),
   });
   if (!res.ok) throw new Error(`updatePr ${res.status}`);
+  return res.json();
+}
+
+// #62 checkpoints: list a run's commit snapshots.
+export async function listCheckpoints(runId: string): Promise<Checkpoint[]> {
+  const res = await fetch(`/runs/${runId}/checkpoints`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listCheckpoints ${res.status}`);
+  const { checkpoints } = (await res.json()) as { checkpoints: Checkpoint[] };
+  return checkpoints;
+}
+
+// #62 checkpoints: restore (rewind) = open a new run from the checkpoint commit.
+export async function restoreCheckpoint(runId: string, cpId: string): Promise<{ run: { id: string } }> {
+  const res = await fetch(`/runs/${runId}/checkpoints/${cpId}/restore`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error(`restoreCheckpoint ${res.status}`);
   return res.json();
 }
 

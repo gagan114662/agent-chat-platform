@@ -36,6 +36,17 @@ export interface ChangedFile {
   patch?: string; // unified diff hunks; omitted by GitHub for large/binary files
 }
 
+// #62 checkpoints: a named snapshot of {branch, commit} captured during a run.
+export interface Checkpoint {
+  id: string;
+  orgId: string;
+  runId: string;
+  label: string;
+  branch: string;
+  commitSha: string;
+  createdAt: string;
+}
+
 export interface Principal { kind: "human" | "agent"; id: string; name: string; }
 export interface Repo {
   id: string; orgId: string; workspaceId: string;

@@ -2,9 +2,10 @@ import { and, eq } from "drizzle-orm";
 import type postgres from "postgres";
 import type { DB } from "../db/client.js";
 import { notify } from "../db/client.js";
-import { runEvents } from "../db/schema.js";
+import { runEvents, runs } from "../db/schema.js";
 import { createMessage } from "../chat/messages.js";
 import { transitionRun } from "../tasks/tasks.js";
+import { recordCheckpoint } from "./checkpoints.js";
 import type { FusionEvent } from "@acp/orchestrator/core/run-fusion.js";
 
 export interface SinkCtx { orgId: string; threadId: string; runId: string; agentId: string; mentionDepth?: number; parentRunId?: string; }
@@ -84,6 +85,23 @@ export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
       metadata,
     });
     await notify(sql, THREAD_CHANNEL, { threadId: ctx.threadId, message: msg });
+
+    // #62 checkpoints: when an event carries a commitSha, record a {branch, commit}
+    // snapshot for the run. branch_pushed carries its own branch; outcome carries
+    // only a commitSha so fall back to the run's branch (deterministic agent/<runId>).
+    // The checkpoint id is deterministic so replays of the same commit collapse.
+    if (e.type === "branch_pushed") {
+      await recordCheckpoint(db, {
+        orgId: ctx.orgId, runId: ctx.runId, label: "agent push",
+        branch: e.branch, commitSha: e.commitSha,
+      });
+    } else if (e.type === "outcome" && e.commitSha) {
+      const [r] = await db.select({ branch: runs.branch }).from(runs).where(eq(runs.id, ctx.runId));
+      await recordCheckpoint(db, {
+        orgId: ctx.orgId, runId: ctx.runId, label: `outcome:${e.outcome}`,
+        branch: r?.branch ?? `agent/${ctx.runId}`, commitSha: e.commitSha,
+      });
+    }
 
     // Move the run into "running" once work begins so the terminal outcome
     // transition (running -> merged/checks_failed/timeout) is legal.

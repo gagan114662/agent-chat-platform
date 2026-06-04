@@ -120,6 +120,19 @@ export const runEvents = pgTable("run_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ seqUx: uniqueIndex("run_events_run_seq_ux").on(t.runId, t.seq) }));
 
+// #62 checkpoints: a named snapshot of {branch, commitSha} at a step in a run.
+// The fusion sink records one whenever an event carries a commitSha. The id is
+// deterministic (`${runId}:cp:${commitSha}`) so replays collapse (idempotent).
+export const runCheckpoints = pgTable("run_checkpoints", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  runId: text("run_id").notNull(),
+  label: text("label").notNull(),
+  branch: text("branch").notNull(),
+  commitSha: text("commit_sha").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull(),
