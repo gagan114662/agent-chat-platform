@@ -6,7 +6,8 @@
     "./sandbox/sandbox-runner-client.js": "./src/sandbox/sandbox-runner-client.ts",
     "./github/octokit-github-service.js": "./src/github/octokit-github-service.ts",
     "./temporal/workflow.js": "./src/temporal/workflow.ts",
-    "./temporal/activities.js": "./src/temporal/activities.ts"
+    "./temporal/activities.js": "./src/temporal/activities.ts",
+    "./telemetry/traced-fusion.js": "./src/telemetry/traced-fusion.ts"
   },
   "scripts": {
     "test": "vitest run",
