@@ -13,6 +13,7 @@ import (
 func NewHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /run", func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // cap request body at 1 MiB
 		var req RunRequest
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()

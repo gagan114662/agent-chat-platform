@@ -37,7 +37,8 @@ func gitOutput(ctx context.Context, dir string, args ...string) (string, error) 
 
 // CloneInto clones repoURL at branch into dest.
 func CloneInto(ctx context.Context, repoURL, branch, dest string) error {
-	return gitRun(ctx, "", "clone", "--branch", branch, "--single-branch", repoURL, dest)
+	// "--" terminates option parsing so repoURL/dest can never be read as flags.
+	return gitRun(ctx, "", "clone", "--single-branch", "--branch", branch, "--", repoURL, dest)
 }
 
 // CommitAllAndPush stages all changes, commits on a new branch, pushes it,

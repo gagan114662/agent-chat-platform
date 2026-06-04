@@ -19,3 +19,24 @@ func TestRedactCreds(t *testing.T) {
 		t.Fatal("plain text changed")
 	}
 }
+
+func TestRedactBareTokens(t *testing.T) {
+	cases := []struct {
+		name, in, leak string
+	}{
+		{"ghp", "token ghp_ABCDEFghij0123456789 here", "ghp_ABCDEFghij0123456789"},
+		{"github_pat", "pat github_pat_11ABCDE_xyz789 here", "github_pat_11ABCDE_xyz789"},
+		{"bearer", "Authorization: Bearer eyJhbGci.abc-123 done", "eyJhbGci.abc-123"},
+		{"x-access-token", "x-access-token:ghp_SECRETvalue done", "ghp_SECRETvalue"},
+		{"aws", "key AKIAIOSFODNN7EXAMPLE done", "AKIAIOSFODNN7EXAMPLE"},
+	}
+	for _, c := range cases {
+		out := redactCreds(c.in)
+		if strings.Contains(out, c.leak) {
+			t.Fatalf("%s: token leaked: %q", c.name, out)
+		}
+		if !strings.Contains(out, "[redacted]") {
+			t.Fatalf("%s: expected [redacted] marker, got %q", c.name, out)
+		}
+	}
+}

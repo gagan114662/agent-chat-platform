@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -27,12 +28,25 @@ func (r RunRequest) Validate() error {
 	if r.RepoURL == "" {
 		return errors.New("repoUrl required")
 	}
+	// Reject a leading '-' so the URL can't be reinterpreted as a git/ssh CLI flag
+	// (e.g. -oProxyCommand=...) when passed as an argv element.
+	if strings.HasPrefix(r.RepoURL, "-") {
+		return errors.New("repoUrl must not start with '-'")
+	}
 	u, err := url.Parse(r.RepoURL)
 	if err != nil {
 		return fmt.Errorf("repoUrl invalid: %w", err)
 	}
 	switch u.Scheme {
-	case "http", "https", "ssh", "git", "file":
+	case "http", "https", "ssh", "git":
+		if u.Host == "" {
+			return fmt.Errorf("repoUrl scheme %q requires a host", u.Scheme)
+		}
+	case "file":
+		// file:// can read arbitrary local paths — gated off by default (prod rejects it).
+		if os.Getenv("ACP_ALLOW_FILE_REPO") != "1" {
+			return errors.New("repoUrl scheme \"file\" not allowed (set ACP_ALLOW_FILE_REPO=1)")
+		}
 	default:
 		return fmt.Errorf("repoUrl scheme %q not allowed", u.Scheme)
 	}

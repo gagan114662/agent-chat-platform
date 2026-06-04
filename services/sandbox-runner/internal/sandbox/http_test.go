@@ -9,6 +9,7 @@ import (
 )
 
 func TestHandleRun(t *testing.T) {
+	t.Setenv("ACP_ALLOW_FILE_REPO", "1") // test fixture clones from a local bare repo via file://
 	src := makeBareRepoWithCommit(t)
 	body, _ := json.Marshal(map[string]string{
 		"repoUrl": "file://" + src, "baseBranch": "main", "intent": "x", "branch": "feature/http",
@@ -31,6 +32,7 @@ func TestHandleRun(t *testing.T) {
 }
 
 func TestHandleRunUnknownAdapter(t *testing.T) {
+	t.Setenv("ACP_ALLOW_FILE_REPO", "1") // test fixture clones from a local bare repo via file://
 	src := makeBareRepoWithCommit(t)
 	body, _ := json.Marshal(map[string]string{
 		"repoUrl": "file://" + src, "baseBranch": "main", "intent": "x", "branch": "feature/z", "adapter": "nope",
