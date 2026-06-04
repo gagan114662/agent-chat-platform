@@ -42,7 +42,7 @@ export function registerApprovalRoutes(app: FastifyInstance, d: ApprovalDeps) {
     if (!repo) return reply.code(404).send({ error: "held run not found" });
 
     const token = process.env[repo.tokenEnvVar];
-    if (!token) return reply.code(400).send({ error: `GitHub token not found in env var: ${repo.tokenEnvVar}` });
+    if (!token) return reply.code(400).send({ error: "repo token not configured" });
 
     try {
       const github = makeGitHub(token);

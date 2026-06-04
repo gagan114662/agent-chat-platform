@@ -4,6 +4,7 @@ import { createSession, resolveSession, deleteSession, listMembersForLogin, veri
 import { roleOf } from "../rbac/rbac.js";
 import { devHeadersAllowed } from "../auth/dev-mode.js";
 import { issueWsTicket } from "../realtime/ws-tickets.js";
+import { allow } from "../auth/rate-limit.js";
 
 function bearer(req: FastifyRequest): string | undefined {
   const h = req.headers["authorization"];
@@ -37,6 +38,10 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
 
   app.post("/auth/login", async (req, reply) => {
     const { memberId, password } = req.body as { memberId: string; password?: string };
+    // Throttle brute-force BEFORE any credential check (per ip+member, 5/min).
+    if (!allow(`${req.ip}:${memberId}`)) {
+      return reply.code(429).send({ error: "too many attempts" });
+    }
     const strict = !devHeadersAllowed();
     if (strict) {
       if (!password || !(await verifyCredentials(d.db, memberId, password))) {

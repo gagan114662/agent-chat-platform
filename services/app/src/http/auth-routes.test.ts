@@ -2,6 +2,7 @@ import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import Fastify from "fastify";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { registerAuth } from "./auth-routes.js";
+import { _reset } from "../auth/rate-limit.js";
 import { orgs, workspaces, members } from "../db/schema.js";
 
 const h = testDb();
@@ -9,6 +10,7 @@ afterAll(async () => { await closeDb(h.sql); });
 function makeApp() { const app = Fastify(); registerAuth(app, { db: h.db }); return app; }
 
 beforeEach(async () => {
+  _reset(); // isolate the in-memory login rate limiter between tests
   await h.reset();
   await h.db.insert(orgs).values({ id: "o1", name: "O" });
   await h.db.insert(workspaces).values({ id: "w1", orgId: "o1", name: "W" });
@@ -29,6 +31,20 @@ describe("auth routes", () => {
     await app.inject({ method: "POST", url: "/auth/logout", headers: { authorization: `Bearer ${token}` } });
     const me2 = await app.inject({ method: "GET", url: "/auth/me", headers: { authorization: `Bearer ${token}` } });
     expect(me2.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("throttles /auth/login: the 6th rapid bad login is 429 (VF-06)", async () => {
+    const app = makeApp();
+    // 5 bad logins for the same member are allowed (each returns 400 for unknown member)
+    for (let i = 0; i < 5; i++) {
+      const res = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "ghost" } });
+      expect(res.statusCode).toBe(400);
+    }
+    // the 6th within the window is rate-limited BEFORE credential checks
+    const sixth = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "ghost" } });
+    expect(sixth.statusCode).toBe(429);
+    expect(sixth.json()).toEqual({ error: "too many attempts" });
     await app.close();
   });
 

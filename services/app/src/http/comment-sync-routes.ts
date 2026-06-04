@@ -41,7 +41,7 @@ export function registerCommentSyncRoutes(app: FastifyInstance, d: CommentSyncDe
     if (!repo) return reply.code(404).send({ error: "repo not found" });
 
     const token = process.env[repo.tokenEnvVar];
-    if (!token) return reply.code(400).send({ error: `GitHub token not found in env var: ${repo.tokenEnvVar}` });
+    if (!token) return reply.code(400).send({ error: "repo token not configured" });
 
     const gh = makeGitHub(token);
     const comments = await gh.listReviewComments(repo.githubOwner, repo.githubName, run.prNumber);

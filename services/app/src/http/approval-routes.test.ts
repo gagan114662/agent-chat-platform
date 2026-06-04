@@ -75,6 +75,8 @@ describe("approval routes", () => {
     const app = makeApp([]);
     const res = await app.inject({ method: "POST", url: `/runs/${run.id}/approve`, headers: { "x-org-id": "oA" } });
     expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "repo token not configured" });
+    expect(res.body).not.toContain(TOKEN_ENV);
     await app.close();
   });
 

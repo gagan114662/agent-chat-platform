@@ -36,7 +36,7 @@ export function registerDiffRoutes(app: FastifyInstance, d: DiffDeps) {
     if (!repo) return reply.code(404).send({ error: "repo not found" });
 
     const token = process.env[repo.tokenEnvVar];
-    if (!token) return reply.code(400).send({ error: `GitHub token not found in env var: ${repo.tokenEnvVar}` });
+    if (!token) return reply.code(400).send({ error: "repo token not configured" });
 
     const gh = makeGitHub(token);
     const files = await gh.getChangedFiles(repo.githubOwner, repo.githubName, run.prNumber);

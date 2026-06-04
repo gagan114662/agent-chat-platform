@@ -41,7 +41,7 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
       const agent = await resolveMention(d.db, orgId, handle);
       if (!agent || !thread?.repoId) continue;
       if (!(await isPermittedOnRepo(d.db, agent.id, thread.repoId))) continue;
-      const [repo] = await d.db.select().from(repos).where(eq(repos.id, thread.repoId));
+      const [repo] = await d.db.select().from(repos).where(and(eq(repos.id, thread.repoId), eq(repos.orgId, orgId)));
       if (!repo) continue; // dangling repoId (no FK constraint) — skip rather than 500
       const token = process.env[repo.tokenEnvVar];
       if (!token) continue;

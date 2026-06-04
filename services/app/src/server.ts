@@ -20,6 +20,16 @@ import { startWorker } from "./fusion/worker.js";
 import { makeTemporalClient } from "./fusion/bridge.js";
 import { startTelemetry, stopTelemetry } from "./telemetry/otel-init.js";
 
+// pino redaction so credentials never reach the logs (defense-in-depth on top
+// of route-level redaction). Paths cover request auth headers, token/ticket
+// query params, and any nested token/repoUrl/tokenEnvVar field.
+export const loggerOptions = {
+  redact: {
+    paths: ["req.headers.authorization", "req.query.token", "req.query.ticket", "*.token", "*.repoUrl", "*.tokenEnvVar"],
+    censor: "[redacted]",
+  },
+};
+
 export async function buildServer() {
   const { db, sql } = makeDb();
   const pubsub = new ThreadPubSub(sql);
@@ -27,7 +37,7 @@ export async function buildServer() {
   const temporal = await makeTemporalClient();
   await startWorker();
 
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: loggerOptions });
   await app.register(websocket);
   registerAuth(app, { db });
   registerWs(

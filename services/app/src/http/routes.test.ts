@@ -1,9 +1,10 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import Fastify from "fastify";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { registerRoutes } from "./routes.js";
 import { createMessage } from "../chat/messages.js";
-import { orgs, workspaces, channels, threads } from "../db/schema.js";
+import { orgs, workspaces, channels, threads, repos, agents } from "../db/schema.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
@@ -42,6 +43,35 @@ describe("thread message routes", () => {
     const res = await app.inject({ method: "GET", url: "/threads/t1/messages", headers: { "x-org-id": "o2" } });
     expect(res.statusCode).toBe(404);
     await app.close();
+  });
+
+  it("POST /threads/:id/messages does not start a run when the thread's repoId belongs to another org (VF-04 org-scope)", async () => {
+    // org o1 thread points at a repo OWNED BY org o2 (but sharing workspace w1 so
+    // isPermittedOnRepo passes). The org-scoped repo load must return nothing →
+    // no run started. Without the fix the repo loads by id and temporalStub throws.
+    await h.db.insert(orgs).values({ id: "o2", name: "O2" });
+    await h.db.insert(repos).values({
+      id: "rForeign", orgId: "o2", workspaceId: "w1", githubOwner: "o", githubName: "r",
+      defaultBranch: "main", tokenEnvVar: "E2E_GITHUB_TOKEN",
+    });
+    await h.db.insert(agents).values({ id: "a1", orgId: "o1", workspaceId: "w1", handle: "bot", displayName: "Bot" });
+    await h.db.update(threads).set({ repoId: "rForeign" }).where(eq(threads.id, "t1"));
+    // Set the foreign repo's token so the only barrier to startFusionRun is the
+    // org-scope filter — proving VF-04 rather than the (later) token guard.
+    process.env.E2E_GITHUB_TOKEN = "tok";
+    const app = makeApp();
+    try {
+      const res = await app.inject({
+        method: "POST", url: "/threads/t1/messages",
+        headers: { "x-org-id": "o1", "content-type": "application/json" },
+        payload: { body: "@bot please fix" },
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().startedRuns).toEqual([]);
+    } finally {
+      delete process.env.E2E_GITHUB_TOKEN;
+      await app.close();
+    }
   });
 
   it("POST /threads/:id/messages on another org's thread is rejected (cross-tenant IDOR)", async () => {
