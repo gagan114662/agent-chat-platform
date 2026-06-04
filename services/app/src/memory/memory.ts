@@ -52,6 +52,32 @@ export async function counts(db: DB, orgId: string): Promise<{ nodes: number; ed
   return { nodes: n?.c ?? 0, edges: e?.c ?? 0 };
 }
 
+// Pulls the org's memory nodes most relevant to an intent: tokenizes the intent
+// into words (>=4 chars), matches them against node label/body (ILIKE), ranks by
+// number of distinct term hits, returns the top `limit`. Decisions/facts/preferences
+// are the useful kinds for run context (identities/artifacts excluded by default).
+export async function recallForIntent(
+  db: DB, orgId: string, intent: string, limit = 5,
+): Promise<Awaited<ReturnType<typeof listNodes>>> {
+  const terms = [...new Set((intent.toLowerCase().match(/[a-z0-9]{4,}/g) ?? []))].slice(0, 12);
+  if (terms.length === 0) return [];
+  const rows = await db.select().from(memoryNodes).where(and(
+    eq(memoryNodes.orgId, orgId),
+    inArray(memoryNodes.kind, ["decision", "fact", "preference"]),
+    or(...terms.flatMap((t) => [ilike(memoryNodes.label, `%${t}%`), ilike(memoryNodes.body, `%${t}%`)])),
+  ));
+  const score = (n: { label: string; body: string }) =>
+    terms.filter((t) => n.label.toLowerCase().includes(t) || (n.body ?? "").toLowerCase().includes(t)).length;
+  return rows.sort((a, b) => score(b) - score(a)).slice(0, limit);
+}
+
+// Formats recalled nodes into a compact context preamble for an agent prompt (or "").
+export function formatRecall(nodes: Awaited<ReturnType<typeof listNodes>>): string {
+  if (nodes.length === 0) return "";
+  const lines = nodes.map((n) => `- (${n.kind}) ${n.label}${n.body ? `: ${n.body}` : ""}`);
+  return `## Relevant prior context\n${lines.join("\n")}`;
+}
+
 export interface MemoryGraph { nodes: Awaited<ReturnType<typeof listNodes>>; edges: { id: string; fromId: string; toId: string; relation: string }[]; }
 
 // Returns the org's nodes (optionally filtered) + the edges among those nodes.
