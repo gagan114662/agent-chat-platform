@@ -10,6 +10,8 @@ function makeFetch(meStatus: number) {
     if (url === "/auth/members") return { ok: true, json: async () => [{ id: "m1", displayName: "You", orgId: "o1" }] };
     if (url === "/channels") return { ok: true, json: async () => [{ id: "c1", orgId: "o1", workspaceId: "w1", name: "general" }] };
     if (url === "/channels/c1/threads") return { ok: true, json: async () => [{ id: "t1", orgId: "o1", channelId: "c1", title: "Demo thread", repoId: "r1", kind: "channel" }] };
+    if (url.startsWith("/memory/graph")) return { ok: true, json: async () => ({ nodes: [], edges: [] }) };
+    if (url === "/memory/stats") return { ok: true, json: async () => ({ nodes: 0, edges: 0 }) };
     return { ok: true, json: async () => [] };
   }) as unknown as typeof fetch;
 }
