@@ -13,6 +13,7 @@ function deps(checks: ChecksStatus[]) {
     openPr: vi.fn().mockResolvedValue({ number: 7, url: "u" }),
     getChecksStatus: vi.fn().mockImplementation(async () => checks[Math.min(i++, checks.length - 1)]),
     merge: vi.fn().mockResolvedValue(undefined),
+    getChangedFiles: vi.fn().mockResolvedValue([]),
   };
   return { sandbox, github };
 }

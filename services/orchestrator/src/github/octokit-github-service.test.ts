@@ -39,4 +39,15 @@ describe("OctokitGitHubService", () => {
     const svc = new OctokitGitHubService("tok");
     await expect(svc.merge("o", "r", 7)).rejects.toThrow(/not mergeable/);
   });
+
+  it("lists changed files for a PR", async () => {
+    nock(api).get("/repos/o/r/pulls/7/files").reply(200, [
+      { filename: "src/a.ts", additions: 3, deletions: 1, status: "modified" },
+      { filename: "README.md", additions: 1, deletions: 0, status: "added" },
+    ]);
+    const svc = new OctokitGitHubService("tok");
+    const files = await svc.getChangedFiles("o", "r", 7);
+    expect(files.map((f) => f.filename)).toEqual(["src/a.ts", "README.md"]);
+    expect(files[0]).toMatchObject({ additions: 3, deletions: 1, status: "modified" });
+  });
 });
