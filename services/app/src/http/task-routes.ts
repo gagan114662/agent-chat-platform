@@ -8,7 +8,7 @@ import { createMessage } from "../chat/messages.js";
 import { reassignTask } from "../tasks/tasks.js";
 import { startFusionRun } from "../fusion/start.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
-import { threads, repos } from "../db/schema.js";
+import { threads, repos, runs } from "../db/schema.js";
 import { actor } from "./actor.js";
 
 export interface TaskDeps { db: DB; sql: postgres.Sql; temporal: Client; sandboxUrl: string; }
@@ -18,13 +18,23 @@ export function registerTaskRoutes(app: FastifyInstance, d: TaskDeps) {
   // "handed off" message. Org-scoped (#14): a cross-org task or agent → 404.
   app.post("/tasks/:id/reassign", async (req, reply) => {
     const { id: taskId } = req.params as { id: string };
-    const { agentId } = req.body as { agentId: string };
+    const { agentId, stackOnRunId } = req.body as { agentId: string; stackOnRunId?: string };
     const { orgId, userId } = actor(req);
+
+    // #53 stacked PRs: if the caller asks to stack on a parent run, only honor it when
+    // that run is in THIS org (cross-org parent → ignored → flat). Resolving here keeps
+    // the parentRunId persisted on the new run and the PR base in lockstep.
+    let parentRunId: string | undefined;
+    if (stackOnRunId) {
+      const [parent] = await d.db.select().from(runs)
+        .where(and(eq(runs.id, stackOnRunId), eq(runs.orgId, orgId)));
+      if (parent) parentRunId = parent.id;
+    }
 
     let task, run, agent;
     try {
       ({ task, run, agent } = await reassignTask(d.db, {
-        orgId, taskId, agentId, byKind: "human", byId: userId,
+        orgId, taskId, agentId, byKind: "human", byId: userId, parentRunId,
       }));
     } catch (e) {
       // task/agent not in this org (or absent) → 404, no leakage.
@@ -44,13 +54,18 @@ export function registerTaskRoutes(app: FastifyInstance, d: TaskDeps) {
         await startFusionRun(d.temporal, {
           run, orgId, threadId: task.threadId, repo, agentId,
           intent: task.title, sandboxUrl: d.sandboxUrl,
+          // stacked: base the child PR on the parent's branch.
+          baseBranchOverride: parentRunId ? `agent/${parentRunId}` : undefined,
         });
       }
     }
 
+    const handoffBody = parentRunId
+      ? `🔁 handed off to ${agent.displayName} — ⬑ stacked on agent/${parentRunId}`
+      : `🔁 handed off to ${agent.displayName}`;
     const msg = await createMessage(d.db, {
       orgId, threadId: task.threadId, authorKind: "agent", authorId: agentId,
-      kind: "system", body: `🔁 handed off to ${agent.displayName}`,
+      kind: "system", body: handoffBody,
     });
     await notify(d.sql, THREAD_CHANNEL, { threadId: task.threadId, message: msg });
 
