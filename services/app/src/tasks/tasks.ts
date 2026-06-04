@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { tasks, runs, agents } from "../db/schema.js";
 import { canTransition, isTerminal, type RunState } from "./runs.js";
+import type { StartRepo } from "../fusion/start.js";
 
 export interface OpenTaskInput {
   orgId: string;
@@ -62,6 +63,70 @@ export async function reassignTask(db: DB, i: ReassignInput) {
   }).returning();
 
   return { task, run, agent };
+}
+
+// The fusion starter, narrowed to what fanOutTask needs. Injectable so tests can
+// pass a fake (no live Temporal/GitHub required — mirrors the reassign route guard).
+export type FusionStarter = (input: {
+  run: { id: string; workflowId: string };
+  orgId: string;
+  threadId: string;
+  repo: StartRepo;
+  agentId: string;
+  intent: string;
+  sandboxUrl: string;
+}) => Promise<void>;
+
+export interface FanOutInput {
+  orgId: string;
+  taskId: string;
+  agentIds: string[];
+  threadId: string;
+  // The resolved repo + sandbox to start each run on. When absent (no repo/token),
+  // the runs are still recorded and `start` is simply skipped (like reassign).
+  repo?: StartRepo | null;
+  sandboxUrl: string;
+  // Injected starter (real `startFusionRun` bound to a temporal client, or a fake
+  // in tests). When null, run rows are created but no workflow is started.
+  start?: FusionStarter | null;
+}
+
+// #64 fan-out: spin up N concurrent Runs for ONE task, one per agent (competing
+// approaches). Each agent is loaded org-scoped (#14) so a cross-org/unknown agent
+// id is silently skipped — never leaked or started. agentIds are de-duplicated so
+// the same agent can't be fanned out to twice. Each run gets its own pending row +
+// `agent/<runId>` branch via the injected starter (guarded: no repo/token → skip).
+// Returns the created run ids (in input order, after dedup + skip).
+export async function fanOutTask(db: DB, i: FanOutInput) {
+  const [task] = await db.select().from(tasks)
+    .where(and(eq(tasks.id, i.taskId), eq(tasks.orgId, i.orgId)));
+  if (!task) throw new Error(`task not found: ${i.taskId}`);
+
+  const seen = new Set<string>();
+  const created: Array<{ runId: string; agentId: string }> = [];
+  for (const agentId of i.agentIds) {
+    if (seen.has(agentId)) continue;
+    seen.add(agentId);
+
+    const [agent] = await db.select().from(agents)
+      .where(and(eq(agents.id, agentId), eq(agents.orgId, i.orgId)));
+    if (!agent) continue; // unknown/cross-org agent → skipped
+
+    const runId = randomUUID();
+    await db.insert(runs).values({
+      id: runId, orgId: i.orgId, taskId: i.taskId, state: "pending", workflowId: `run-${runId}`,
+    });
+
+    if (i.start && i.repo) {
+      await i.start({
+        run: { id: runId, workflowId: `run-${runId}` },
+        orgId: i.orgId, threadId: i.threadId, repo: i.repo, agentId,
+        intent: task.title, sandboxUrl: i.sandboxUrl,
+      });
+    }
+    created.push({ runId, agentId });
+  }
+  return { task, runIds: created.map((c) => c.runId), created };
 }
 
 export interface RunFields {

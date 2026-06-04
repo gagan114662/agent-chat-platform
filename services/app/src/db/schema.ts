@@ -104,6 +104,7 @@ export const runs = pgTable("runs", {
   state: text("state").notNull().default("pending"),
   workflowId: text("workflow_id").notNull(),
   parentRunId: text("parent_run_id"), // #53 stacked PRs: a child (hand-off) run's parent — its PR bases on `agent/<parentRunId>`
+  selected: boolean("selected").notNull().default(false), // #64 concurrent runs: the winning run among a task's siblings (exclusive)
   branch: text("branch"),
   commitSha: text("commit_sha"),
   prNumber: integer("pr_number"),

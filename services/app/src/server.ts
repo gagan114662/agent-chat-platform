@@ -6,6 +6,7 @@ import { registerWs } from "./realtime/ws.js";
 import { redeemWsTicket } from "./realtime/ws-tickets.js";
 import { registerRoutes } from "./http/routes.js";
 import { registerTaskRoutes } from "./http/task-routes.js";
+import { registerFanoutRoutes } from "./http/fanout-routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
 import { registerNotifyRoutes } from "./http/notify-routes.js";
 import { registerDmRoutes } from "./http/dm-routes.js";
@@ -67,6 +68,7 @@ export async function buildServer() {
   const sandboxUrl = process.env.SANDBOX_URL ?? "http://localhost:8090";
   registerRoutes(app, { db, sql, temporal, sandboxUrl });
   registerTaskRoutes(app, { db, sql, temporal, sandboxUrl });
+  registerFanoutRoutes(app, { db, sql, temporal, sandboxUrl });
   registerNavRoutes(app, { db });
   registerNotifyRoutes(app, { db });
   registerDmRoutes(app, { db });
