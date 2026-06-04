@@ -5,6 +5,10 @@
     "./core/run-fusion.js": "./src/core/run-fusion.ts",
     "./sandbox/sandbox-runner-client.js": "./src/sandbox/sandbox-runner-client.ts",
     "./github/octokit-github-service.js": "./src/github/octokit-github-service.ts",
+    "./github/github-service.js": "./src/github/github-service.ts",
+    "./policy/risk.js": "./src/policy/risk.ts",
+    "./policy/policy.js": "./src/policy/policy.ts",
+    "./policy/qa.js": "./src/policy/qa.ts",
     "./temporal/workflow.js": "./src/temporal/workflow.ts",
     "./temporal/activities.js": "./src/temporal/activities.ts",
     "./telemetry/traced-fusion.js": "./src/telemetry/traced-fusion.ts"

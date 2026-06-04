@@ -43,6 +43,13 @@
       "when": 1780578332958,
       "tag": "0005_wild_tag",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780586457521,
+      "tag": "0006_true_komodo",
+      "breakpoints": true
     }
   ]
 }

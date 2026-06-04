@@ -16,8 +16,10 @@ function describe(e: FusionEvent): string {
     case "branch_pushed": return `📤 pushed branch \`${e.branch}\` (${e.commitSha.slice(0, 7)})`;
     case "pr_opened": return `🔀 opened PR #${e.prNumber}`;
     case "checks": return `⏳ checks: ${e.status}`;
-    case "outcome": return e.outcome === "merged"
-      ? `✅ merged PR #${e.prNumber}` : `⚠️ ${e.outcome}`;
+    case "outcome":
+      if (e.outcome === "merged") return `✅ merged PR #${e.prNumber}`;
+      if (e.outcome === "held_for_human") return `🔶 held for human review — PR #${e.prNumber}`;
+      return `⚠️ ${e.outcome}`;
   }
 }
 
@@ -70,12 +72,7 @@ export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
       await transitionRun(db, ctx.runId, "running", {});
     }
 
-    // `held_for_human` is a 4a orchestrator outcome that only arises when a
-    // mergeGate is supplied to runFusion. The app does not wire a gate yet
-    // (that, plus the held_for_human run state + thread card, is Plan 4b), so
-    // it cannot occur at runtime here; guard it out to keep the run-state
-    // transition map (RunState) sound until 4b adds the state.
-    if (isOutcome && e.type === "outcome" && e.outcome !== "held_for_human") {
+    if (isOutcome && e.type === "outcome") {
       await transitionRun(db, ctx.runId, e.outcome, {
         prNumber: e.prNumber, prUrl: e.prUrl, commitSha: e.commitSha,
       });
