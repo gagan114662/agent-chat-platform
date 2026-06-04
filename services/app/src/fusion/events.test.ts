@@ -36,6 +36,8 @@ describe("fusion sink", () => {
     const msgs = await listMessages(h.db, "t1", "o1");
     expect(msgs.at(-1)?.kind).toBe("pr_card");
     expect((msgs.at(-1)?.metadata as any).prNumber).toBe(7);
+    // The pr_card metadata must carry runId so the UI can call approve/decline.
+    expect((msgs.at(-1)?.metadata as any).runId).toBe(run.id);
     expect(msgs.every((m) => m.authorKind === "agent")).toBe(true);
 
     const [r] = await h.db.select().from(runs).where(eq(runs.id, run.id));

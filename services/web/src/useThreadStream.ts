@@ -41,5 +41,8 @@ export function useThreadStream(threadId: string) {
   }, [threadId]);
 
   const send = (body: string) => postMessage(threadId, body);
-  return { messages, send };
+  // Re-pull history (e.g. after an approve/decline action) so any message the action
+  // posted shows up even if the WS push was missed. append() dedupes by id.
+  const refetch = () => listMessages(threadId).then((hist) => { for (const m of hist) append(m); }).catch(() => {});
+  return { messages, send, refetch };
 }
