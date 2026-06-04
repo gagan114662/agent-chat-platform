@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -11,9 +12,18 @@ import (
 
 // NewHandler returns the sandbox-runner HTTP mux.
 func NewHandler() http.Handler {
+	limits := LimitsFromEnv()
+	sem := newSemaphore(limits.MaxConcurrent) // shared across both routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /run", func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // cap request body at 1 MiB
+		if !sem.tryAcquire() {
+			http.Error(w, "too many concurrent runs", http.StatusServiceUnavailable)
+			return
+		}
+		defer sem.release()
+		ctx, cancel := context.WithTimeout(r.Context(), limits.Timeout)
+		defer cancel()
 		var req RunRequest
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
@@ -47,13 +57,13 @@ func NewHandler() http.Handler {
 			return
 		}
 		ad := factory()
-		if err := ad.Prepare(r.Context(), adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Intent}); err != nil {
+		if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Intent}); err != nil {
 			http.Error(w, redactCreds(err.Error()), http.StatusBadRequest)
 			return
 		}
 		var ag Agent = adapter.AsAgent(ad)
 
-		res, err := Run(r.Context(), req, ag)
+		res, err := Run(ctx, req, ag, limits)
 		if err != nil {
 			http.Error(w, redactCreds(err.Error()), http.StatusInternalServerError)
 			return
@@ -63,6 +73,13 @@ func NewHandler() http.Handler {
 	})
 	mux.HandleFunc("POST /feedback", func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // cap request body at 1 MiB
+		if !sem.tryAcquire() {
+			http.Error(w, "too many concurrent runs", http.StatusServiceUnavailable)
+			return
+		}
+		defer sem.release()
+		ctx, cancel := context.WithTimeout(r.Context(), limits.Timeout)
+		defer cancel()
 		var req FeedbackRequest
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
@@ -97,7 +114,7 @@ func NewHandler() http.Handler {
 		}
 		ad := factory()
 
-		res, err := Feedback(r.Context(), req, ad)
+		res, err := Feedback(ctx, req, ad, limits)
 		if err != nil {
 			http.Error(w, redactCreds(err.Error()), http.StatusInternalServerError)
 			return

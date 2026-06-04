@@ -31,6 +31,26 @@ func TestHandleRun(t *testing.T) {
 	}
 }
 
+func TestHandleRunSizeGuard(t *testing.T) {
+	t.Setenv("ACP_ALLOW_FILE_REPO", "1") // test fixture clones from a local bare repo via file://
+	t.Setenv("ACP_MAX_REPO_BYTES", "1")  // any non-empty clone exceeds 1 byte -> guard trips
+	src := makeBareRepoWithCommit(t)
+	body, _ := json.Marshal(map[string]string{
+		"repoUrl": "file://" + src, "baseBranch": "main", "intent": "x", "branch": "feature/size",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/run", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewHandler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 from size guard, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte("exceeds size limit")) {
+		t.Fatalf("expected size-limit message, got %q", rec.Body.String())
+	}
+}
+
 func TestHandleRunUnknownAdapter(t *testing.T) {
 	t.Setenv("ACP_ALLOW_FILE_REPO", "1") // test fixture clones from a local bare repo via file://
 	t.Setenv("ACP_ALLOWED_ADAPTERS", "nope") // pass the authz gate so we exercise the unknown-adapter (400) path

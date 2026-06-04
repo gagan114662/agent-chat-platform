@@ -54,9 +54,12 @@ func (r FeedbackRequest) Validate() error {
 
 // Feedback re-clones the branch, resolves + prepares the adapter, applies the
 // feedback notes, then commits and pushes to the SAME branch, returning the new SHA.
-func Feedback(ctx context.Context, req FeedbackRequest, ad adapter.Adapter) (RunResult, error) {
-	if err := CloneInto(ctx, req.RepoURL, req.Branch, req.WorkDir); err != nil {
+func Feedback(ctx context.Context, req FeedbackRequest, ad adapter.Adapter, limits Limits) (RunResult, error) {
+	if err := CloneIntoDepth(ctx, req.RepoURL, req.Branch, req.WorkDir, limits.CloneDepth); err != nil {
 		return RunResult{}, fmt.Errorf("clone: %w", err)
+	}
+	if err := checkRepoSize(req.WorkDir, limits.MaxRepoBytes); err != nil {
+		return RunResult{}, err
 	}
 	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Notes}); err != nil {
 		return RunResult{}, fmt.Errorf("prepare: %w", err)
