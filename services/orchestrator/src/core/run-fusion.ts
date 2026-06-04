@@ -15,7 +15,7 @@ export interface FusionInput {
   branch: string;
 }
 
-export type FusionOutcome = "merged" | "checks_failed" | "timeout";
+export type FusionOutcome = "merged" | "checks_failed" | "timeout" | "held_for_human";
 
 export type FusionEvent =
   | { type: "sandbox_started" }
@@ -28,6 +28,7 @@ export interface FusionOptions {
   pollMs: number;
   maxPolls: number;
   onEvent?: (e: FusionEvent) => void | Promise<void>;
+  mergeGate?: (info: { prNumber: number; prUrl: string; commitSha: string; branch: string }) => Promise<{ merge: boolean; reason: string }>;
 }
 
 export interface FusionResult {
@@ -71,6 +72,13 @@ export async function runFusion(
     const status = await deps.github.getChecksStatus(input.owner, input.repo, run.commitSha);
     await emit({ type: "checks", status });
     if (status === "success") {
+      if (opts.mergeGate) {
+        const gate = await opts.mergeGate({ prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha, branch: run.branch });
+        if (!gate.merge) {
+          await emit({ type: "outcome", outcome: "held_for_human", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha });
+          return { outcome: "held_for_human", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha };
+        }
+      }
       await deps.github.merge(input.owner, input.repo, pr.number);
       await emit({ type: "outcome", outcome: "merged", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha });
       return { outcome: "merged", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha };
