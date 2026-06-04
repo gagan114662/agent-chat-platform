@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/rest";
 import type { GitHubService, OpenPrInput } from "./github-service.js";
 import type { ChecksStatus, PullRequest } from "../types.js";
+import type { ChangedFile } from "../policy/risk.js";
 import { nodeFetch } from "../http/node-fetch.js";
 
 export class OctokitGitHubService implements GitHubService {
@@ -42,5 +43,15 @@ export class OctokitGitHubService implements GitHubService {
         `Failed to merge PR #${prNumber} for ${owner}/${repo}${reason}`
       );
     }
+  }
+
+  async getChangedFiles(owner: string, repo: string, prNumber: number): Promise<ChangedFile[]> {
+    const res = await this.octokit.pulls.listFiles({ owner, repo, pull_number: prNumber });
+    return res.data.map((f) => ({
+      filename: f.filename,
+      additions: f.additions,
+      deletions: f.deletions,
+      status: f.status,
+    }));
   }
 }

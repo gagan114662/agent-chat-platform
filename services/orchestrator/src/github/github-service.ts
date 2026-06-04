@@ -1,4 +1,5 @@
 import type { ChecksStatus, PullRequest } from "../types.js";
+import type { ChangedFile } from "../policy/risk.js";
 
 export interface OpenPrInput {
   owner: string;
@@ -13,4 +14,5 @@ export interface GitHubService {
   openPr(input: OpenPrInput): Promise<PullRequest>;
   getChecksStatus(owner: string, repo: string, ref: string): Promise<ChecksStatus>;
   merge(owner: string, repo: string, prNumber: number): Promise<void>;
+  getChangedFiles(owner: string, repo: string, prNumber: number): Promise<ChangedFile[]>;
 }

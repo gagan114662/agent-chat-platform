@@ -70,7 +70,12 @@ export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
       await transitionRun(db, ctx.runId, "running", {});
     }
 
-    if (isOutcome && e.type === "outcome") {
+    // `held_for_human` is a 4a orchestrator outcome that only arises when a
+    // mergeGate is supplied to runFusion. The app does not wire a gate yet
+    // (that, plus the held_for_human run state + thread card, is Plan 4b), so
+    // it cannot occur at runtime here; guard it out to keep the run-state
+    // transition map (RunState) sound until 4b adds the state.
+    if (isOutcome && e.type === "outcome" && e.outcome !== "held_for_human") {
       await transitionRun(db, ctx.runId, e.outcome, {
         prNumber: e.prNumber, prUrl: e.prUrl, commitSha: e.commitSha,
       });
