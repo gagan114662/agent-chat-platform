@@ -33,6 +33,9 @@ export interface ReassignInput {
   agentId: string;
   byKind: "human" | "agent";
   byId: string;
+  // #53 stacked PRs: when set, the new hand-off run records this parent run so its
+  // PR can base on the parent's branch. Default null → flat (today's behavior).
+  parentRunId?: string;
 }
 
 // Hand a task to another agent: re-point the assignee and spin a fresh pending Run
@@ -55,6 +58,7 @@ export async function reassignTask(db: DB, i: ReassignInput) {
   const runId = randomUUID();
   const [run] = await db.insert(runs).values({
     id: runId, orgId: i.orgId, taskId: i.taskId, state: "pending", workflowId: `run-${runId}`,
+    parentRunId: i.parentRunId ?? null,
   }).returning();
 
   return { task, run, agent };

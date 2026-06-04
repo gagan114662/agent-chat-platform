@@ -46,6 +46,25 @@ describe("fusion sink", () => {
     expect(tk.state).toBe("done");
   });
 
+  it("attaches parentRunId to the outcome (pr_card) metadata when the run is stacked (#53)", async () => {
+    const { run } = await seedRun();
+    const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1", parentRunId: "r-parent" });
+    await sink({ type: "sandbox_started" });
+    await sink({ type: "outcome", outcome: "merged", prNumber: 7, prUrl: "u", commitSha: "s" });
+    const msgs = await listMessages(h.db, "t1", "o1");
+    expect(msgs.at(-1)?.kind).toBe("pr_card");
+    expect((msgs.at(-1)?.metadata as any).parentRunId).toBe("r-parent");
+  });
+
+  it("omits parentRunId from outcome metadata for a flat (non-stacked) run", async () => {
+    const { run } = await seedRun();
+    const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" });
+    await sink({ type: "sandbox_started" });
+    await sink({ type: "outcome", outcome: "merged", prNumber: 7, prUrl: "u", commitSha: "s" });
+    const msgs = await listMessages(h.db, "t1", "o1");
+    expect((msgs.at(-1)?.metadata as any).parentRunId).toBeUndefined();
+  });
+
   it("keeps distinct ci_fix_attempt events separate and renders them", async () => {
     const { run } = await seedRun();
     const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" });

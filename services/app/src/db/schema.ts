@@ -103,6 +103,7 @@ export const runs = pgTable("runs", {
   taskId: text("task_id").notNull(),
   state: text("state").notNull().default("pending"),
   workflowId: text("workflow_id").notNull(),
+  parentRunId: text("parent_run_id"), // #53 stacked PRs: a child (hand-off) run's parent — its PR bases on `agent/<parentRunId>`
   branch: text("branch"),
   commitSha: text("commit_sha"),
   prNumber: integer("pr_number"),
