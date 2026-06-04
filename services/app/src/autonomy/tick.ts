@@ -4,7 +4,7 @@ import type postgres from "postgres";
 import type { DB } from "../db/client.js";
 import { tasks, threads, repos, runs, agents } from "../db/schema.js";
 import { startFusionRun, type StartFusionRunInput } from "../fusion/start.js";
-import { agentModelConfig } from "../agents/agents.js";
+import { agentModelConfig, agentMcp } from "../agents/agents.js";
 
 // `start` is injectable so the tick can run with a FAKE temporal in tests (and so the
 // production path stays identical to the mention/hand-off starter). It defaults to the
@@ -58,6 +58,7 @@ export async function tick(d: TickDeps, args: { orgId: string; budgetMax?: numbe
       },
       agentId: t.assigneeId, intent: t.title, sandboxUrl: d.sandboxUrl,
       ...agentModelConfig(agent), // #58: per-agent model/provider from agents.config
+      ...(agentMcp(agent) ? { mcpServers: agentMcp(agent) } : {}), // #57: per-agent MCP servers
     });
     dispatched.push(runId);
   }

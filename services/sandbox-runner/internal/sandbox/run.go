@@ -14,10 +14,11 @@ type RunRequest struct {
 	BaseBranch string `json:"baseBranch"`
 	Intent     string `json:"intent"`
 	Branch     string `json:"branch"`
-	Adapter    string `json:"adapter"`
-	Model      string `json:"model,omitempty"`
-	Provider   string `json:"provider,omitempty"`
-	WorkDir    string `json:"-"`
+	Adapter    string   `json:"adapter"`
+	Model      string   `json:"model,omitempty"`
+	Provider   string   `json:"provider,omitempty"`
+	McpServers []string `json:"mcpServers,omitempty"`
+	WorkDir    string   `json:"-"`
 }
 
 type RunResult struct {
@@ -64,7 +65,29 @@ func (r RunRequest) Validate() error {
 	if err := validModelProvider(r.Provider, "provider"); err != nil {
 		return err
 	}
+	if err := validMcpServers(r.McpServers); err != nil {
+		return err
+	}
 	return validRef(r.Branch, "branch")
+}
+
+// validMcpServers gates the optional MCP server names. Each becomes part of a
+// catalog lookup / .mcp.json key, so reject anything that could be reinterpreted
+// as a CLI flag (leading '-') or carry whitespace/shell metacharacters. Empty
+// list is OK (no MCP servers).
+func validMcpServers(names []string) error {
+	for _, n := range names {
+		if n == "" {
+			return fmt.Errorf("mcpServers entry must not be empty")
+		}
+		if strings.HasPrefix(n, "-") {
+			return fmt.Errorf("mcpServers entry must not start with '-'")
+		}
+		if strings.ContainsAny(n, " \t\n\r;|&$`\\\"'/") {
+			return fmt.Errorf("mcpServers entry contains illegal characters")
+		}
+	}
+	return nil
 }
 
 // validModelProvider gates the optional model/provider selectors. They become

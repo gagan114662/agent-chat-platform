@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { resolveMention, isPermittedOnRepo, agentModelConfig } from "./agents.js";
+import { resolveMention, isPermittedOnRepo, agentModelConfig, agentMcp } from "./agents.js";
 import { orgs, workspaces, agents, repos } from "../db/schema.js";
 
 const h = testDb();
@@ -80,5 +80,24 @@ describe("agentModelConfig (#58)", () => {
     expect(agentModelConfig({ config: { model: 123, provider: ["x"] } })).toEqual({});
     expect(agentModelConfig({ config: { model: "", provider: "" } })).toEqual({});
     expect(agentModelConfig({ config: "not-an-object" })).toEqual({});
+  });
+});
+
+describe("agentMcp (#57)", () => {
+  it("returns undefined for null/absent/empty/non-array config", () => {
+    expect(agentMcp(null)).toBeUndefined();
+    expect(agentMcp(undefined)).toBeUndefined();
+    expect(agentMcp({})).toBeUndefined();
+    expect(agentMcp({ config: {} })).toBeUndefined();
+    expect(agentMcp({ config: { mcpServers: "filesystem" } })).toBeUndefined();
+    expect(agentMcp({ config: "not-an-object" })).toBeUndefined();
+  });
+  it("surfaces a non-empty array of catalog names", () => {
+    expect(agentMcp({ config: { mcpServers: ["filesystem", "git"] } })).toEqual(["filesystem", "git"]);
+  });
+  it("filters non-string / empty entries; undefined when none remain", () => {
+    expect(agentMcp({ config: { mcpServers: ["filesystem", 123, "", null] } })).toEqual(["filesystem"]);
+    expect(agentMcp({ config: { mcpServers: [123, ""] } })).toBeUndefined();
+    expect(agentMcp({ config: { mcpServers: [] } })).toBeUndefined();
   });
 });

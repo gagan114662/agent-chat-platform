@@ -8,7 +8,7 @@ import { transitionRun, openTaskForMention } from "../tasks/tasks.js";
 import { loadPlanRunWithRepo } from "../approvals/approvals.js";
 import { startFusionRun } from "../fusion/start.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
-import { agentModelConfig } from "../agents/agents.js";
+import { agentModelConfig, agentMcp } from "../agents/agents.js";
 import { agents } from "../db/schema.js";
 import { and, eq } from "drizzle-orm";
 import { actor } from "./actor.js";
@@ -45,6 +45,7 @@ export function registerPlanRoutes(app: FastifyInstance, d: PlanDeps) {
         run, orgId, threadId: thread.id, repo, agentId: task.assigneeId ?? "agent",
         intent: task.title, sandboxUrl: d.sandboxUrl, planMode: false,
         ...agentModelConfig(agent),
+        ...(agentMcp(agent) ? { mcpServers: agentMcp(agent) } : {}), // #57: per-agent MCP servers
       });
     }
 
@@ -101,6 +102,7 @@ export function registerPlanRoutes(app: FastifyInstance, d: PlanDeps) {
           run: newRun, orgId, threadId: thread.id, repo, agentId: task.assigneeId ?? "agent",
           intent, sandboxUrl: d.sandboxUrl, planMode: true,
           ...agentModelConfig(agent),
+          ...(agentMcp(agent) ? { mcpServers: agentMcp(agent) } : {}), // #57: per-agent MCP servers
         });
       }
       replanned = true;

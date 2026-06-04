@@ -78,6 +78,11 @@ type PrepareContext struct {
 	// "vertex"); the adapter maps it to the appropriate provider env. Empty =
 	// the default (Anthropic) provider. Credentials stay deployment env.
 	Provider string
+	// McpServers optionally names built-in MCP catalog servers to provision into
+	// the run (written to .mcp.json, loaded via the CLI --mcp-config). Subject to
+	// default-deny authz (catalog tier + ACP_ALLOWED_MCP). Empty/nil = none (no
+	// .mcp.json, no --mcp-config — today's behavior).
+	McpServers []string
 }
 
 // Adapter is the contract every agent implements. Real adapters (Claude Code,

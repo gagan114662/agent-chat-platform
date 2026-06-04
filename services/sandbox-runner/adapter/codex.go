@@ -17,12 +17,13 @@ import (
 // (the exec seam) differs. exec/lookPath are injectable for tests, so the suite
 // needs no real `codex` binary.
 type CodexAdapter struct {
-	lookPath func(string) (string, error)
-	exec     func(ctx context.Context, dir, intent, model, provider string, onLine func(string)) error
-	planExec func(ctx context.Context, dir, intent, model, provider string) (string, error)
-	repoDir  string // captured from Prepare so ApplyFeedback (no dir param) knows where to run
-	model    string // captured from Prepare; "" = the CLI default (no --model flag)
-	provider string // captured from Prepare; "" = default provider (no provider env)
+	lookPath   func(string) (string, error)
+	exec       func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error
+	planExec   func(ctx context.Context, dir, intent, model, provider, mcpConfig string) (string, error)
+	repoDir    string   // captured from Prepare so ApplyFeedback (no dir param) knows where to run
+	model      string   // captured from Prepare; "" = the CLI default (no --model flag)
+	provider   string   // captured from Prepare; "" = default provider (no provider env)
+	mcpServers []string // captured from Prepare; nil/empty = no .mcp.json, no --mcp-config
 }
 
 func NewCodexAdapter() *CodexAdapter {
@@ -40,25 +41,26 @@ func (a *CodexAdapter) Prepare(_ context.Context, p PrepareContext) error {
 	a.repoDir = p.RepoDir // ApplyFeedback has no dir param; capture it here like claude-code
 	a.model = p.Model     // optional --model selection (validated upstream in Validate())
 	a.provider = p.Provider
+	a.mcpServers = p.McpServers // optional MCP servers (authz applied at provisioning)
 	return nil
 }
 
 func (a *CodexAdapter) Run(ctx context.Context, repoDir, intent string, emit Emit) error {
-	return runAgentShared(ctx, a.exec, a.model, a.provider, repoDir, intent, "codex: starting", "codex: finished", "codex run failed", emit)
+	return runAgentShared(ctx, a.exec, a.model, a.provider, a.mcpServers, repoDir, intent, "codex: starting", "codex: finished", "codex run failed", emit)
 }
 
 // Plan runs codex in read-only plan mode in repoDir and returns the captured
 // output. Reuses the shared hardening (prompt-bound, quarantine, built-in
 // skills, env-scrub) via planShared.
 func (a *CodexAdapter) Plan(ctx context.Context, repoDir, intent string) (string, error) {
-	return planShared(ctx, a.planExec, a.model, a.provider, repoDir, intent, "codex plan failed")
+	return planShared(ctx, a.planExec, a.model, a.provider, a.mcpServers, repoDir, intent, "codex plan failed")
 }
 
 // ApplyFeedback runs codex with the feedback notes as the prompt against the
 // repo dir captured in Prepare — essentially Run with notes — reusing the same
 // hardening via runAgentShared.
 func (a *CodexAdapter) ApplyFeedback(ctx context.Context, notes string, emit Emit) error {
-	return runAgentShared(ctx, a.exec, a.model, a.provider, a.repoDir, notes, "codex: applying feedback", "feedback applied", "codex feedback failed", emit)
+	return runAgentShared(ctx, a.exec, a.model, a.provider, a.mcpServers, a.repoDir, notes, "codex: applying feedback", "feedback applied", "codex feedback failed", emit)
 }
 
 func (*CodexAdapter) Teardown(context.Context) error { return nil }
@@ -78,8 +80,10 @@ func codexArgs(intent, model string, extra ...string) []string {
 // runCodexCLI invokes `codex exec <intent>` in dir, streaming combined
 // stdout+stderr line-by-line to onLine. When model is set it appends
 // `--model <model>`; provider selects the backend via provider env. The child
-// env is scrubbed via filterChildEnv (same as claude-code).
-func runCodexCLI(ctx context.Context, dir, intent, model, provider string, onLine func(string)) error {
+// env is scrubbed via filterChildEnv (same as claude-code). mcpConfig is part
+// of the shared exec seam but unused here — codex has no --mcp-config flag; the
+// claude adapter consumes it.
+func runCodexCLI(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
 	cmd := exec.CommandContext(ctx, "codex", codexArgs(intent, model)...)
 	if dir != "" {
 		cmd.Dir = dir
@@ -107,8 +111,9 @@ func runCodexCLI(ctx context.Context, dir, intent, model, provider string, onLin
 }
 
 // runCodexPlanCLI invokes codex in read-only plan mode in dir, capturing the
-// full combined stdout+stderr as the returned plan string.
-func runCodexPlanCLI(ctx context.Context, dir, intent, model, provider string) (string, error) {
+// full combined stdout+stderr as the returned plan string. mcpConfig is part of
+// the shared plan seam but unused here — codex has no --mcp-config flag.
+func runCodexPlanCLI(ctx context.Context, dir, intent, model, provider, mcpConfig string) (string, error) {
 	cmd := exec.CommandContext(ctx, "codex", codexArgs(intent, model, "--plan")...)
 	if dir != "" {
 		cmd.Dir = dir

@@ -5,7 +5,7 @@ import type { DB } from "../db/client.js";
 import { notify } from "../db/client.js";
 import { parseMentions } from "./mentions.js";
 import { createMessage } from "./messages.js";
-import { resolveMention, isPermittedOnRepo, agentModelConfig } from "../agents/agents.js";
+import { resolveMention, isPermittedOnRepo, agentModelConfig, agentMcp } from "../agents/agents.js";
 import { openTaskForMention } from "../tasks/tasks.js";
 import { startFusionRun } from "../fusion/start.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
@@ -69,6 +69,7 @@ export async function handleMentions(d: MentionDeps, m: MentionInput): Promise<s
       planMode: repo.planMode, // #20: plan-first when the repo opts in
       mentionDepth: m.depth + 1, // #27: children one level deeper
       ...agentModelConfig(agent), // #58: per-agent model/provider from agents.config
+      ...(agentMcp(agent) ? { mcpServers: agentMcp(agent) } : {}), // #57: per-agent MCP servers
     });
     started.push(run.id);
   }

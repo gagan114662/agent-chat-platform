@@ -38,6 +38,9 @@ export interface StartFusionRunInput {
   // agentModelConfig). Optional; empty = the platform default (today's behavior).
   model?: string;
   provider?: string;
+  // #57 per-agent MCP servers (from agents.config via agentMcp). Optional;
+  // undefined = no MCP servers (today's behavior). Authz enforced in the sandbox.
+  mcpServers?: string[];
 }
 
 // Shared starter: builds the RunFusionActivityInput and kicks off the fusion workflow.
@@ -52,6 +55,7 @@ export async function startFusionRun(temporal: Client, i: StartFusionRunInput) {
     planMode: i.planMode ?? false,
     ...(i.model ? { model: i.model } : {}),
     ...(i.provider ? { provider: i.provider } : {}),
+    ...(i.mcpServers ? { mcpServers: i.mcpServers } : {}),
     sink: { orgId: i.orgId, threadId: i.threadId, runId: i.run.id, agentId: i.agentId, mentionDepth: i.mentionDepth ?? 0, ...(i.parentRunId ? { parentRunId: i.parentRunId } : {}) },
   });
 }

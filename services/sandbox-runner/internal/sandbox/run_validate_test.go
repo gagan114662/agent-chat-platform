@@ -58,6 +58,27 @@ func TestRunRequestValidateModelProvider(t *testing.T) {
 	}
 }
 
+// TestRunRequestValidateMcpServers verifies optional MCP server names are
+// accepted when well-formed, ignored when empty, and rejected when they carry a
+// leading '-' or shell/path metacharacters (injection into catalog/.mcp.json).
+func TestRunRequestValidateMcpServers(t *testing.T) {
+	base := func() RunRequest {
+		return RunRequest{RepoURL: "https://github.com/o/r.git", BaseBranch: "main", Intent: "x", Branch: "feature/x"}
+	}
+	ok := base()
+	ok.McpServers = []string{"filesystem", "sequential-thinking"}
+	if err := ok.Validate(); err != nil {
+		t.Fatalf("valid mcpServers rejected: %v", err)
+	}
+	for _, v := range []string{"-rf", "a b", "a;rm -rf /", "a\tb", "../etc", "a/b", ""} {
+		r := base()
+		r.McpServers = []string{v}
+		if err := r.Validate(); err == nil {
+			t.Fatalf("bad mcpServers entry accepted: %q", v)
+		}
+	}
+}
+
 func TestRunRequestValidateFileSchemeGated(t *testing.T) {
 	r := RunRequest{RepoURL: "file:///tmp/repo", BaseBranch: "main", Intent: "x", Branch: "b"}
 	// Default (prod): file:// is rejected.

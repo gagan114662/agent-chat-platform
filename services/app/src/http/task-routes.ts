@@ -7,7 +7,7 @@ import { notify } from "../db/client.js";
 import { createMessage } from "../chat/messages.js";
 import { reassignTask } from "../tasks/tasks.js";
 import { startFusionRun } from "../fusion/start.js";
-import { agentModelConfig } from "../agents/agents.js";
+import { agentModelConfig, agentMcp } from "../agents/agents.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
 import { threads, repos, runs } from "../db/schema.js";
 import { actor } from "./actor.js";
@@ -60,6 +60,7 @@ export function registerTaskRoutes(app: FastifyInstance, d: TaskDeps) {
           baseBranchOverride: parentRunId ? `agent/${parentRunId}` : undefined,
           parentRunId,
           ...agentModelConfig(agent), // #58: per-agent model/provider from agents.config
+          ...(agentMcp(agent) ? { mcpServers: agentMcp(agent) } : {}), // #57: per-agent MCP servers
         });
       }
     }
