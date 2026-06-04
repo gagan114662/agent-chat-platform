@@ -87,6 +87,16 @@ export const tasks = pgTable("tasks", {
   createdById: text("created_by_id").notNull(),
 });
 
+export const goals = pgTable("goals", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  title: text("title").notNull(),
+  criteria: text("criteria").notNull().default(""), // done-criteria, one task per line (default planner)
+  state: text("state").notNull().default("open"),    // 'open' | 'active' | 'done'
+  createdByKind: text("created_by_kind").notNull(),
+  createdById: text("created_by_id").notNull(),
+});
+
 export const runs = pgTable("runs", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
