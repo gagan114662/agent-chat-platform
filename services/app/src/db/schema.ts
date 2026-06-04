@@ -3,6 +3,7 @@ import { pgTable, text, timestamp, integer, jsonb, uniqueIndex } from "drizzle-o
 export const orgs = pgTable("orgs", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
 });
 
 export const workspaces = pgTable("workspaces", {

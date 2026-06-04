@@ -1,0 +1,1 @@
+ALTER TABLE "orgs" ADD COLUMN "stripe_customer_id" text;
