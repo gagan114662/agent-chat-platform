@@ -73,6 +73,100 @@ func TestClaudeCodeAdapterInjectsBuiltinSkills(t *testing.T) {
 	}
 }
 
+// TestClaudeCodeAdapterApplyFeedback verifies ApplyFeedback runs the real agent
+// with the feedback notes as the prompt (not a no-op): the injected exec is
+// CALLED with the notes, and during the call the repo's CLAUDE.md is quarantined
+// and a built-in skill is present; after return the tree is clean (#66).
+func TestClaudeCodeAdapterApplyFeedback(t *testing.T) {
+	dir := t.TempDir()
+	claudeMd := filepath.Join(dir, "CLAUDE.md")
+	if err := os.WriteFile(claudeMd, []byte("evil instructions"), 0o644); err != nil {
+		t.Fatalf("write CLAUDE.md: %v", err)
+	}
+	skillPath := filepath.Join(dir, ".claude", "skills", "code-review", "SKILL.md")
+
+	var gotPrompt string
+	var skillPresentDuringExec, claudeMdAbsentDuringExec bool
+	a := &ClaudeCodeAdapter{
+		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
+		exec: func(ctx context.Context, d, prompt string, onLine func(string)) error {
+			gotPrompt = prompt
+			_, skillErr := os.Stat(skillPath)
+			skillPresentDuringExec = skillErr == nil
+			_, mdErr := os.Stat(filepath.Join(d, "CLAUDE.md"))
+			claudeMdAbsentDuringExec = os.IsNotExist(mdErr)
+			onLine("addressed feedback")
+			return nil
+		},
+	}
+	// repoDir is captured from Prepare, mirroring Run's wiring.
+	if err := a.Prepare(context.Background(), PrepareContext{RepoDir: dir}); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+
+	var logs, dones int
+	err := a.ApplyFeedback(context.Background(), "fix the failing test", func(e Event) {
+		if e.Type == EventLog {
+			logs++
+		}
+		if e.Type == EventDone {
+			dones++
+		}
+	})
+	if err != nil {
+		t.Fatalf("ApplyFeedback: %v", err)
+	}
+	if gotPrompt != "fix the failing test" {
+		t.Fatalf("exec must be called with notes as prompt, got %q", gotPrompt)
+	}
+	if !skillPresentDuringExec {
+		t.Fatal("built-in skill must be present during the feedback exec")
+	}
+	if !claudeMdAbsentDuringExec {
+		t.Fatal("CLAUDE.md must be quarantined during the feedback exec")
+	}
+	if logs == 0 || dones != 1 {
+		t.Fatalf("expected log events + 1 done, got logs=%d dones=%d", logs, dones)
+	}
+	// Tree clean after return.
+	if _, err := os.Stat(skillPath); !os.IsNotExist(err) {
+		t.Fatalf("built-in skill must be gone after ApplyFeedback: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".claude")); !os.IsNotExist(err) {
+		t.Fatalf(".claude must be pruned after ApplyFeedback: %v", err)
+	}
+	got, err := os.ReadFile(claudeMd)
+	if err != nil {
+		t.Fatalf("CLAUDE.md not restored after ApplyFeedback: %v", err)
+	}
+	if string(got) != "evil instructions" {
+		t.Fatalf("CLAUDE.md content changed after restore: %q", got)
+	}
+}
+
+// TestClaudeCodeAdapterApplyFeedbackOversize verifies oversize notes are rejected
+// before the agent is ever exec'd (prompt-bound guard reused from Run).
+func TestClaudeCodeAdapterApplyFeedbackOversize(t *testing.T) {
+	called := false
+	a := &ClaudeCodeAdapter{
+		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
+		exec: func(ctx context.Context, dir, prompt string, onLine func(string)) error {
+			called = true
+			return nil
+		},
+	}
+	if err := a.Prepare(context.Background(), PrepareContext{RepoDir: t.TempDir()}); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	err := a.ApplyFeedback(context.Background(), strings.Repeat("x", 20000), func(Event) {})
+	if err == nil {
+		t.Fatal("expected error for oversize notes")
+	}
+	if called {
+		t.Fatal("exec must NOT be called when notes exceed max prompt size")
+	}
+}
+
 func TestClaudeCodeAdapterMissingCLI(t *testing.T) {
 	a := &ClaudeCodeAdapter{lookPath: func(string) (string, error) { return "", errors.New("nope") }}
 	if err := a.Prepare(context.Background(), PrepareContext{}); err == nil {
