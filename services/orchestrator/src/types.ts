@@ -8,6 +8,9 @@ export interface SandboxRunRequest {
   baseBranch: string;
   intent: string;
   branch: string;
+  // Optional per-agent model/provider selection (#58). Empty = sandbox default.
+  model?: string;
+  provider?: string;
 }
 
 export interface SandboxFeedbackRequest {
@@ -15,6 +18,8 @@ export interface SandboxFeedbackRequest {
   branch: string;
   notes: string;
   adapter?: string;
+  model?: string;
+  provider?: string;
 }
 
 export interface SandboxPlanRequest {
@@ -22,6 +27,8 @@ export interface SandboxPlanRequest {
   baseBranch: string;
   intent: string;
   adapter?: string;
+  model?: string;
+  provider?: string;
 }
 
 export interface PlanResult {
