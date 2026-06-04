@@ -4,25 +4,30 @@ import { App } from "./App.js";
 
 class QuietWS { onmessage: unknown = null; onopen: unknown = null; constructor() {} close() {} send() {} }
 
-// Route each fetch by URL: nav endpoints return seed data; messages return [].
-function routedFetch(url: string) {
-  if (url === "/channels") return [{ id: "c1", orgId: "o1", workspaceId: "w1", name: "general" }];
-  if (url === "/repos") return [];
-  if (url === "/channels/c1/threads") return [{ id: "t1", orgId: "o1", channelId: "c1", title: "Demo thread", repoId: "r1" }];
-  if (url.startsWith("/threads/")) return [];
-  return [];
+function makeFetch(meStatus: number) {
+  return vi.fn(async (url: string) => {
+    if (url === "/auth/me") return { status: meStatus, ok: meStatus === 200, json: async () => ({ orgId: "o1", userId: "m1" }) };
+    if (url === "/auth/members") return { ok: true, json: async () => [{ id: "m1", displayName: "You", orgId: "o1" }] };
+    if (url === "/channels") return { ok: true, json: async () => [{ id: "c1", orgId: "o1", workspaceId: "w1", name: "general" }] };
+    if (url === "/channels/c1/threads") return { ok: true, json: async () => [{ id: "t1", orgId: "o1", channelId: "c1", title: "Demo thread", repoId: "r1", kind: "channel" }] };
+    return { ok: true, json: async () => [] };
+  }) as unknown as typeof fetch;
 }
 
-beforeEach(() => {
-  vi.stubGlobal("WebSocket", QuietWS as unknown as typeof WebSocket);
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => ({ ok: true, json: async () => routedFetch(url) })) as unknown as typeof fetch);
-});
+beforeEach(() => { localStorage.clear(); vi.stubGlobal("WebSocket", QuietWS as unknown as typeof WebSocket); });
 
-describe("App", () => {
-  it("loads channels + threads and renders the active thread", async () => {
+describe("App auth gate", () => {
+  it("shows the workspace when authenticated", async () => {
+    localStorage.setItem("acp_token", "tok");
+    vi.stubGlobal("fetch", makeFetch(200));
     render(<App />);
-    expect(screen.getByText("Demo Workspace")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("# general")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Demo Workspace")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByRole("heading", { name: "Demo thread" })).toBeInTheDocument());
+  });
+
+  it("shows the login screen when unauthenticated", async () => {
+    vi.stubGlobal("fetch", makeFetch(401));
+    render(<App />);
+    await waitFor(() => expect(screen.getByText(/sign in \(dev\)/i)).toBeInTheDocument());
   });
 });
