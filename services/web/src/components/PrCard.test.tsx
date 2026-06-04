@@ -174,3 +174,27 @@ describe("PrCard sync comments", () => {
     expect(onSyncComments).toHaveBeenCalledWith("run1");
   });
 });
+
+describe("PrCard select run (#64)", () => {
+  it("shows a Select button when a runId is present and onSelectRun is given", () => {
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} onSelectRun={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /^select$/i })).toBeInTheDocument();
+  });
+
+  it("hides the Select button when no runId is present", () => {
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7 } } as Message} onSelectRun={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /^select$/i })).toBeNull();
+  });
+
+  it("clicking Select calls onSelectRun with the runId", () => {
+    const onSelectRun = vi.fn();
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1" } } as Message} onSelectRun={onSelectRun} />);
+    fireEvent.click(screen.getByRole("button", { name: /^select$/i }));
+    expect(onSelectRun).toHaveBeenCalledWith("run1");
+  });
+
+  it("shows a ✓ selected badge when metadata.selected is true", () => {
+    render(<PrCard message={{ ...base, body: "✅ merged PR #7", metadata: { outcome: "merged", prNumber: 7, runId: "run1", selected: true } } as Message} onSelectRun={vi.fn()} />);
+    expect(screen.getByText(/selected/i)).toBeInTheDocument();
+  });
+});

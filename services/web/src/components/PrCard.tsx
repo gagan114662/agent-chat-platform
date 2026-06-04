@@ -22,10 +22,12 @@ interface PrCardProps {
   onUpdatePr?: (runId: string, patch: { title?: string; body?: string; base?: string }) => void;
   onLoadCheckpoints?: (runId: string) => Promise<Checkpoint[]>;
   onRestoreCheckpoint?: (runId: string, cpId: string) => void;
+  // #64 concurrent runs: pick this run as the winner among its task's siblings.
+  onSelectRun?: (runId: string) => void;
 }
 
-export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr, onLoadCheckpoints, onRestoreCheckpoint }: PrCardProps) {
-  const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string; runId?: string; parentRunId?: string };
+export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr, onLoadCheckpoints, onRestoreCheckpoint, onSelectRun }: PrCardProps) {
+  const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string; runId?: string; parentRunId?: string; selected?: boolean };
   const outcome = m.outcome ?? "merged";
   // #53 stacked PRs: when this run is a child of another, surface a small badge.
   const parentRunId = typeof m.parentRunId === "string" ? m.parentRunId : undefined;
@@ -39,6 +41,11 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
   const canEdit = typeof m.runId === "string";
   // #62: a runId lets a human list + restore the run's checkpoints (commit snapshots).
   const canCheckpoint = typeof m.runId === "string";
+  // #64 concurrent runs: a runId + an onSelectRun handler lets a human pick this run
+  // as the winner among its task's siblings. `selected` (if the sink carries it)
+  // surfaces a winner badge.
+  const canSelect = typeof m.runId === "string" && !!onSelectRun;
+  const isSelected = m.selected === true;
 
   const [diffOpen, setDiffOpen] = useState(false);
   const [diffFiles, setDiffFiles] = useState<ChangedFile[] | null>(null);
@@ -122,9 +129,14 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
             ⬑ stacked on {parentRunId}
           </span>
         )}
+        {isSelected && (
+          <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+            ✓ selected
+          </span>
+        )}
       </div>
       <p className="mt-1 text-sm">{message.body}</p>
-      {(actionable || canDiff || canEdit || canCheckpoint) && (
+      {(actionable || canDiff || canEdit || canCheckpoint || canSelect) && (
         <div className="mt-3 flex gap-2">
           {actionable && (
             <button
@@ -178,6 +190,15 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
               className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
             >
               {cpOpen ? "Hide checkpoints" : "Checkpoints"}
+            </button>
+          )}
+          {canSelect && (
+            <button
+              type="button"
+              onClick={() => onSelectRun?.(m.runId!)}
+              className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              Select
             </button>
           )}
         </div>
