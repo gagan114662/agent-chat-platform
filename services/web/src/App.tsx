@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "./components/Sidebar.js";
 import { ThreadView } from "./components/ThreadView.js";
 import { Composer } from "./components/Composer.js";
+import { SearchBar } from "./components/SearchBar.js";
 import { useThreadStream } from "./useThreadStream.js";
-import { listChannels, listThreads, listRepos, createThread } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages } from "./api.js";
 import type { Channel, Thread, Repo } from "./types.js";
 
 export function App() {
@@ -32,6 +33,11 @@ export function App() {
     setActiveThreadId(t.id);
   };
 
+  const onCreateChannel = async (name: string) => {
+    const c = await createChannel(name);
+    setChannels((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
+  };
+
   return (
     <div className="flex h-screen bg-white text-slate-900">
       <Sidebar
@@ -41,13 +47,17 @@ export function App() {
         activeThreadId={activeThreadId}
         onSelectThread={setActiveThreadId}
         onCreateThread={onCreateThread}
+        onCreateChannel={onCreateChannel}
       />
       <main className="flex flex-1 flex-col">
-        <header className="border-b border-slate-200 px-4 py-3">
-          <h1 className="text-sm font-semibold text-slate-700">
-            {threads.find((t) => t.id === activeThreadId)?.title ?? "No thread selected"}
-          </h1>
-          <p className="text-xs text-slate-400">chat → sandboxed agent → PR → back to chat</p>
+        <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <div>
+            <h1 className="text-sm font-semibold text-slate-700">
+              {threads.find((t) => t.id === activeThreadId)?.title ?? "No thread selected"}
+            </h1>
+            <p className="text-xs text-slate-400">chat → sandboxed agent → PR → back to chat</p>
+          </div>
+          <SearchBar onSearch={searchMessages} onSelect={setActiveThreadId} />
         </header>
         {activeThreadId
           ? <ThreadConversation threadId={activeThreadId} />
