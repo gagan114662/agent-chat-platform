@@ -56,6 +56,19 @@ describe("OctokitGitHubService", () => {
     expect(ctx).not.toContain("ci/test");
   });
 
+  it("lists review comments for a PR", async () => {
+    nock(api).get("/repos/o/r/pulls/7/comments").reply(200, [
+      { id: 101, body: "fix this", user: { login: "alice" }, path: "src/a.ts", line: 12 },
+      { id: 102, body: "nit", user: { login: "bob" }, path: "src/b.ts", line: null },
+    ]);
+    const svc = new OctokitGitHubService("tok");
+    const comments = await svc.listReviewComments("o", "r", 7);
+    expect(comments).toEqual([
+      { id: 101, body: "fix this", user: "alice", path: "src/a.ts", line: 12 },
+      { id: 102, body: "nit", user: "bob", path: "src/b.ts", line: undefined },
+    ]);
+  });
+
   it("lists changed files for a PR", async () => {
     const patch = "@@ -1,2 +1,3 @@\n context\n-removed\n+added\n+added2";
     nock(api).get("/repos/o/r/pulls/7/files").reply(200, [

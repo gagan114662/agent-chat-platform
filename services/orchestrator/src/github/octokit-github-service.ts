@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest";
-import type { GitHubService, OpenPrInput } from "./github-service.js";
+import type { GitHubService, OpenPrInput, ReviewComment } from "./github-service.js";
 import type { ChecksStatus, PullRequest } from "../types.js";
 import type { ChangedFile } from "../policy/risk.js";
 import { nodeFetch } from "../http/node-fetch.js";
@@ -64,6 +64,17 @@ export class OctokitGitHubService implements GitHubService {
       deletions: f.deletions,
       status: f.status,
       patch: f.patch,
+    }));
+  }
+
+  async listReviewComments(owner: string, repo: string, prNumber: number): Promise<ReviewComment[]> {
+    const res = await this.octokit.pulls.listReviewComments({ owner, repo, pull_number: prNumber });
+    return res.data.map((c) => ({
+      id: c.id,
+      body: c.body,
+      user: c.user?.login ?? "?",
+      path: c.path,
+      line: c.line ?? undefined,
     }));
   }
 }
