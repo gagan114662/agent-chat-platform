@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, sql as dsql } from "drizzle-orm";
 import type { DB } from "../db/client.js";
-import { runs, runEvents, incidents } from "../db/schema.js";
+import { runs, runEvents, incidents, logEvents } from "../db/schema.js";
 import { TERMINAL_RUN_STATES } from "../tasks/runs.js";
 
 export interface DebugAnswer {
@@ -11,7 +11,10 @@ export interface DebugAnswer {
 
 const FAILURE_STATES = ["checks_failed", "error", "timeout"] as const;
 const HELP =
-  "I can answer: a run's status, recent failures, run counts by state, or incidents.";
+  "I can answer: a run's status, recent failures, run counts by state, incidents, or recent error logs.";
+
+// Log levels treated as errors for the "recent errors" branch (#95).
+const LOG_ERROR_LEVELS = ["error", "fatal"] as const;
 
 // answerDebug — #92. A deterministic, rule-based router over the org's telemetry
 // (runs / run_events / incidents). NO LLM: it pattern-matches the question and runs
@@ -72,7 +75,20 @@ export async function answerDebug(db: DB, orgId: string, question: string): Prom
     return { kind: "counts", answer, data: { counts, total, failed } };
   }
 
-  // 4) Incidents / alerts.
+  // 4) Recent error logs (#95): "recent errors" / "error logs" / "logs". The
+  // most recent error/fatal log_events for the org, over the unified log store.
+  if (/(recent errors?|error logs?|\blogs?\b|log events?)/.test(q)) {
+    const rows = await db.select().from(logEvents)
+      .where(and(eq(logEvents.orgId, orgId), inArray(logEvents.level, [...LOG_ERROR_LEVELS])))
+      .orderBy(desc(logEvents.ts))
+      .limit(20);
+    const answer = rows.length
+      ? `${rows.length} recent error log(s): ${rows.map((l) => `[${l.source}] ${l.message}`).join("; ")}.`
+      : "No error logs in this org.";
+    return { kind: "recent-errors", answer, data: rows };
+  }
+
+  // 5) Incidents / alerts.
   if (/(incidents?|alerts?)/.test(q)) {
     const rows = await db.select().from(incidents)
       .where(eq(incidents.orgId, orgId))
@@ -84,7 +100,7 @@ export async function answerDebug(db: DB, orgId: string, question: string): Prom
     return { kind: "incidents", answer, data: rows };
   }
 
-  // 5) Fallback — honest help text (no fabricated answer).
+  // 6) Fallback — honest help text (no fabricated answer).
   return { kind: "unknown", answer: HELP, data: null };
 }
 

@@ -5,6 +5,7 @@ const TABLES = [
   "sessions",
   "read_state",
   "memory_edges", "memory_nodes",
+  "log_events",
   "incidents",
   "run_checkpoints", "run_events", "runs", "tasks", "messages", "threads", "channels",
   "agents", "members", "repos", "workspaces", "orgs",

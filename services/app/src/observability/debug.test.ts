@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { answerDebug } from "./debug.js";
-import { orgs, runs, runEvents, incidents } from "../db/schema.js";
+import { orgs, runs, runEvents, incidents, logEvents } from "../db/schema.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
@@ -24,6 +24,11 @@ async function seed() {
   await h.db.insert(incidents).values([
     { id: "oA:i1", orgId: "oA", source: "alert", severity: "high", title: "CI red streak" },
     { id: "oB:i9", orgId: "oB", source: "alert", severity: "low", title: "other org" },
+  ]);
+  await h.db.insert(logEvents).values([
+    { id: "oA:l1", orgId: "oA", source: "app", level: "error", message: "db down: refused" },
+    { id: "oA:l2", orgId: "oA", source: "app", level: "info", message: "started ok" },
+    { id: "oB:l9", orgId: "oB", source: "app", level: "error", message: "other org error" },
   ]);
 }
 
@@ -67,6 +72,15 @@ describe("answerDebug", () => {
     expect(a.kind).toBe("incidents");
     const titles = (a.data as { title: string }[]).map((i) => i.title);
     expect(titles).toEqual(["CI red streak"]);
+  });
+
+  it("recent errors returns the org's error-level log events only", async () => {
+    const a = await answerDebug(h.db, "oA", "show me recent errors in the logs");
+    expect(a.kind).toBe("recent-errors");
+    const msgs = (a.data as { message: string }[]).map((l) => l.message);
+    expect(msgs).toContain("db down: refused");
+    expect(msgs).not.toContain("started ok");        // info level excluded
+    expect(msgs).not.toContain("other org error");   // org-scoped
   });
 
   it("unknown question returns the help fallback", async () => {

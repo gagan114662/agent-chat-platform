@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, jsonb, boolean, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, jsonb, boolean, uniqueIndex, index, primaryKey } from "drizzle-orm/pg-core";
 
 export const orgs = pgTable("orgs", {
   id: text("id").primaryKey(),
@@ -149,6 +149,20 @@ export const incidents = pgTable("incidents", {
   taskId: text("task_id"),                     // nullable — set when a Task is opened
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// #95 log_events: the unified, any-source/any-format log store. Each ingested
+// record (NDJSON / JSON-array / plain text line) normalizes to one row with a
+// `level` + `message` + the original `raw`. Error-level rows derive incidents
+// (reusing the #55 table). Indexed on (orgId, ts) for org-scoped recency queries.
+export const logEvents = pgTable("log_events", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  source: text("source").notNull(),                 // e.g. "app", "nginx", "worker"
+  level: text("level").notNull(),                    // "error" | "warn" | "info" | ...
+  message: text("message").notNull(),
+  raw: jsonb("raw").notNull().default({}),
+  ts: timestamp("ts", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ orgTsIx: index("log_events_org_ts_ix").on(t.orgId, t.ts) }));
 
 // #61 read-state: per-user, per-thread read marker. `lastReadAt` is the
 // timestamp the user last read the thread; messages with createdAt > lastReadAt
