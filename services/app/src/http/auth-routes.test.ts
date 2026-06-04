@@ -63,4 +63,21 @@ describe("auth routes", () => {
       delete process.env.AUTH_REQUIRE_SESSION;
     }
   });
+
+  it("strict mode rejects unauthenticated requests and hides /auth/members", async () => {
+    process.env.AUTH_REQUIRE_SESSION = "true";
+    try {
+      const app = makeApp();
+      const me = await app.inject({ method: "GET", url: "/auth/me" });
+      expect(me.statusCode).toBe(401);
+      const members = await app.inject({ method: "GET", url: "/auth/members" });
+      expect(members.statusCode).toBe(404);
+      // login remains public
+      const login = await app.inject({ method: "GET", url: "/auth/login" }); // GET not allowed but path is public → 404 routing, not 401
+      expect(login.statusCode).not.toBe(401);
+      await app.close();
+    } finally {
+      delete process.env.AUTH_REQUIRE_SESSION;
+    }
+  });
 });
