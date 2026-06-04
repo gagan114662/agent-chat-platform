@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "./components/Sidebar.js";
+import { CommandPalette } from "./components/CommandPalette.js";
+import { buildCommands, type Command } from "./lib/commands.js";
 import { ThreadView } from "./components/ThreadView.js";
 import { Composer } from "./components/Composer.js";
 import { SearchBar } from "./components/SearchBar.js";
@@ -28,6 +30,9 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
   const [view, setView] = useState<"thread" | "context" | "inbox">("thread");
   const [unreads, setUnreads] = useState<Record<string, number>>({});
   const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [search, setSearch] = useState<{ q: string; nonce: number } | undefined>(undefined);
+  const searchRef = useRef<HTMLInputElement>(null);
   const memory = useMemory();
 
   // #61: refetch unread counts + mentions inbox (on mount, after WS messages, after mark-read).
@@ -45,6 +50,32 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
     setUnreads((prev) => { const next = { ...prev }; delete next[id]; return next; });
     markThreadRead(id).then(refreshNotifications).catch(() => {});
   };
+
+  // Navigating to a channel selects its first thread (no dedicated channel view exists).
+  const selectChannel = (channelId: string) => {
+    const first = threads.find((t) => t.channelId === channelId);
+    if (first) selectThread(first.id);
+  };
+
+  // Focus the header search input (used by the "Search messages…" command + /search).
+  // A query (from `/search <q>`) is pushed through state so SearchBar runs it.
+  const focusSearch = (query?: string) => {
+    searchRef.current?.focus();
+    // Bump a nonce so SearchBar re-runs even when the same query repeats.
+    if (query) setSearch((prev) => ({ q: query, nonce: (prev?.nonce ?? 0) + 1 }));
+  };
+
+  // ⌘K / Ctrl+K toggles the command palette.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Load channels + repos once, then threads for each channel.
   useEffect(() => {
@@ -80,6 +111,28 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
     selectThread(t.id);
   };
 
+  // Build the command registry from current nav state + the real App actions.
+  // New thread/DM are created via inline Sidebar forms (no programmatic modal),
+  // so those commands focus the sidebar's "New thread" input as the closest action.
+  const newThreadRef = useRef<HTMLInputElement>(null);
+  const commands = useMemo(
+    () => buildCommands({
+      channels: channels.map((c) => ({ id: c.id, name: c.name })),
+      threads: [...threads, ...dms].map((t) => ({ id: t.id, title: t.title })),
+      actions: {
+        selectChannel,
+        selectThread,
+        openNewThread: () => newThreadRef.current?.focus(),
+        openNewDm: () => newThreadRef.current?.focus(),
+        openInbox: () => setView("inbox"),
+        focusSearch,
+      },
+    }),
+    // selectChannel/selectThread close over `threads`; rebuild when nav state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [channels, threads, dms],
+  );
+
   return (
     <div className="flex h-screen bg-[#f0f0f7] text-[#2b2b2b]">
       <Sidebar
@@ -98,6 +151,7 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
         onStartDm={onStartDm}
         onOpenContext={() => setView("context")}
         canCreateChannel={role === "admin"}
+        newThreadRef={newThreadRef}
       />
       <main className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-[#e7e7f0] bg-white px-4 py-3">
@@ -112,7 +166,7 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
             <p className="text-xs text-neutral-400">chat → sandboxed agent → PR → back to chat</p>
           </div>
           <div className="flex items-center gap-3">
-            <SearchBar onSearch={searchMessages} onSelect={setActiveThreadId} />
+            <SearchBar key={search?.nonce ?? 0} onSearch={searchMessages} onSelect={setActiveThreadId} inputRef={searchRef} initialQuery={search?.q} />
             <button onClick={onLogout} className="text-xs text-neutral-500 hover:text-neutral-800">Sign out ({userId})</button>
           </div>
         </header>
@@ -129,9 +183,10 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
           : view === "inbox"
             ? <InboxPanel inbox={inbox} onSelect={selectThread} />
             : activeThreadId
-              ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} />
+              ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} commands={commands} onSlashSearch={focusSearch} />
               : <div className="flex-1" />}
       </main>
+      <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }
@@ -162,7 +217,7 @@ function InboxPanel({ inbox, onSelect }: { inbox: InboxItem[]; onSelect: (id: st
 }
 
 // Separate component so the stream hook re-subscribes when the active thread changes.
-function ThreadConversation({ threadId, onActivity }: { threadId: string; onActivity?: () => void }) {
+function ThreadConversation({ threadId, onActivity, commands, onSlashSearch }: { threadId: string; onActivity?: () => void; commands?: Command[]; onSlashSearch?: (q: string) => void }) {
   const { messages, send, refetch } = useThreadStream(threadId, onActivity);
   const onApprove = (runId: string) => { approveRun(runId).then(refetch).catch(() => {}); };
   const onDecline = (runId: string) => { declineRun(runId).then(refetch).catch(() => {}); };
@@ -179,7 +234,7 @@ function ThreadConversation({ threadId, onActivity }: { threadId: string; onActi
   return (
     <>
       <ThreadView messages={messages} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} onLoadCheckpoints={onLoadCheckpoints} onRestoreCheckpoint={onRestoreCheckpoint} onApprovePlan={onApprovePlan} onRejectPlan={onRejectPlan} />
-      <Composer onSend={send} />
+      <Composer onSend={send} commands={commands} onSlashSearch={onSlashSearch} />
     </>
   );
 }
