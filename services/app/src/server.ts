@@ -5,6 +5,7 @@ import { ThreadPubSub } from "./realtime/pubsub.js";
 import { registerWs } from "./realtime/ws.js";
 import { registerRoutes } from "./http/routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
+import { registerDmRoutes } from "./http/dm-routes.js";
 import { startWorker } from "./fusion/worker.js";
 import { makeTemporalClient } from "./fusion/bridge.js";
 
@@ -20,6 +21,7 @@ export async function buildServer() {
   registerWs(app, pubsub);
   registerRoutes(app, { db, sql, temporal, sandboxUrl: process.env.SANDBOX_URL ?? "http://localhost:8090" });
   registerNavRoutes(app, { db });
+  registerDmRoutes(app, { db });
   return app;
 }
 
