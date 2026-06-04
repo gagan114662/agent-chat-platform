@@ -9,6 +9,7 @@ import { registerTaskRoutes } from "./http/task-routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
 import { registerDmRoutes } from "./http/dm-routes.js";
 import { registerMemoryRoutes } from "./http/memory-routes.js";
+import { registerAgentRoutes } from "./http/agent-routes.js";
 import { registerApprovalRoutes } from "./http/approval-routes.js";
 import { registerPlanRoutes } from "./http/plan-routes.js";
 import { registerDiffRoutes } from "./http/diff-routes.js";
@@ -57,6 +58,7 @@ export async function buildServer() {
   registerNavRoutes(app, { db });
   registerDmRoutes(app, { db });
   registerMemoryRoutes(app, { db });
+  registerAgentRoutes(app, { db });
   registerApprovalRoutes(app, { db });
   registerPlanRoutes(app, { db, sql, temporal, sandboxUrl });
   registerDiffRoutes(app, { db });

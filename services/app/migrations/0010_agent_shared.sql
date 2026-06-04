@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "shared" boolean DEFAULT false NOT NULL;
