@@ -102,3 +102,11 @@ export const runEvents = pgTable("run_events", {
   payload: jsonb("payload").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ seqUx: uniqueIndex("run_events_run_seq_ux").on(t.runId, t.seq) }));
+
+export const sessions = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  memberId: text("member_id").notNull(),
+  orgId: text("org_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
