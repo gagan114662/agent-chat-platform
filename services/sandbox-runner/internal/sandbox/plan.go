@@ -18,6 +18,8 @@ type PlanRequest struct {
 	BaseBranch string `json:"baseBranch"`
 	Intent     string `json:"intent"`
 	Adapter    string `json:"adapter"`
+	Model      string `json:"model,omitempty"`
+	Provider   string `json:"provider,omitempty"`
 	WorkDir    string `json:"-"`
 }
 
@@ -54,6 +56,12 @@ func (r PlanRequest) Validate() error {
 	if r.Intent == "" {
 		return errors.New("intent required")
 	}
+	if err := validModelProvider(r.Model, "model"); err != nil {
+		return err
+	}
+	if err := validModelProvider(r.Provider, "provider"); err != nil {
+		return err
+	}
 	return validRef(r.BaseBranch, "baseBranch")
 }
 
@@ -66,7 +74,7 @@ func Plan(ctx context.Context, req PlanRequest, ad adapter.Adapter, limits Limit
 	if err := checkRepoSize(req.WorkDir, limits.MaxRepoBytes); err != nil {
 		return PlanResult{}, err
 	}
-	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Intent}); err != nil {
+	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Intent, Model: req.Model, Provider: req.Provider}); err != nil {
 		return PlanResult{}, fmt.Errorf("prepare: %w", err)
 	}
 	text, err := ad.Plan(ctx, req.WorkDir, req.Intent)

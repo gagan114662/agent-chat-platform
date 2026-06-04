@@ -71,6 +71,13 @@ type PrepareContext struct {
 	RepoDir string
 	Intent  string
 	Env     map[string]string
+	// Model optionally selects the underlying model (e.g. passed as the claude
+	// CLI --model flag). Empty = the adapter/CLI default (today's behavior).
+	Model string
+	// Provider optionally selects a non-default provider backend ("bedrock",
+	// "vertex"); the adapter maps it to the appropriate provider env. Empty =
+	// the default (Anthropic) provider. Credentials stay deployment env.
+	Provider string
 }
 
 // Adapter is the contract every agent implements. Real adapters (Claude Code,
