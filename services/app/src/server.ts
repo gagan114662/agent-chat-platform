@@ -7,6 +7,7 @@ import { registerRoutes } from "./http/routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
 import { registerDmRoutes } from "./http/dm-routes.js";
 import { registerMemoryRoutes } from "./http/memory-routes.js";
+import { registerApprovalRoutes } from "./http/approval-routes.js";
 import { registerAuth } from "./http/auth-routes.js";
 import { resolveSession } from "./auth/auth.js";
 import { eq } from "drizzle-orm";
@@ -38,6 +39,7 @@ export async function buildServer() {
   registerNavRoutes(app, { db });
   registerDmRoutes(app, { db });
   registerMemoryRoutes(app, { db });
+  registerApprovalRoutes(app, { db });
   return app;
 }
 

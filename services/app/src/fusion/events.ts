@@ -61,12 +61,16 @@ export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
     if (!appended) return;
 
     const isOutcome = e.type === "outcome";
+    // The FusionEvent outcome carries prNumber/prUrl/commitSha but NOT runId. The UI
+    // needs runId on the pr_card to call approve/decline on a held_for_human run, so
+    // attach ctx.runId to the outcome message metadata.
+    const metadata = isOutcome ? { ...(e as any), runId: ctx.runId } : (e as any);
     const msg = await createMessage(db, {
       id: `${ctx.runId}:${mySeq}`,
       orgId: ctx.orgId, threadId: ctx.threadId, authorKind: "agent", authorId: ctx.agentId,
       kind: isOutcome ? "pr_card" : "system",
       body: describe(e),
-      metadata: e as any,
+      metadata,
     });
     await notify(sql, THREAD_CHANNEL, { threadId: ctx.threadId, message: msg });
 
