@@ -62,6 +62,16 @@ export async function syncPrComments(runId: string): Promise<{ synced: number }>
   return res.json();
 }
 
+export async function updatePr(runId: string, patch: { title?: string; body?: string; base?: string }): Promise<{ ok: boolean }> {
+  const res = await fetch(`/runs/${runId}/update-pr`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`updatePr ${res.status}`);
+  return res.json();
+}
+
 export async function listChannels(): Promise<Channel[]> {
   const res = await fetch(`/channels`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`listChannels ${res.status}`);

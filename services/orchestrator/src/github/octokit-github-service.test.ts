@@ -69,6 +69,16 @@ describe("OctokitGitHubService", () => {
     ]);
   });
 
+  it("updates a PR with only the provided fields", async () => {
+    let sentBody: unknown;
+    nock(api)
+      .patch("/repos/o/r/pulls/7", (body) => { sentBody = body; return true; })
+      .reply(200, { number: 7 });
+    const svc = new OctokitGitHubService("tok");
+    await expect(svc.updatePr("o", "r", 7, { title: "x" })).resolves.toBeUndefined();
+    expect(sentBody).toEqual({ title: "x" });
+  });
+
   it("lists changed files for a PR", async () => {
     const patch = "@@ -1,2 +1,3 @@\n context\n-removed\n+added\n+added2";
     nock(api).get("/repos/o/r/pulls/7/files").reply(200, [
