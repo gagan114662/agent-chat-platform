@@ -1,4 +1,4 @@
-import type { Message, Channel, Thread, Repo, SearchResult, Principal } from "./types.js";
+import type { Message, Channel, Thread, Repo, SearchResult, Principal, MemoryGraph, MemoryStats, MemoryKind, MemoryScope } from "./types.js";
 import { authHeaders } from "./auth.js";
 
 export async function listMessages(threadId: string): Promise<Message[]> {
@@ -80,5 +80,20 @@ export async function startDm(peerKind: "human" | "agent", peerId: string): Prom
     body: JSON.stringify({ peerKind, peerId }),
   });
   if (!res.ok) throw new Error(`startDm ${res.status}`);
+  return res.json();
+}
+
+export async function memoryGraph(filter: { kind?: MemoryKind; scope?: MemoryScope } = {}): Promise<MemoryGraph> {
+  const qs = new URLSearchParams();
+  if (filter.kind) qs.set("kind", filter.kind);
+  if (filter.scope) qs.set("scope", filter.scope);
+  const res = await fetch(`/memory/graph?${qs}`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`memoryGraph ${res.status}`);
+  return res.json();
+}
+
+export async function memoryStats(): Promise<MemoryStats> {
+  const res = await fetch(`/memory/stats`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`memoryStats ${res.status}`);
   return res.json();
 }

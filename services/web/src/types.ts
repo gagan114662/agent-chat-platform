@@ -42,3 +42,10 @@ export interface SearchResult {
   kind: MessageKind;
   createdAt: string;
 }
+
+export type MemoryKind = "decision" | "fact" | "preference" | "identity" | "artifact";
+export type MemoryScope = "personal" | "project" | "team" | "org";
+export interface MemoryNode { id: string; orgId: string; kind: MemoryKind; scope: MemoryScope; label: string; body: string; metadata: Record<string, unknown>; createdAt: string; }
+export interface MemoryEdge { id: string; fromId: string; toId: string; relation: string; }
+export interface MemoryGraph { nodes: MemoryNode[]; edges: MemoryEdge[]; }
+export interface MemoryStats { nodes: number; edges: number; }
