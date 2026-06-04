@@ -134,6 +134,13 @@
       "when": 1781320000000,
       "tag": "0018_teams",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1781410000000,
+      "tag": "0019_channel_archived",
+      "breakpoints": true
     }
   ]
 }

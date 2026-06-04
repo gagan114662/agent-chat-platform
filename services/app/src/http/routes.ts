@@ -19,7 +19,13 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
     const { orgId } = actor(req);
     const [thread] = await d.db.select().from(threads).where(and(eq(threads.id, threadId), eq(threads.orgId, orgId)));
     if (!thread) return reply.code(404).send({ error: "thread not found" });
-    return listMessages(d.db, threadId, orgId);
+    const q = req.query as { before?: string; after?: string; limit?: string };
+    const limit = q.limit !== undefined ? Number(q.limit) : undefined;
+    return listMessages(d.db, threadId, orgId, {
+      before: q.before,
+      after: q.after,
+      limit: Number.isFinite(limit) ? limit : undefined,
+    });
   });
 
   app.post("/threads/:id/messages", async (req, reply) => {

@@ -49,6 +49,7 @@ export const channels = pgTable("channels", {
   orgId: text("org_id").notNull(),
   workspaceId: text("workspace_id").notNull(),
   name: text("name").notNull(),
+  archived: boolean("archived").notNull().default(false), // #89: archived channels hidden from GET /channels by default
 });
 
 export const threads = pgTable("threads", {

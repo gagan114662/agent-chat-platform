@@ -111,4 +111,40 @@ describe("thread message routes", () => {
     expect(asOwner.json()).toEqual([]);
     await app.close();
   });
+
+  it("GET /threads/:id/messages cursor pagination: ?limit, ?before, ?after (#89)", async () => {
+    const app = makeApp();
+    // Seed 5 messages with deterministic ids m1..m5, ascending createdAt.
+    for (let i = 1; i <= 5; i++) {
+      await createMessage(h.db, {
+        id: `m${i}`, orgId: "o1", threadId: "t1", authorKind: "human", authorId: "u",
+        body: `body${i}`,
+      });
+      // stagger createdAt deterministically
+      await h.db.update((await import("../db/schema.js")).messages)
+        .set({ createdAt: new Date(`2024-01-0${i}T00:00:00Z`) })
+        .where(eq((await import("../db/schema.js")).messages.id, `m${i}`));
+    }
+
+    // default (no params): returns all 5, ascending (backward-compatible)
+    const all = await app.inject({ method: "GET", url: "/threads/t1/messages", headers: { "x-org-id": "o1" } });
+    expect(all.json().map((m: { id: string }) => m.id)).toEqual(["m1", "m2", "m3", "m4", "m5"]);
+
+    // ?limit=2 → the newest 2 (ascending output)
+    const limited = await app.inject({ method: "GET", url: "/threads/t1/messages?limit=2", headers: { "x-org-id": "o1" } });
+    expect(limited.json().map((m: { id: string }) => m.id)).toEqual(["m4", "m5"]);
+
+    // ?before=m3 → the messages older than m3 (m1, m2)
+    const before = await app.inject({ method: "GET", url: "/threads/t1/messages?before=m3", headers: { "x-org-id": "o1" } });
+    expect(before.json().map((m: { id: string }) => m.id)).toEqual(["m1", "m2"]);
+
+    // ?before=m3&limit=1 → just the newest older one (m2)
+    const before1 = await app.inject({ method: "GET", url: "/threads/t1/messages?before=m3&limit=1", headers: { "x-org-id": "o1" } });
+    expect(before1.json().map((m: { id: string }) => m.id)).toEqual(["m2"]);
+
+    // ?after=m3 → the messages newer than m3 (m4, m5)
+    const after = await app.inject({ method: "GET", url: "/threads/t1/messages?after=m3", headers: { "x-org-id": "o1" } });
+    expect(after.json().map((m: { id: string }) => m.id)).toEqual(["m4", "m5"]);
+    await app.close();
+  });
 });

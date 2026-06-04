@@ -120,6 +120,90 @@ describe("nav routes", () => {
     await app.close();
   });
 
+  it("PATCH /channels/:id renames (admin); non-admin is 403 (#89)", async () => {
+    const app = makeApp();
+    const ok = await app.inject({
+      method: "PATCH", url: "/channels/c1",
+      headers: { "x-org-id": "o1", "x-user-id": "m1", "content-type": "application/json" },
+      payload: { name: "renamed" },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().name).toBe("renamed");
+    const list = await app.inject({ method: "GET", url: "/channels", headers: { "x-org-id": "o1" } });
+    expect(list.json().map((c: { name: string }) => c.name)).toContain("renamed");
+
+    const denied = await app.inject({
+      method: "PATCH", url: "/channels/c1",
+      headers: { "x-org-id": "o1", "x-user-id": "reg", "content-type": "application/json" },
+      payload: { name: "nope" },
+    });
+    expect(denied.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("PATCH /channels/:id from another org is 404 (cross-org) (#89)", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "O2" });
+    await h.db.insert(workspaces).values({ id: "w2", orgId: "o2", name: "W2" });
+    await h.db.insert(members).values({ id: "m2", orgId: "o2", workspaceId: "w2", displayName: "Other", role: "admin" });
+    const app = makeApp();
+    // o2 admin tries to rename o1's channel → 404 (org-scoped), not a leak
+    const res = await app.inject({
+      method: "PATCH", url: "/channels/c1",
+      headers: { "x-org-id": "o2", "x-user-id": "m2", "content-type": "application/json" },
+      payload: { name: "hijack" },
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("POST /channels/:id/archive hides it from GET /channels; ?includeArchived=1 shows it (#89)", async () => {
+    const app = makeApp();
+    const arch = await app.inject({
+      method: "POST", url: "/channels/c1/archive",
+      headers: { "x-org-id": "o1", "x-user-id": "m1", "content-type": "application/json" },
+      payload: { archived: true },
+    });
+    expect(arch.statusCode).toBe(200);
+    expect(arch.json().archived).toBe(true);
+
+    const def = await app.inject({ method: "GET", url: "/channels", headers: { "x-org-id": "o1" } });
+    expect(def.json().map((c: { id: string }) => c.id)).not.toContain("c1");
+
+    const inc = await app.inject({ method: "GET", url: "/channels?includeArchived=1", headers: { "x-org-id": "o1" } });
+    expect(inc.json().map((c: { id: string }) => c.id)).toContain("c1");
+
+    // unarchive → visible again
+    const un = await app.inject({
+      method: "POST", url: "/channels/c1/archive",
+      headers: { "x-org-id": "o1", "x-user-id": "m1", "content-type": "application/json" },
+      payload: { archived: false },
+    });
+    expect(un.statusCode).toBe(200);
+    const back = await app.inject({ method: "GET", url: "/channels", headers: { "x-org-id": "o1" } });
+    expect(back.json().map((c: { id: string }) => c.id)).toContain("c1");
+    await app.close();
+  });
+
+  it("POST /channels/:id/archive by a non-admin is 403; cross-org is 404 (#89)", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "O2" });
+    await h.db.insert(workspaces).values({ id: "w2", orgId: "o2", name: "W2" });
+    await h.db.insert(members).values({ id: "m2", orgId: "o2", workspaceId: "w2", displayName: "Other", role: "admin" });
+    const app = makeApp();
+    const denied = await app.inject({
+      method: "POST", url: "/channels/c1/archive",
+      headers: { "x-org-id": "o1", "x-user-id": "reg", "content-type": "application/json" },
+      payload: { archived: true },
+    });
+    expect(denied.statusCode).toBe(403);
+    const cross = await app.inject({
+      method: "POST", url: "/channels/c1/archive",
+      headers: { "x-org-id": "o2", "x-user-id": "m2", "content-type": "application/json" },
+      payload: { archived: true },
+    });
+    expect(cross.statusCode).toBe(404);
+    await app.close();
+  });
+
   it("GET /search filters by body, org-scoped", async () => {
     const app = makeApp();
     // seed a thread + message to find
