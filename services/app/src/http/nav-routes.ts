@@ -1,12 +1,45 @@
 import type { FastifyInstance } from "fastify";
+import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel } from "../nav/nav.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, renameChannel, setChannelArchived } from "../nav/nav.js";
 import { searchMessages } from "../search/search.js";
+import { ensureDefaultAssistant } from "../agents/default-assistant.js";
+import { workspaces } from "../db/schema.js";
 import { roleOf, can } from "../rbac/rbac.js";
 
 export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
-  app.get("/channels", async (req) => listChannels(d.db, actor(req).orgId));
+  app.get("/channels", async (req) => {
+    const includeArchived = (req.query as { includeArchived?: string }).includeArchived === "1";
+    return listChannels(d.db, actor(req).orgId, { includeArchived });
+  });
+
+  // #89: rename a channel (admin-gated, org-scoped). Cross-org / unknown id → 404.
+  app.patch("/channels/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { name } = req.body as { name?: string };
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "channel:manage")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
+    if (!name?.trim()) return reply.code(400).send({ error: "name required" });
+    const channel = await renameChannel(d.db, { orgId, channelId: id, name: name.trim() });
+    if (!channel) return reply.code(404).send({ error: "channel not found" });
+    return channel;
+  });
+
+  // #89: archive/unarchive a channel (admin-gated, org-scoped). Cross-org → 404.
+  app.post("/channels/:id/archive", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { archived } = (req.body ?? {}) as { archived?: boolean };
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "channel:manage")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
+    const channel = await setChannelArchived(d.db, { orgId, channelId: id, archived: archived ?? true });
+    if (!channel) return reply.code(404).send({ error: "channel not found" });
+    return channel;
+  });
 
   app.get("/channels/:id/threads", async (req) => {
     const { id } = req.params as { id: string };
@@ -39,6 +72,20 @@ export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
     if (!name?.trim()) return reply.code(400).send({ error: "name required" });
     const channel = await createChannel(d.db, { orgId, name: name.trim() });
     return reply.code(201).send(channel);
+  });
+
+  // #87: provision the built-in @iris assistant for a workspace (admin-gated,
+  // org-scoped, idempotent). Cross-org / unknown workspace → 404.
+  app.post("/workspaces/:id/ensure-assistant", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "channel:manage")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
+    const [ws] = await d.db.select().from(workspaces).where(and(eq(workspaces.id, id), eq(workspaces.orgId, orgId)));
+    if (!ws) return reply.code(404).send({ error: "workspace not found" });
+    const agent = await ensureDefaultAssistant(d.db, { orgId, workspaceId: id });
+    return agent;
   });
 
   app.get("/search", async (req) => {
