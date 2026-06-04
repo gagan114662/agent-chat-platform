@@ -14,7 +14,7 @@ func TestRun(t *testing.T) {
 		Intent:     "do the thing",
 		Branch:     "feature/run",
 		WorkDir:    filepath.Join(t.TempDir(), "co"),
-	}, FakeAgent{})
+	}, FakeAgent{}, LimitsFromEnv())
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

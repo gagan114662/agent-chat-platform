@@ -73,9 +73,12 @@ func validRef(ref, field string) error {
 }
 
 // Run clones, applies the agent, commits and pushes a branch.
-func Run(ctx context.Context, req RunRequest, agent Agent) (RunResult, error) {
-	if err := CloneInto(ctx, req.RepoURL, req.BaseBranch, req.WorkDir); err != nil {
+func Run(ctx context.Context, req RunRequest, agent Agent, limits Limits) (RunResult, error) {
+	if err := CloneIntoDepth(ctx, req.RepoURL, req.BaseBranch, req.WorkDir, limits.CloneDepth); err != nil {
 		return RunResult{}, fmt.Errorf("clone: %w", err)
+	}
+	if err := checkRepoSize(req.WorkDir, limits.MaxRepoBytes); err != nil {
+		return RunResult{}, err
 	}
 	if err := agent.Apply(ctx, req.WorkDir, req.Intent); err != nil {
 		return RunResult{}, fmt.Errorf("agent: %w", err)
