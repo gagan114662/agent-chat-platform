@@ -194,6 +194,22 @@ export const teamMembers = pgTable("team_members", {
   memberId: text("member_id").notNull(),
 }, (t) => ({ pk: primaryKey({ columns: [t.orgId, t.teamId, t.memberKind, t.memberId] }) }));
 
+// #83 api_keys: org-scoped, hashed, revocable API keys for agent authentication.
+// Only the sha256 hex `keyHash` is stored — the plaintext `acp_…` key is returned
+// ONCE at issue time and never persisted or logged. `scopes` records the key's
+// channel/action grants (enforced via a requireScope follow-up). The auth
+// preHandler resolves an `acp_`-prefixed bearer to a principal until `revoked`.
+export const apiKeys = pgTable("api_keys", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  name: text("name").notNull(),
+  keyHash: text("key_hash").notNull(),
+  scopes: jsonb("scopes").notNull().default({}),
+  revoked: boolean("revoked").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+}, (t) => ({ keyHashIx: index("api_keys_key_hash_ix").on(t.keyHash) }));
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull(),

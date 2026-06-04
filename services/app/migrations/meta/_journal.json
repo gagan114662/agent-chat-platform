@@ -141,6 +141,13 @@
       "when": 1781410000000,
       "tag": "0019_channel_archived",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1781500000000,
+      "tag": "0020_api_keys",
+      "breakpoints": true
     }
   ]
 }
