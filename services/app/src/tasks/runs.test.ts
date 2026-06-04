@@ -23,4 +23,9 @@ describe("run state machine", () => {
     expect(canTransition("running", "held_for_human")).toBe(true);
     expect(canTransition("held_for_human", "running")).toBe(false);
   });
+  it("allows held_for_human→merged (human approval) but not other transitions out", () => {
+    expect(canTransition("held_for_human", "merged")).toBe(true);
+    expect(canTransition("held_for_human", "running")).toBe(false);
+    expect(canTransition("merged", "running")).toBe(false); // merged stays terminal
+  });
 });

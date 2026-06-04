@@ -7,7 +7,7 @@ const TRANSITIONS: Record<RunState, RunState[]> = {
   checks_failed: [],
   timeout: [],
   error: [],
-  held_for_human: [],
+  held_for_human: ["merged"], // human approval gate: a held run can be approved → merged
 };
 
 export function canTransition(from: RunState, to: RunState): boolean {
