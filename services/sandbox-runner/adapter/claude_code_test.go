@@ -41,6 +41,38 @@ func TestClaudeCodeAdapter(t *testing.T) {
 	}
 }
 
+// TestClaudeCodeAdapterInjectsBuiltinSkills verifies the embedded built-in skill
+// set is present in repoDir/.claude/skills/ DURING the agent exec and removed
+// AFTER Run returns (so the committed tree stays clean), layered on quarantine.
+func TestClaudeCodeAdapterInjectsBuiltinSkills(t *testing.T) {
+	dir := t.TempDir()
+	skillPath := filepath.Join(dir, ".claude", "skills", "code-review", "SKILL.md")
+
+	var presentDuringExec bool
+	a := &ClaudeCodeAdapter{
+		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
+		exec: func(ctx context.Context, d, intent string, onLine func(string)) error {
+			_, statErr := os.Stat(skillPath)
+			presentDuringExec = statErr == nil
+			onLine("ran")
+			return nil
+		},
+	}
+
+	if err := a.Run(context.Background(), dir, "do work", func(Event) {}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !presentDuringExec {
+		t.Fatal("built-in skill must be present during the agent exec")
+	}
+	if _, err := os.Stat(skillPath); !os.IsNotExist(err) {
+		t.Fatalf("built-in skill must be gone after Run: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".claude")); !os.IsNotExist(err) {
+		t.Fatalf(".claude must be pruned after Run: %v", err)
+	}
+}
+
 func TestClaudeCodeAdapterMissingCLI(t *testing.T) {
 	a := &ClaudeCodeAdapter{lookPath: func(string) (string, error) { return "", errors.New("nope") }}
 	if err := a.Prepare(context.Background(), PrepareContext{}); err == nil {

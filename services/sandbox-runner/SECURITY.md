@@ -31,6 +31,13 @@ These are defense-in-depth *inside* the container, not a substitute for it:
   `.github/copilot-instructions.md`, `.aider.conf.yml`, `.windsurfrules`) are moved aside
   for the duration of the run and restored afterward, so an untrusted clone cannot inject
   trusted instructions/skills. The committed tree/diff is unaffected.
+- **Built-in skills (#48):** a small, trusted skill set is embedded in the runner binary
+  (`//go:embed`, overridable via `ACP_BUILTIN_SKILLS_DIR`) and injected into the clone's
+  `.claude/skills/` **after** the quarantine above, then removed before commit (defer-LIFO:
+  skills-cleanup runs before quarantine-restore, so the committed tree is unchanged). These
+  are trusted because they ship with the runner. Future **optional/community** skills are
+  untrusted code paths and must be authorized + sandboxed like adapters (#38) — see
+  `SKILLS.md`.
 - **Prompt bound (#49):** `intent`/`notes` are length-bounded (`ACP_MAX_PROMPT_BYTES`,
   default 16 KiB); oversize prompts are rejected before the agent is exec'd.
 - **Child-env scrub (#49):** the agent process is started with platform/host secrets
