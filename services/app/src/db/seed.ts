@@ -13,7 +13,9 @@ await db.insert(members).values({ id: "m1", orgId: "o1", workspaceId: "w1", disp
 await db.update(members).set({ passwordHash: hashPassword(process.env.DEV_PASSWORD ?? "dev") }).where(eq(members.id, "m1"));
 await db.insert(repos).values({ id: "r1", orgId: "o1", workspaceId: "w1", githubOwner: owner, githubName: repo, defaultBranch: "main", tokenEnvVar: "E2E_GITHUB_TOKEN" }).onConflictDoNothing();
 await db.insert(channels).values({ id: "c1", orgId: "o1", workspaceId: "w1", name: "general" }).onConflictDoNothing();
-await db.insert(threads).values({ id: "t1", orgId: "o1", channelId: "c1", title: "Demo thread", repoId: "r1" }).onConflictDoNothing();
+// Upsert so re-seeding an existing demo thread (from an earlier run) repairs its repo binding.
+await db.insert(threads).values({ id: "t1", orgId: "o1", channelId: "c1", title: "Demo thread", repoId: "r1" })
+  .onConflictDoUpdate({ target: threads.id, set: { channelId: "c1", repoId: "r1" } });
 await db.insert(agents).values({ id: "a1", orgId: "o1", workspaceId: "w1", handle: "coder", displayName: "Coder", adapter: "fake", config: {} }).onConflictDoNothing();
 await sql.end();
 console.log("seeded");
