@@ -1,17 +1,22 @@
 import { useState } from "react";
-import type { Channel, Thread, Repo } from "../types.js";
+import type { Channel, Thread, Repo, Principal } from "../types.js";
 import { NewThreadForm } from "./NewThreadForm.js";
+import { NewDmPicker } from "./NewDmPicker.js";
 
 export function Sidebar({
-  channels, threads, repos, activeThreadId, onSelectThread, onCreateThread, onCreateChannel,
+  channels, threads, dms, principals, repos, activeThreadId,
+  onSelectThread, onCreateThread, onCreateChannel, onStartDm,
 }: {
   channels: Channel[];
   threads: Thread[];
+  dms: Thread[];
+  principals: Principal[];
   repos: Repo[];
   activeThreadId: string | null;
   onSelectThread: (id: string) => void;
   onCreateThread: (title: string, repoId?: string) => void;
   onCreateChannel: (name: string) => void;
+  onStartDm: (peerKind: "human" | "agent", peerId: string) => void;
 }) {
   const [channelName, setChannelName] = useState("");
   const createChannel = () => {
@@ -20,6 +25,15 @@ export function Sidebar({
     onCreateChannel(n);
     setChannelName("");
   };
+  const threadButton = (t: Thread) => (
+    <button
+      key={t.id}
+      onClick={() => onSelectThread(t.id)}
+      className={`block w-full rounded-md px-2 py-1.5 text-left ${t.id === activeThreadId ? "bg-indigo-100 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-100"}`}
+    >
+      {t.title}
+    </button>
+  );
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-slate-50">
       <div className="px-4 py-4 text-sm font-semibold text-slate-700">Demo Workspace</div>
@@ -27,17 +41,14 @@ export function Sidebar({
         {channels.map((c) => (
           <div key={c.id} className="mb-2">
             <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-400"># {c.name}</div>
-            {threads.filter((t) => t.channelId === c.id).map((t) => (
-              <button
-                key={t.id}
-                onClick={() => onSelectThread(t.id)}
-                className={`block w-full rounded-md px-2 py-1.5 text-left ${t.id === activeThreadId ? "bg-indigo-100 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-100"}`}
-              >
-                {t.title}
-              </button>
-            ))}
+            {threads.filter((t) => t.channelId === c.id).map(threadButton)}
           </div>
         ))}
+        <div className="mb-2">
+          <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Direct Messages</div>
+          {dms.map(threadButton)}
+          <NewDmPicker principals={principals} onStartDm={onStartDm} />
+        </div>
       </nav>
       <div className="flex gap-1 px-3 pt-2">
         <input
