@@ -57,13 +57,14 @@ describe("OctokitGitHubService", () => {
   });
 
   it("lists changed files for a PR", async () => {
+    const patch = "@@ -1,2 +1,3 @@\n context\n-removed\n+added\n+added2";
     nock(api).get("/repos/o/r/pulls/7/files").reply(200, [
-      { filename: "src/a.ts", additions: 3, deletions: 1, status: "modified" },
+      { filename: "src/a.ts", additions: 3, deletions: 1, status: "modified", patch },
       { filename: "README.md", additions: 1, deletions: 0, status: "added" },
     ]);
     const svc = new OctokitGitHubService("tok");
     const files = await svc.getChangedFiles("o", "r", 7);
     expect(files.map((f) => f.filename)).toEqual(["src/a.ts", "README.md"]);
-    expect(files[0]).toMatchObject({ additions: 3, deletions: 1, status: "modified" });
+    expect(files[0]).toMatchObject({ additions: 3, deletions: 1, status: "modified", patch });
   });
 });

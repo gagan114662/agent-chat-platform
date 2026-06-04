@@ -63,6 +63,7 @@ export class OctokitGitHubService implements GitHubService {
       additions: f.additions,
       deletions: f.deletions,
       status: f.status,
+      patch: f.patch,
     }));
   }
 }
