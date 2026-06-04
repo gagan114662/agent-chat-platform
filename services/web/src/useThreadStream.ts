@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Message } from "./types.js";
-import { listMessages, postMessage } from "./api.js";
-import { getToken } from "./auth.js";
-
-function wsUrl(threadId: string): string {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const token = getToken();
-  const q = `threadId=${encodeURIComponent(threadId)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
-  return `${proto}://${location.host}/ws?${q}`;
-}
+import { listMessages, postMessage, getWsTicket } from "./api.js";
 
 export function useThreadStream(threadId: string) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -31,10 +23,17 @@ export function useThreadStream(threadId: string) {
       for (const m of hist) append(m);
     }).catch(() => {});
 
-    ws = new WebSocket(wsUrl(threadId));
-    ws.onmessage = (e) => {
-      try { append(JSON.parse(e.data) as Message); } catch { /* ignore non-JSON */ }
-    };
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    // Fetch a short-lived single-use ticket first, then open the socket — the token
+    // never rides in the WS URL (proxy-loggable). Falls back to no ticket if none.
+    getWsTicket().then((ticket) => {
+      if (cancelled) return;
+      const q = `threadId=${encodeURIComponent(threadId)}${ticket ? `&ticket=${encodeURIComponent(ticket)}` : ""}`;
+      ws = new WebSocket(`${proto}://${location.host}/ws?${q}`);
+      ws.onmessage = (e) => {
+        try { append(JSON.parse(e.data) as Message); } catch { /* ignore non-JSON */ }
+      };
+    }).catch(() => {});
 
     return () => { cancelled = true; ws?.close(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
