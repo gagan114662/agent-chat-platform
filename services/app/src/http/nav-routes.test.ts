@@ -90,6 +90,25 @@ describe("nav routes", () => {
     await app.close();
   });
 
+  it("POST /channels/:id/threads by a viewer is 403; a member succeeds (#29)", async () => {
+    await h.db.insert(members).values({ id: "vw", orgId: "o1", workspaceId: "w1", displayName: "Viewer", role: "viewer" });
+    const app = makeApp();
+    const denied = await app.inject({
+      method: "POST", url: "/channels/c1/threads",
+      headers: { "x-org-id": "o1", "x-user-id": "vw", "content-type": "application/json" },
+      payload: { title: "nope", repoId: "r1" },
+    });
+    expect(denied.statusCode).toBe(403);
+    // a member (reg) can still create threads
+    const ok = await app.inject({
+      method: "POST", url: "/channels/c1/threads",
+      headers: { "x-org-id": "o1", "x-user-id": "reg", "content-type": "application/json" },
+      payload: { title: "yes", repoId: "r1" },
+    });
+    expect(ok.statusCode).toBe(201);
+    await app.close();
+  });
+
   it("POST /channels as a non-admin is 403", async () => {
     const app = makeApp();
     const res = await app.inject({

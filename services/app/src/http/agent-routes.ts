@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
 import { setAgentShared } from "../agents/agents.js";
-import { roleOf } from "../rbac/rbac.js";
+import { roleOf, can } from "../rbac/rbac.js";
 
 export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
   // #28: toggle whether an agent is shared org-wide (admin only, org-scoped).
@@ -10,7 +10,7 @@ export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
     const { id } = req.params as { id: string };
     const { shared } = req.body as { shared: boolean };
     const { orgId, userId } = actor(req);
-    if ((await roleOf(d.db, userId, orgId)) !== "admin") {
+    if (!can(await roleOf(d.db, userId, orgId), "agent:share")) {
       return reply.code(403).send({ error: "forbidden" });
     }
     if (typeof shared !== "boolean") return reply.code(400).send({ error: "shared (boolean) required" });

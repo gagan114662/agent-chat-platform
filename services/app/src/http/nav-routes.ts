@@ -16,7 +16,10 @@ export function registerNavRoutes(app: FastifyInstance, d: { db: DB }) {
   app.post("/channels/:id/threads", async (req, reply) => {
     const { id } = req.params as { id: string };
     const { title, repoId } = req.body as { title: string; repoId?: string };
-    const { orgId } = actor(req);
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "thread:create")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
     try {
       const thread = await createThread(d.db, { orgId, channelId: id, title, repoId });
       return reply.code(201).send(thread);

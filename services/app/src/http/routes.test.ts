@@ -4,7 +4,7 @@ import Fastify from "fastify";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { registerRoutes } from "./routes.js";
 import { createMessage } from "../chat/messages.js";
-import { orgs, workspaces, channels, threads, repos, agents } from "../db/schema.js";
+import { orgs, workspaces, channels, threads, repos, agents, members } from "../db/schema.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
@@ -72,6 +72,29 @@ describe("thread message routes", () => {
       delete process.env.E2E_GITHUB_TOKEN;
       await app.close();
     }
+  });
+
+  it("POST /threads/:id/messages by a viewer is 403; a member succeeds (#29)", async () => {
+    await h.db.insert(members).values({ id: "vw", orgId: "o1", workspaceId: "w1", displayName: "Viewer", role: "viewer" });
+    await h.db.insert(members).values({ id: "mb", orgId: "o1", workspaceId: "w1", displayName: "Member", role: "member" });
+    const app = makeApp();
+    const denied = await app.inject({
+      method: "POST", url: "/threads/t1/messages",
+      headers: { "x-org-id": "o1", "x-user-id": "vw", "content-type": "application/json" },
+      payload: { body: "viewer cannot post" },
+    });
+    expect(denied.statusCode).toBe(403);
+    // nothing written
+    const empty = await app.inject({ method: "GET", url: "/threads/t1/messages", headers: { "x-org-id": "o1" } });
+    expect(empty.json()).toEqual([]);
+    // a member can post
+    const ok = await app.inject({
+      method: "POST", url: "/threads/t1/messages",
+      headers: { "x-org-id": "o1", "x-user-id": "mb", "content-type": "application/json" },
+      payload: { body: "member can post" },
+    });
+    expect(ok.statusCode).toBe(201);
+    await app.close();
   });
 
   it("POST /threads/:id/messages on another org's thread is rejected (cross-tenant IDOR)", async () => {

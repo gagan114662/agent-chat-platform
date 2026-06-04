@@ -9,6 +9,7 @@ import { handleMentions } from "../chat/handle-mentions.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
 import { threads } from "../db/schema.js";
 import { actor } from "./actor.js";
+import { roleOf, can } from "../rbac/rbac.js";
 
 export interface Deps { db: DB; sql: postgres.Sql; temporal: Client; sandboxUrl: string; }
 
@@ -25,6 +26,11 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
     const { id: threadId } = req.params as { id: string };
     const { body } = req.body as { body: string };
     const { orgId, userId } = actor(req);
+
+    // #29: viewers are read-only — block message posts before any DB work.
+    if (!can(await roleOf(d.db, userId, orgId), "message:post")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
 
     // Load the thread org-scoped FIRST so a foreign thread id can't be written to / mined for mentions.
     const [thread] = await d.db.select().from(threads).where(and(eq(threads.id, threadId), eq(threads.orgId, orgId)));
