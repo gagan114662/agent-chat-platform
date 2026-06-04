@@ -1,4 +1,6 @@
-import type { Message } from "../types.js";
+import { useState } from "react";
+import type { Message, ChangedFile } from "../types.js";
+import { DiffView } from "./DiffView.js";
 
 const OUTCOME_STYLES: Record<string, string> = {
   merged: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -12,15 +14,34 @@ interface PrCardProps {
   message: Message;
   onApprove?: (runId: string) => void;
   onDecline?: (runId: string) => void;
+  onLoadDiff?: (runId: string) => Promise<ChangedFile[]>;
 }
 
-export function PrCard({ message, onApprove, onDecline }: PrCardProps) {
+export function PrCard({ message, onApprove, onDecline, onLoadDiff }: PrCardProps) {
   const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string; runId?: string };
   const outcome = m.outcome ?? "merged";
   // Only treat https:// URLs as links — never render javascript:/data:/etc. as an href.
   const safePrUrl = m.prUrl && m.prUrl.startsWith("https://") ? m.prUrl : undefined;
   // A held_for_human card with a runId is human-actionable: offer Approve / Decline.
   const actionable = outcome === "held_for_human" && typeof m.runId === "string";
+  // Any card carrying a runId can show its PR diff (lazy-loaded).
+  const canDiff = typeof m.runId === "string";
+
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [diffFiles, setDiffFiles] = useState<ChangedFile[] | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+
+  const toggleDiff = () => {
+    if (diffOpen) { setDiffOpen(false); return; }
+    setDiffOpen(true);
+    if (diffFiles === null && onLoadDiff && m.runId) {
+      setDiffLoading(true);
+      onLoadDiff(m.runId)
+        .then((files) => setDiffFiles(files))
+        .catch(() => setDiffFiles([]))
+        .finally(() => setDiffLoading(false));
+    }
+  };
   return (
     <div className={`rounded-xl border px-4 py-3 ${OUTCOME_STYLES[outcome] ?? OUTCOME_STYLES.merged}`}>
       <div className="flex items-center gap-2">
@@ -36,24 +57,38 @@ export function PrCard({ message, onApprove, onDecline }: PrCardProps) {
         )}
       </div>
       <p className="mt-1 text-sm">{message.body}</p>
-      {actionable && (
+      {(actionable || canDiff) && (
         <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            onClick={() => onApprove?.(m.runId!)}
-            className="rounded-lg bg-[#15151f] px-3 py-1.5 text-xs font-semibold text-white hover:bg-black"
-          >
-            Approve
-          </button>
-          <button
-            type="button"
-            onClick={() => onDecline?.(m.runId!)}
-            className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
-          >
-            Decline
-          </button>
+          {actionable && (
+            <button
+              type="button"
+              onClick={() => onApprove?.(m.runId!)}
+              className="rounded-lg bg-[#15151f] px-3 py-1.5 text-xs font-semibold text-white hover:bg-black"
+            >
+              Approve
+            </button>
+          )}
+          {actionable && (
+            <button
+              type="button"
+              onClick={() => onDecline?.(m.runId!)}
+              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              Decline
+            </button>
+          )}
+          {canDiff && (
+            <button
+              type="button"
+              onClick={toggleDiff}
+              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              {diffOpen ? "Hide diff" : "View diff"}
+            </button>
+          )}
         </div>
       )}
+      {diffOpen && <DiffView files={diffFiles ?? []} loading={diffLoading} />}
     </div>
   );
 }

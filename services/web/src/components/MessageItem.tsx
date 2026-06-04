@@ -1,15 +1,16 @@
-import type { Message } from "../types.js";
+import type { Message, ChangedFile } from "../types.js";
 import { PrCard } from "./PrCard.js";
 
 interface MessageItemProps {
   message: Message;
   onApprove?: (runId: string) => void;
   onDecline?: (runId: string) => void;
+  onLoadDiff?: (runId: string) => Promise<ChangedFile[]>;
 }
 
-export function MessageItem({ message, onApprove, onDecline }: MessageItemProps) {
+export function MessageItem({ message, onApprove, onDecline, onLoadDiff }: MessageItemProps) {
   if (message.kind === "pr_card") {
-    return <div className="px-4 py-1.5"><PrCard message={message} onApprove={onApprove} onDecline={onDecline} /></div>;
+    return <div className="px-4 py-1.5"><PrCard message={message} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} /></div>;
   }
   if (message.kind === "system") {
     return (
