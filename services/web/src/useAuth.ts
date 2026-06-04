@@ -9,7 +9,7 @@ export function useAuth() {
     me().then((p) => setPrincipal(p)).catch(() => setPrincipal(null)).finally(() => setLoading(false));
   }, []);
 
-  const login = async (memberId: string) => { setPrincipal(await apiLogin(memberId)); };
+  const login = async (memberId: string, password?: string) => { setPrincipal(await apiLogin(memberId, password)); };
   const logout = async () => { await apiLogout(); setPrincipal(null); };
 
   return { principal, loading, login, logout };

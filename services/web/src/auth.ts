@@ -21,11 +21,11 @@ export async function listLoginMembers(): Promise<LoginMember[]> {
   return res.json();
 }
 
-export async function login(memberId: string): Promise<Principal> {
+export async function login(memberId: string, password?: string): Promise<Principal> {
   const res = await fetch(`/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ memberId }),
+    body: JSON.stringify(password ? { memberId, password } : { memberId }),
   });
   if (!res.ok) throw new Error(`login ${res.status}`);
   const { token, member } = await res.json() as { token: string; member: { orgId: string } };
