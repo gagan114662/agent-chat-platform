@@ -175,6 +175,24 @@ export const readState = pgTable("read_state", {
   lastReadAt: timestamp("last_read_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ pk: primaryKey({ columns: [t.orgId, t.userId, t.threadId] }) }));
 
+// #79 teams: a named group of members/agents in an org for bulk access +
+// `@team` mentions. Org-scoped. `team_members` rows are typed (human|agent) and
+// reference an existing member/agent id in the same org. The composite PK
+// (orgId, teamId, memberKind, memberId) makes add idempotent and forbids dupes.
+export const teams = pgTable("teams", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const teamMembers = pgTable("team_members", {
+  orgId: text("org_id").notNull(),
+  teamId: text("team_id").notNull(),
+  memberKind: text("member_kind").notNull(), // 'human' | 'agent'
+  memberId: text("member_id").notNull(),
+}, (t) => ({ pk: primaryKey({ columns: [t.orgId, t.teamId, t.memberKind, t.memberId] }) }));
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull(),

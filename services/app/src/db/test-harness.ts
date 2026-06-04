@@ -3,6 +3,7 @@ import { makeDb } from "./client.js";
 
 const TABLES = [
   "sessions",
+  "team_members", "teams",
   "read_state",
   "memory_edges", "memory_nodes",
   "log_events",
