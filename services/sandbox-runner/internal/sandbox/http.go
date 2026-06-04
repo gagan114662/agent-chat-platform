@@ -1,7 +1,6 @@
 package sandbox
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -13,7 +12,13 @@ func NewHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /run", func(w http.ResponseWriter, r *http.Request) {
 		var req RunRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			http.Error(w, redactCreds(err.Error()), http.StatusBadRequest)
+			return
+		}
+		if err := req.Validate(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -25,9 +30,9 @@ func NewHandler() http.Handler {
 		defer os.RemoveAll(work)
 		req.WorkDir = filepath.Join(work, "repo")
 
-		res, err := Run(context.Background(), req, FakeAgent{})
+		res, err := Run(r.Context(), req, FakeAgent{})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, redactCreds(err.Error()), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
