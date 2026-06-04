@@ -1,5 +1,6 @@
 import type { RunResult, SandboxRunRequest, SandboxFeedbackRequest } from "../types.js";
 import { nodeFetch } from "../http/node-fetch.js";
+import { redactCreds } from "../util/redact.js";
 
 export interface SandboxRunner {
   run(req: SandboxRunRequest): Promise<RunResult>;
@@ -27,13 +28,13 @@ export class SandboxRunnerClient implements SandboxRunner {
     });
     if (res.status !== 200) {
       const text = await res.text();
-      throw new Error(`sandbox-runner ${res.status}: ${text}`);
+      throw new Error(redactCreds(`sandbox-runner ${res.status}: ${text}`));
     }
     try {
       return (await res.json()) as RunResult;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`sandbox-runner ${url}: invalid JSON response: ${message}`);
+      throw new Error(redactCreds(`sandbox-runner ${url}: invalid JSON response: ${message}`));
     }
   }
 
@@ -46,13 +47,13 @@ export class SandboxRunnerClient implements SandboxRunner {
     });
     if (res.status !== 200) {
       const text = await res.text();
-      throw new Error(`sandbox-runner ${res.status}: ${text}`);
+      throw new Error(redactCreds(`sandbox-runner ${res.status}: ${text}`));
     }
     try {
       return (await res.json()) as RunResult;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`sandbox-runner ${url}: invalid JSON response: ${message}`);
+      throw new Error(redactCreds(`sandbox-runner ${url}: invalid JSON response: ${message}`));
     }
   }
 }
