@@ -6,8 +6,17 @@ import { SearchBar } from "./components/SearchBar.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm } from "./api.js";
 import type { Channel, Thread, Repo, Principal } from "./types.js";
+import { useAuth } from "./useAuth.js";
+import { LoginScreen } from "./components/LoginScreen.js";
 
 export function App() {
+  const { principal, loading, login, logout } = useAuth();
+  if (loading) return <div className="flex h-screen items-center justify-center text-sm text-slate-400">Loading…</div>;
+  if (!principal) return <LoginScreen onLogin={login} />;
+  return <Workspace onLogout={logout} userId={principal.userId} />;
+}
+
+function Workspace({ onLogout, userId }: { onLogout: () => void; userId: string }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -70,7 +79,10 @@ export function App() {
             </h1>
             <p className="text-xs text-slate-400">chat → sandboxed agent → PR → back to chat</p>
           </div>
-          <SearchBar onSearch={searchMessages} onSelect={setActiveThreadId} />
+          <div className="flex items-center gap-3">
+            <SearchBar onSearch={searchMessages} onSelect={setActiveThreadId} />
+            <button onClick={onLogout} className="text-xs text-slate-400 hover:text-slate-600">Sign out ({userId})</button>
+          </div>
         </header>
         {activeThreadId
           ? <ThreadConversation threadId={activeThreadId} />
