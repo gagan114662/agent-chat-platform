@@ -13,7 +13,7 @@ func gitRun(dir string, args ...string) error {
 		cmd.Dir = dir
 	}
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git %v: %w\n%s", args, err, out)
+		return fmt.Errorf("git %s: %v\n%s", redactCreds(strings.Join(args, " ")), err, redactCreds(string(out)))
 	}
 	return nil
 }
@@ -27,9 +27,9 @@ func gitOutput(dir string, args ...string) (string, error) {
 	out, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("git %v: %w\n%s", args, err, ee.Stderr)
+			return "", fmt.Errorf("git %s: %v\n%s", redactCreds(strings.Join(args, " ")), err, redactCreds(string(ee.Stderr)))
 		}
-		return "", fmt.Errorf("git %v: %w", args, err)
+		return "", fmt.Errorf("git %s: %v", redactCreds(strings.Join(args, " ")), err)
 	}
 	return strings.TrimSpace(string(out)), nil
 }
