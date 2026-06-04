@@ -9,7 +9,7 @@ export interface NewMessage {
   authorKind: "human" | "agent";
   authorId: string;
   body: string;
-  kind?: "chat" | "system" | "pr_card";
+  kind?: "chat" | "system" | "pr_card" | "plan_card";
   metadata?: Record<string, unknown>;
   id?: string;
 }

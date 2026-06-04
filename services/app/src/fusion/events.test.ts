@@ -62,6 +62,23 @@ describe("fusion sink", () => {
     expect(bodies.some((b) => b.includes("CI fix attempt 2") && b.includes("ci: test failed"))).toBe(true);
   });
 
+  it("renders plan_proposed as a plan_card and parks at awaiting_plan_approval (#20)", async () => {
+    const { run } = await seedRun();
+    const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" });
+    await sink({ type: "plan_proposed", plan: "1. step one\n2. step two" });
+    await sink({ type: "outcome", outcome: "awaiting_plan" });
+
+    const msgs = await listMessages(h.db, "t1", "o1");
+    const plan = msgs.find((m) => m.kind === "plan_card");
+    expect(plan).toBeTruthy();
+    expect(plan?.body).toContain("step one");
+    expect((plan?.metadata as any).runId).toBe(run.id);
+    expect((plan?.metadata as any).kind).toBe("plan");
+
+    const [r] = await h.db.select().from(runs).where(eq(runs.id, run.id));
+    expect(r.state).toBe("awaiting_plan_approval");
+  });
+
   it("is idempotent on replay (same seq not double-written)", async () => {
     const { run } = await seedRun();
     const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" });

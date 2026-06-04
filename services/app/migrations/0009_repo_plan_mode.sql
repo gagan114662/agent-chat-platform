@@ -1,0 +1,1 @@
+ALTER TABLE "repos" ADD COLUMN "plan_mode" boolean DEFAULT false NOT NULL;

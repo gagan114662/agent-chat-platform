@@ -28,4 +28,10 @@ describe("run state machine", () => {
     expect(canTransition("held_for_human", "running")).toBe(false);
     expect(canTransition("merged", "running")).toBe(false); // merged stays terminal
   });
+  it("allows pending→awaiting_plan_approval and approve/reject out (plan mode #20)", () => {
+    expect(canTransition("pending", "awaiting_plan_approval")).toBe(true);
+    expect(canTransition("awaiting_plan_approval", "running")).toBe(true); // approve
+    expect(canTransition("awaiting_plan_approval", "error")).toBe(true); // reject
+    expect(canTransition("awaiting_plan_approval", "merged")).toBe(false);
+  });
 });

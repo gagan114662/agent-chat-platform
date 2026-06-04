@@ -19,6 +19,9 @@ export interface StartFusionRunInput {
   agentId: string;
   intent: string;
   sandboxUrl: string;
+  // Plan mode (#20): when true, the run proposes a read-only plan and parks at
+  // awaiting_plan_approval instead of executing. Defaults false (execute now).
+  planMode?: boolean;
 }
 
 // Shared starter: builds the RunFusionActivityInput and kicks off the fusion workflow.
@@ -30,6 +33,7 @@ export async function startFusionRun(temporal: Client, i: StartFusionRunInput) {
     baseBranch: i.repo.defaultBranch, intent: i.intent, branch: `agent/${i.run.id}`,
     tokenEnvVar: i.repo.tokenEnvVar, sandboxUrl: i.sandboxUrl, pollMs: 5000, maxPolls: 24,
     autonomy: (i.repo.autonomy as "monitor-only" | "resolve-ci" | "autopilot-merge"),
+    planMode: i.planMode ?? false,
     sink: { orgId: i.orgId, threadId: i.threadId, runId: i.run.id, agentId: i.agentId },
   });
 }

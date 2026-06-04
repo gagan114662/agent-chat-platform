@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, jsonb, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const orgs = pgTable("orgs", {
   id: text("id").primaryKey(),
@@ -21,6 +21,7 @@ export const repos = pgTable("repos", {
   defaultBranch: text("default_branch").notNull().default("main"),
   tokenEnvVar: text("token_env_var").notNull(),
   autonomy: text("autonomy").notNull().default("autopilot-merge"), // 'monitor-only'|'resolve-ci'|'autopilot-merge'
+  planMode: boolean("plan_mode").notNull().default(false), // #20: mentions on this repo plan-first (propose → approve → execute)
 });
 
 export const members = pgTable("members", {

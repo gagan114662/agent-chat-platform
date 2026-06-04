@@ -13,6 +13,7 @@ export const THREAD_CHANNEL = "thread_messages";
 function describe(e: FusionEvent): string {
   switch (e.type) {
     case "sandbox_started": return "🧪 sandbox started — cloning repo and running agent…";
+    case "plan_proposed": return e.plan;
     case "branch_pushed": return `📤 pushed branch \`${e.branch}\` (${e.commitSha.slice(0, 7)})`;
     case "pr_opened": return `🔀 opened PR #${e.prNumber}`;
     case "checks": return `⏳ checks: ${e.status}`;
@@ -20,6 +21,7 @@ function describe(e: FusionEvent): string {
     case "outcome":
       if (e.outcome === "merged") return `✅ merged PR #${e.prNumber}`;
       if (e.outcome === "held_for_human") return `🔶 held for human review — PR #${e.prNumber}`;
+      if (e.outcome === "awaiting_plan") return "📝 plan proposed — awaiting approval";
       return `⚠️ ${e.outcome}`;
   }
 }
@@ -61,14 +63,21 @@ export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
     if (!appended) return;
 
     const isOutcome = e.type === "outcome";
+    const isPlan = e.type === "plan_proposed";
     // The FusionEvent outcome carries prNumber/prUrl/commitSha but NOT runId. The UI
     // needs runId on the pr_card to call approve/decline on a held_for_human run, so
-    // attach ctx.runId to the outcome message metadata.
-    const metadata = isOutcome ? { ...(e as any), runId: ctx.runId } : (e as any);
+    // attach ctx.runId to the outcome message metadata. The plan_card likewise needs
+    // runId (+ kind) so the UI can approve/reject the plan.
+    let kind: "system" | "pr_card" | "plan_card" = "system";
+    if (isOutcome) kind = "pr_card";
+    if (isPlan) kind = "plan_card";
+    let metadata: Record<string, unknown> = e as any;
+    if (isOutcome) metadata = { ...(e as any), runId: ctx.runId };
+    if (isPlan) metadata = { runId: ctx.runId, kind: "plan" };
     const msg = await createMessage(db, {
       id: `${ctx.runId}:${mySeq}`,
       orgId: ctx.orgId, threadId: ctx.threadId, authorKind: "agent", authorId: ctx.agentId,
-      kind: isOutcome ? "pr_card" : "system",
+      kind,
       body: describe(e),
       metadata,
     });
@@ -81,9 +90,15 @@ export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
     }
 
     if (isOutcome && e.type === "outcome") {
-      await transitionRun(db, ctx.runId, e.outcome, {
-        prNumber: e.prNumber, prUrl: e.prUrl, commitSha: e.commitSha,
-      }, ctx.orgId);
+      // Plan-mode park: outcome "awaiting_plan" maps to the awaiting_plan_approval
+      // run state (pending → awaiting_plan_approval, a legal transition).
+      if (e.outcome === "awaiting_plan") {
+        await transitionRun(db, ctx.runId, "awaiting_plan_approval", {}, ctx.orgId);
+      } else {
+        await transitionRun(db, ctx.runId, e.outcome, {
+          prNumber: e.prNumber, prUrl: e.prUrl, commitSha: e.commitSha,
+        }, ctx.orgId);
+      }
     }
   };
 }
