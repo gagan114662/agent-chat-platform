@@ -34,6 +34,10 @@ export interface GitHubIssue {
 
 export interface GitHubService {
   openPr(input: OpenPrInput): Promise<PullRequest>;
+  // Find-or-create support (#70): returns the first open PR whose head is `head`
+  // (the branch), or null if none. Lets a retried activity reuse an existing PR
+  // instead of creating a duplicate.
+  findPrForBranch(owner: string, repo: string, head: string): Promise<{ number: number; url: string } | null>;
   getChecksStatus(owner: string, repo: string, ref: string): Promise<ChecksStatus>;
   merge(owner: string, repo: string, prNumber: number): Promise<void>;
   getChangedFiles(owner: string, repo: string, prNumber: number): Promise<ChangedFile[]>;

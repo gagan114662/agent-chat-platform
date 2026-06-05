@@ -20,6 +20,25 @@ describe("OctokitGitHubService", () => {
     expect(pr).toEqual({ number: 7, url: "https://github.com/o/r/pull/7" });
   });
 
+  it("finds an existing open PR for a branch", async () => {
+    nock(api)
+      .get("/repos/o/r/pulls")
+      .query({ head: "o:feature/x", state: "open" })
+      .reply(200, [{ number: 7, html_url: "https://github.com/o/r/pull/7" }]);
+    const svc = new OctokitGitHubService("tok");
+    const pr = await svc.findPrForBranch("o", "r", "feature/x");
+    expect(pr).toEqual({ number: 7, url: "https://github.com/o/r/pull/7" });
+  });
+
+  it("returns null when no open PR exists for a branch", async () => {
+    nock(api)
+      .get("/repos/o/r/pulls")
+      .query({ head: "o:feature/x", state: "open" })
+      .reply(200, []);
+    const svc = new OctokitGitHubService("tok");
+    expect(await svc.findPrForBranch("o", "r", "feature/x")).toBeNull();
+  });
+
   it("maps combined status to ChecksStatus", async () => {
     nock(api).get("/repos/o/r/commits/abc/status").reply(200, { state: "success" });
     const svc = new OctokitGitHubService("tok");
