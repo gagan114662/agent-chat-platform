@@ -12,6 +12,14 @@ function bearer(req: FastifyRequest): string | undefined {
   return typeof h === "string" && h.startsWith("Bearer ") ? h.slice(7) : undefined;
 }
 
+// #80: the signed file content/download routes carry their own HMAC `?sig=` token
+// (verified in file-storage-routes), so the user-session preHandler must let them
+// through. Matches `/files/<id>/content` and `/files/<id>/download` ONLY — the bare
+// `/files` (create) and `/files/<id>` (metadata) routes still require a session.
+function isSignedFilePath(path: string): boolean {
+  return /^\/files\/[^/]+\/(content|download)$/.test(path);
+}
+
 // registerAuth adds a root preHandler that resolves the bearer token into req.principal,
 // plus the /auth/* routes. Must be registered BEFORE other route registrars so the
 // preHandler covers them.
@@ -37,7 +45,12 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
       // /ingest/* is machine-to-machine (its own x-acp-ingest-secret guard);
       // /webhooks/* is machine-to-machine too (its own X-Hub-Signature-256 HMAC).
       // Both must bypass the user-session 401 here, NOT be left unauthenticated.
-      if (!PUBLIC_PATHS.has(path) && !path.startsWith("/ingest/") && !path.startsWith("/webhooks/")) {
+      // #80 signed file content/download (PUT /files/:id/content, GET
+      // /files/:id/download) authenticate via an HMAC `?sig=` token enforced in the
+      // route, so they bypass the session 401 here too (the route verifies the sig).
+      // POST /files and GET /files/:id (metadata) stay under normal auth.
+      if (!PUBLIC_PATHS.has(path) && !path.startsWith("/ingest/") && !path.startsWith("/webhooks/")
+          && !isSignedFilePath(path)) {
         return reply.code(401).send({ error: "unauthenticated" });
       }
     }

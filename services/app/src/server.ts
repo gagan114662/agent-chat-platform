@@ -21,6 +21,7 @@ import { registerDiffRoutes } from "./http/diff-routes.js";
 import { registerRootCauseRoutes } from "./http/rootcause-routes.js";
 import { registerDebugRoutes } from "./http/debug-routes.js";
 import { registerFileRoutes } from "./http/file-routes.js";
+import { registerFileStorageRoutes } from "./http/file-storage-routes.js";
 import { registerCommentSyncRoutes } from "./http/comment-sync-routes.js";
 import { registerPrEditRoutes } from "./http/pr-edit-routes.js";
 import { registerAutonomyRoutes } from "./http/autonomy-routes.js";
@@ -90,6 +91,7 @@ export async function buildServer() {
   registerRootCauseRoutes(app, { db });
   registerDebugRoutes(app, { db });
   registerFileRoutes(app, { db });
+  registerFileStorageRoutes(app, { db });
   registerCommentSyncRoutes(app, { db, sql });
   registerPrEditRoutes(app, { db });
   registerAutonomyRoutes(app, { db, sql, temporal, sandboxUrl });
