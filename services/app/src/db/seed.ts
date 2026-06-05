@@ -10,8 +10,10 @@ const repo = process.env.E2E_REPO_NAME ?? "acp-e2e-fixture";
 const { db, sql } = makeDb();
 await db.insert(orgs).values({ id: "o1", name: "Demo Org" }).onConflictDoNothing();
 await db.insert(workspaces).values({ id: "w1", orgId: "o1", name: "Demo" }).onConflictDoNothing();
-await db.insert(members).values({ id: "m1", orgId: "o1", workspaceId: "w1", displayName: "You" }).onConflictDoNothing();
-await db.update(members).set({ passwordHash: hashPassword(process.env.DEV_PASSWORD ?? "dev") }).where(eq(members.id, "m1"));
+await db.insert(members).values({ id: "m1", orgId: "o1", workspaceId: "w1", displayName: "You", role: "admin" }).onConflictDoNothing();
+// m1 is the sole operator/owner — give it admin so it can manage agents, teams,
+// skills, and api keys (member role lacks agent:share et al). Re-seed promotes it.
+await db.update(members).set({ passwordHash: hashPassword(process.env.DEV_PASSWORD ?? "dev"), role: "admin" }).where(eq(members.id, "m1"));
 // Upsert so re-seeding repoints an existing r1 (e.g. fixture -> real demo repo) instead of leaving a stale binding.
 await db.insert(repos).values({ id: "r1", orgId: "o1", workspaceId: "w1", githubOwner: owner, githubName: repo, defaultBranch: "main", tokenEnvVar: "E2E_GITHUB_TOKEN" })
   .onConflictDoUpdate({ target: repos.id, set: { githubOwner: owner, githubName: repo, defaultBranch: "main", tokenEnvVar: "E2E_GITHUB_TOKEN" } });
