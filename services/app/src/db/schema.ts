@@ -34,6 +34,13 @@ export const members = pgTable("members", {
   // #84 magic-link: a member's login email. Nullable (existing members/invite
   // provisioning don't set it) — magic-link lookup matches on this when present.
   email: text("email"),
+  // #84 TOTP MFA: the member's base32-encoded TOTP shared secret. Set by enroll
+  // (not yet enforced); enforcement flips on only when `mfaEnabled` is true.
+  // Nullable — members without MFA have none.
+  totpSecret: text("totp_secret"),
+  // #84 TOTP MFA: when true, login + magic-link verify require a valid TOTP code.
+  // Off by default so existing logins are unchanged.
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
 });
 
 export const agents = pgTable("agents", {
