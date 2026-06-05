@@ -74,6 +74,13 @@ export async function syncPrComments(runId: string): Promise<{ synced: number }>
   return res.json();
 }
 
+// #143: read a run's current PR title/body/base to pre-fill the edit form.
+export async function getRunPr(runId: string): Promise<{ title: string; body: string; base: string }> {
+  const res = await fetch(`/runs/${runId}/pr`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getRunPr ${res.status}`);
+  return res.json();
+}
+
 export async function updatePr(runId: string, patch: { title?: string; body?: string; base?: string }): Promise<{ ok: boolean }> {
   const res = await fetch(`/runs/${runId}/update-pr`, {
     method: "POST",
@@ -653,6 +660,13 @@ export async function memoryRecall(q: string, limit?: number): Promise<MemoryNod
 export async function memoryConsolidate(): Promise<{ created: number; clusters: number }> {
   const res = await fetch(`/memory/consolidate`, { method: "POST", headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`memoryConsolidate ${res.status}`);
+  return res.json();
+}
+
+// #143: connect the graph — derive `related` edges among nodes sharing terms.
+export async function deriveMemoryEdges(): Promise<{ created: number }> {
+  const res = await fetch(`/memory/derive-edges`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`deriveMemoryEdges ${res.status}`);
   return res.json();
 }
 

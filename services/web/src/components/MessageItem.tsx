@@ -30,6 +30,7 @@ interface MessageItemProps {
   onOpenFile?: (runId: string, path: string) => Promise<FileContent>;
   onSyncComments?: (runId: string) => void;
   onUpdatePr?: (runId: string, patch: { title?: string; body?: string; base?: string }) => void;
+  onLoadPr?: (runId: string) => Promise<{ title: string; body: string; base: string }>;
   onLoadCheckpoints?: (runId: string) => Promise<Checkpoint[]>;
   onRestoreCheckpoint?: (runId: string, cpId: string) => void;
   onApprovePlan?: (runId: string) => void;
@@ -44,9 +45,9 @@ function clock(iso?: string): string {
   return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-export function MessageItem({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr, onLoadCheckpoints, onRestoreCheckpoint, onApprovePlan, onRejectPlan }: MessageItemProps) {
+export function MessageItem({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr, onLoadPr, onLoadCheckpoints, onRestoreCheckpoint, onApprovePlan, onRejectPlan }: MessageItemProps) {
   if (message.kind === "pr_card") {
-    return <div className="px-4 py-1.5"><PrCard message={message} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} onLoadCheckpoints={onLoadCheckpoints} onRestoreCheckpoint={onRestoreCheckpoint} /></div>;
+    return <div className="px-4 py-1.5"><PrCard message={message} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} onLoadPr={onLoadPr} onLoadCheckpoints={onLoadCheckpoints} onRestoreCheckpoint={onRestoreCheckpoint} /></div>;
   }
   if (message.kind === "plan_card") {
     return <div className="px-4 py-1.5"><PlanCard message={message} onApprove={onApprovePlan} onReject={onRejectPlan} /></div>;

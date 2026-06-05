@@ -174,6 +174,11 @@ export class OctokitGitHubService implements GitHubService {
     await this.octokit.pulls.update({ owner, repo, pull_number: prNumber, ...patch });
   }
 
+  async getPr(owner: string, repo: string, prNumber: number): Promise<{ title: string; body: string; base: string }> {
+    const res = await this.octokit.pulls.get({ owner, repo, pull_number: prNumber });
+    return { title: res.data.title ?? "", body: res.data.body ?? "", base: res.data.base?.ref ?? "" };
+  }
+
   async listReviewComments(owner: string, repo: string, prNumber: number): Promise<ReviewComment[]> {
     const res = await this.octokit.pulls.listReviewComments({ owner, repo, pull_number: prNumber });
     return res.data.map((c) => ({

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { MemoryGraph, MemoryStats, MemoryKind, MemoryScope } from "./types.js";
 import { memoryGraph, memoryStats } from "./api.js";
 
@@ -13,23 +13,15 @@ export function useMemory() {
   const [stats, setStats] = useState<MemoryStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const reload = useCallback(() => {
     setLoading(true);
-    Promise.all([memoryGraph({ scope, kind }), memoryStats()])
-      .then(([g, s]) => {
-        if (cancelled) return;
-        setGraph(g);
-        setStats(s);
-      })
+    return Promise.all([memoryGraph({ scope, kind }), memoryStats()])
+      .then(([g, s]) => { setGraph(g); setStats(s); })
       .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => setLoading(false));
   }, [scope, kind]);
 
-  return { graph, stats, scope, setScope, kind, setKind, loading };
+  useEffect(() => { reload(); }, [reload]);
+
+  return { graph, stats, scope, setScope, kind, setKind, loading, reload };
 }

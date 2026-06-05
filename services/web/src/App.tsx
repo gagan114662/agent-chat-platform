@@ -8,7 +8,7 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, setDeployCommand, deployRepo, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listBusinesses, createBusiness, getBusiness, createPaymentIntent, decidePaymentIntent, createCampaign, decideCampaign, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes, listApprovals } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, getRunPr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, setDeployCommand, deployRepo, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listBusinesses, createBusiness, getBusiness, createPaymentIntent, decidePaymentIntent, createCampaign, decideCampaign, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes, listApprovals, deriveMemoryEdges } from "./api.js";
 import { GoalsPanel } from "./components/GoalsPanel.js";
 import { AgentsPanel } from "./components/AgentsPanel.js";
 import { TasksPanel } from "./components/TasksPanel.js";
@@ -260,6 +260,7 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
               kind={memory.kind}
               onKindChange={memory.setKind}
               loading={memory.loading}
+              onDeriveEdges={() => deriveMemoryEdges().then(() => memory.reload())}
             />
           : view === "inbox"
             ? <InboxPanel inbox={inbox} approvals={approvals} onSelect={selectThread} onAct={onApproval} />
@@ -353,6 +354,7 @@ function ThreadConversation({ threadId, onActivity, commands, onSlashSearch, men
   // Synced comments also arrive via WS, but refetch covers the no-socket case.
   const onSyncComments = (runId: string) => { syncPrComments(runId).then(refetch).catch(() => {}); };
   const onUpdatePr = (runId: string, patch: { title?: string; body?: string; base?: string }) => { updatePr(runId, patch).then(refetch).catch(() => {}); };
+  const onLoadPr = (runId: string) => getRunPr(runId);
   const onLoadCheckpoints = (runId: string) => listCheckpoints(runId);
   // Restore opens a new run; refetch picks up the "restored from checkpoint" message.
   const onRestoreCheckpoint = (runId: string, cpId: string) => { restoreCheckpoint(runId, cpId).then(refetch).catch(() => {}); };
@@ -360,7 +362,7 @@ function ThreadConversation({ threadId, onActivity, commands, onSlashSearch, men
   const onRejectPlan = (runId: string, notes?: string) => { rejectPlan(runId, notes).then(refetch).catch(() => {}); };
   return (
     <>
-      <ThreadView messages={messages} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} onLoadCheckpoints={onLoadCheckpoints} onRestoreCheckpoint={onRestoreCheckpoint} onApprovePlan={onApprovePlan} onRejectPlan={onRejectPlan} />
+      <ThreadView messages={messages} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} onLoadPr={onLoadPr} onLoadCheckpoints={onLoadCheckpoints} onRestoreCheckpoint={onRestoreCheckpoint} onApprovePlan={onApprovePlan} onRejectPlan={onRejectPlan} />
       <Composer onSend={send} commands={commands} onSlashSearch={onSlashSearch} mentionables={mentionables} />
     </>
   );

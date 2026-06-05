@@ -47,6 +47,7 @@ export function ContextExplorer({
   kind,
   onKindChange,
   loading,
+  onDeriveEdges,
 }: {
   graph: MemoryGraph;
   stats: MemoryStats;
@@ -55,7 +56,14 @@ export function ContextExplorer({
   kind: MemoryKind | undefined;
   onKindChange: (kind: MemoryKind | undefined) => void;
   loading: boolean;
+  onDeriveEdges?: () => Promise<void>;
 }) {
+  const [connecting, setConnecting] = useState(false);
+  const connect = async () => {
+    if (!onDeriveEdges || connecting) return;
+    setConnecting(true);
+    try { await onDeriveEdges(); } finally { setConnecting(false); }
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const nodes = graph.nodes;
   const n = nodes.length;
@@ -77,11 +85,16 @@ export function ContextExplorer({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto bg-surface p-6 text-sm text-ink">
-      <div className="mb-4">
-        <h1 className="text-lg font-semibold text-ink">Context Explorer</h1>
-        <div className="text-xs text-ink-3">
-          Visual <span className="text-ink-2">graph</span> of how memories connect — for search &amp; recall, use <span className="text-ink-2">Memory</span>. · {stats.nodes} memories · {stats.edges} edges{loading ? " · loading…" : ""}
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-ink">Context Explorer</h1>
+          <div className="text-xs text-ink-3">
+            Visual <span className="text-ink-2">graph</span> of how memories connect — for search &amp; recall, use <span className="text-ink-2">Memory</span>. · {stats.nodes} memories · {stats.edges} edges{loading ? " · loading…" : ""}
+          </div>
         </div>
+        {onDeriveEdges && (
+          <button onClick={connect} disabled={connecting} title="Link memories that share a topic so the graph connects" className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-elevated-2 hover:text-ink disabled:opacity-50">{connecting ? "Connecting…" : "Connect related"}</button>
+        )}
       </div>
 
       <div className="mb-2 flex flex-wrap gap-1.5">

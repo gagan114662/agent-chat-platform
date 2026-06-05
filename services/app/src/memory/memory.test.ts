@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { createNode, createEdge, listNodes, neighbors, searchNodes, counts, graph, recallForIntent, formatRecall, supersedeNode, invalidateNode, revalidateNode, addContradiction } from "./memory.js";
+import { createNode, createEdge, listNodes, neighbors, searchNodes, counts, graph, recallForIntent, formatRecall, supersedeNode, invalidateNode, revalidateNode, addContradiction, deriveRelatedEdges } from "./memory.js";
 import { memoryEdges } from "../db/schema.js";
 import { and, eq } from "drizzle-orm";
 import { orgs } from "../db/schema.js";
@@ -153,5 +153,19 @@ describe("memory", () => {
     const out = formatRecall([dec]);
     expect(out).toContain("## Relevant prior context");
     expect(out).toContain("- (decision) Use LISTEN/NOTIFY: for realtime");
+  });
+});
+
+describe("deriveRelatedEdges (#143)", () => {
+  it("links nodes sharing a meaningful label term, idempotently", async () => {
+    await createNode(h.db, { orgId: "o1", kind: "fact", label: "authentication uses scrypt hashing" });
+    await createNode(h.db, { orgId: "o1", kind: "decision", label: "authentication flow redesign" });
+    await createNode(h.db, { orgId: "o1", kind: "fact", label: "billing uses stripe" });
+    const created = await deriveRelatedEdges(h.db, "o1");
+    expect(created).toBe(1); // the two "authentication" nodes connect; billing is alone
+    const g = await graph(h.db, "o1");
+    expect(g.edges.filter((e) => e.relation === "related").length).toBe(1);
+    // re-running creates no duplicates
+    expect(await deriveRelatedEdges(h.db, "o1")).toBe(0);
   });
 });

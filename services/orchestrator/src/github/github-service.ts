@@ -49,6 +49,8 @@ export interface GitHubService {
   findPrForBranch(owner: string, repo: string, head: string): Promise<{ number: number; url: string } | null>;
   getChecksStatus(owner: string, repo: string, ref: string): Promise<ChecksStatus>;
   merge(owner: string, repo: string, prNumber: number): Promise<void>;
+  // Reads a PR's current title/body/base — so an edit form can pre-fill (#143).
+  getPr(owner: string, repo: string, prNumber: number): Promise<{ title: string; body: string; base: string }>;
   getChangedFiles(owner: string, repo: string, prNumber: number): Promise<ChangedFile[]>;
   // Lists a repo's issues (open by default). Pull requests are filtered out — the
   // GitHub REST issues endpoint returns PRs too (they carry a `pull_request` key).

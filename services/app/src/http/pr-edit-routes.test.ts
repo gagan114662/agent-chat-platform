@@ -39,6 +39,7 @@ function makeApp(calls: UpdateCall[]) {
       updatePr: async (owner: string, repo: string, prNumber: number, patch) => {
         calls.push({ owner, repo, prNumber, patch });
       },
+      getPr: async () => ({ title: "current title", body: "current body", base: "main" }),
     }),
   });
   return app;

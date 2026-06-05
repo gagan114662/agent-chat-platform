@@ -29,6 +29,44 @@ export async function createEdge(db: DB, e: { orgId: string; fromId: string; toI
   return edge;
 }
 
+const STOPWORDS = new Set(["this", "that", "with", "from", "your", "have", "uses", "used", "will", "into", "when", "what", "should", "would", "about", "which", "their", "there", "they", "them", "then", "than", "were", "been", "also", "must", "only", "some", "such", "each", "more", "most", "make", "made", "does", "doing", "after", "before"]);
+function tokens(label: string): string[] {
+  return [...new Set(label.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 4 && !STOPWORDS.has(t)))];
+}
+// A deterministic id so re-deriving is idempotent (no duplicate edges). Sorted pair.
+function relatedEdgeId(a: string, b: string): string {
+  const [x, y] = a < b ? [a, b] : [b, a];
+  return `related:${x}:${y}`;
+}
+
+// #143: the memory graph showed "0 edges" because edges were only ever created by
+// consolidation/supersede/contradict — raw captured nodes had none. deriveRelatedEdges
+// connects nodes that SHARE a meaningful label term with a `related` edge, so the
+// graph actually links concepts. Idempotent (deterministic edge ids), bounded:
+// hub terms shared by too many nodes are skipped, and total new edges are capped.
+export async function deriveRelatedEdges(db: DB, orgId: string, opts: { maxPerTerm?: number; cap?: number } = {}): Promise<number> {
+  const maxPerTerm = opts.maxPerTerm ?? 6;
+  const cap = opts.cap ?? 300;
+  const nodes = await listNodes(db, orgId);
+  const byTerm = new Map<string, string[]>();
+  for (const n of nodes) for (const t of tokens(n.label)) {
+    const arr = byTerm.get(t) ?? []; arr.push(n.id); byTerm.set(t, arr);
+  }
+  const wanted = new Map<string, { fromId: string; toId: string }>();
+  for (const ids of byTerm.values()) {
+    if (ids.length < 2 || ids.length > maxPerTerm) continue; // skip singletons + hub terms
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      wanted.set(relatedEdgeId(ids[i], ids[j]), { fromId: ids[i], toId: ids[j] });
+    }
+  }
+  let created = 0;
+  for (const [id, e] of [...wanted].slice(0, cap)) {
+    const [row] = await db.insert(memoryEdges).values({ id, orgId, fromId: e.fromId, toId: e.toId, relation: "related" }).onConflictDoNothing().returning();
+    if (row) created++;
+  }
+  return created;
+}
+
 export async function listNodes(db: DB, orgId: string, filter: { kind?: NodeKind; scope?: Scope } = {}, opts: VisibilityOpts = {}) {
   const conds = [eq(memoryNodes.orgId, orgId)];
   if (filter.kind) conds.push(eq(memoryNodes.kind, filter.kind));

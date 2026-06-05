@@ -8,7 +8,7 @@ import { actor } from "./actor.js";
 
 // Builds a GitHub client from a token. Injectable so pr-edit-routes.test.ts can pass a
 // fake updatePr() (no network); production uses OctokitGitHubService.
-export type MakeGitHub = (token: string) => Pick<GitHubService, "updatePr">;
+export type MakeGitHub = (token: string) => Pick<GitHubService, "updatePr" | "getPr">;
 
 export interface PrEditDeps {
   db: DB;
@@ -17,6 +17,26 @@ export interface PrEditDeps {
 
 export function registerPrEditRoutes(app: FastifyInstance, d: PrEditDeps) {
   const makeGitHub: MakeGitHub = d.makeGitHub ?? ((token: string) => new OctokitGitHubService(token));
+
+  // #143: read a run's current PR title/body/base so the in-thread edit form
+  // pre-fills (instead of opening blank). Same org-scoped run→repo resolution.
+  app.get("/runs/:id/pr", async (req, reply) => {
+    const { id: runId } = req.params as { id: string };
+    const { orgId } = actor(req);
+    const [run] = await d.db.select().from(runs).where(and(eq(runs.id, runId), eq(runs.orgId, orgId)));
+    if (!run) return reply.code(404).send({ error: "run not found" });
+    if (run.prNumber == null) return reply.code(404).send({ error: "run has no PR yet" });
+    const [task] = await d.db.select().from(tasks).where(and(eq(tasks.id, run.taskId), eq(tasks.orgId, orgId)));
+    if (!task) return reply.code(404).send({ error: "task not found" });
+    const [thread] = await d.db.select().from(threads).where(and(eq(threads.id, task.threadId), eq(threads.orgId, orgId)));
+    if (!thread?.repoId) return reply.code(404).send({ error: "repo not found" });
+    const [repo] = await d.db.select().from(repos).where(and(eq(repos.id, thread.repoId), eq(repos.orgId, orgId)));
+    if (!repo) return reply.code(404).send({ error: "repo not found" });
+    const token = process.env[repo.tokenEnvVar];
+    if (!token) return reply.code(400).send({ error: "repo token not configured" });
+    const pr = await makeGitHub(token).getPr(repo.githubOwner, repo.githubName, run.prNumber);
+    return reply.code(200).send(pr);
+  });
 
   app.post("/runs/:id/update-pr", async (req, reply) => {
     const { id: runId } = req.params as { id: string };

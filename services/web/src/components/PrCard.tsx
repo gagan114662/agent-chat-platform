@@ -20,13 +20,14 @@ interface PrCardProps {
   onOpenFile?: (runId: string, path: string) => Promise<FileContent>;
   onSyncComments?: (runId: string) => void;
   onUpdatePr?: (runId: string, patch: { title?: string; body?: string; base?: string }) => void;
+  onLoadPr?: (runId: string) => Promise<{ title: string; body: string; base: string }>;
   onLoadCheckpoints?: (runId: string) => Promise<Checkpoint[]>;
   onRestoreCheckpoint?: (runId: string, cpId: string) => void;
   // #64 concurrent runs: pick this run as the winner among its task's siblings.
   onSelectRun?: (runId: string) => void;
 }
 
-export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr, onLoadCheckpoints, onRestoreCheckpoint, onSelectRun }: PrCardProps) {
+export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, onSyncComments, onUpdatePr, onLoadPr, onLoadCheckpoints, onRestoreCheckpoint, onSelectRun }: PrCardProps) {
   const m = message.metadata as { outcome?: string; prNumber?: number; prUrl?: string; runId?: string; parentRunId?: string; selected?: boolean };
   const outcome = m.outcome ?? "merged";
   // #53 stacked PRs: when this run is a child of another, surface a small badge.
@@ -88,6 +89,21 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
   const [editBase, setEditBase] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+
+  // #143: open the edit form PRE-FILLED with the PR's current title/body/base
+  // (was blank, which made it look broken). Falls back to blank if the fetch fails.
+  const toggleEdit = () => {
+    if (editOpen) { setEditOpen(false); return; }
+    setEditOpen(true);
+    if (onLoadPr && m.runId) {
+      setEditLoading(true);
+      onLoadPr(m.runId)
+        .then((pr) => { setEditTitle(pr.title); setEditBody(pr.body); setEditBase(pr.base); })
+        .catch(() => {})
+        .finally(() => setEditLoading(false));
+    }
+  };
 
   const saveEdit = () => {
     if (!onUpdatePr || !m.runId) return;
@@ -177,7 +193,7 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
           {canEdit && (
             <button
               type="button"
-              onClick={() => setEditOpen((o) => !o)}
+              onClick={toggleEdit}
               className="rounded-lg border border-line bg-elevated px-3 py-1.5 text-xs font-semibold text-ink-2 hover:bg-elevated-2"
             >
               Edit
@@ -233,6 +249,7 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
       )}
       {editOpen && (
         <div className="mt-3 flex flex-col gap-2 rounded-lg border border-line bg-app/40 p-3">
+          {editLoading && <p className="text-[11px] text-ink-3">Loading current PR…</p>}
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             Title
             <input

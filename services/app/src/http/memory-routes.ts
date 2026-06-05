@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
-import { createNode, listNodes, neighbors, searchNodes, counts, graph, recallForIntent, supersedeNode, invalidateNode, revalidateNode, addContradiction, type NodeKind, type Scope } from "../memory/memory.js";
+import { createNode, listNodes, neighbors, searchNodes, counts, graph, recallForIntent, supersedeNode, invalidateNode, revalidateNode, addContradiction, deriveRelatedEdges, type NodeKind, type Scope } from "../memory/memory.js";
 import { consolidate } from "../memory/dreaming.js";
 import { roleOf, can } from "../rbac/rbac.js";
 
@@ -29,6 +29,12 @@ export function registerMemoryRoutes(app: FastifyInstance, d: { db: DB }) {
   app.post("/memory/consolidate", async (req) => {
     const { orgId } = actor(req);
     return consolidate(d.db, orgId);
+  });
+  // #143: connect the graph — link nodes that share a meaningful label term with
+  // `related` edges, so the explorer isn't scattered dots. Idempotent + bounded.
+  app.post("/memory/derive-edges", async (req) => {
+    const { orgId } = actor(req);
+    return { created: await deriveRelatedEdges(d.db, orgId) };
   });
   app.post("/memory", async (req, reply) => {
     const { orgId, userId } = actor(req);
