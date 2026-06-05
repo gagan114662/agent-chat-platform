@@ -93,6 +93,10 @@ const GH_ISSUES: GitHubIssue[] = [
 function fakeGitHub(issues: GitHubIssue[], calls: string[][]) {
   return {
     listIssues: async (owner: string, repo: string) => { calls.push([owner, repo]); return issues; },
+    // Unused on the issues-import path; present so the fake satisfies the widened
+    // MakeGitHub seam (now also covers #78 start-from-PR's read methods).
+    getChangedFiles: async () => [],
+    listReviewComments: async () => [],
   };
 }
 
