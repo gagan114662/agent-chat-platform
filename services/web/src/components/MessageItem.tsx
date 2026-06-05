@@ -5,6 +5,7 @@ import { PrCard } from "./PrCard.js";
 import { PlanCard } from "./PlanCard.js";
 import { Icon } from "./Icon.js";
 import { renderMarkdown } from "../lib/markdown.js";
+import { avatarColor, initials } from "../avatar.js";
 
 // Hover action: copy the raw message text to the clipboard, with a brief "Copied" tick.
 function CopyButton({ text }: { text: string }) {
@@ -64,8 +65,8 @@ export function MessageItem({ message, onApprove, onDecline, onLoadDiff, onOpenF
   const ts = clock(message.createdAt);
   return (
     <div className="group relative flex gap-3 px-4 py-1.5 transition-colors hover:bg-surface-2">
-      <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold text-white ${isAgent ? "bg-gradient-to-br from-accent to-[#5b48e0]" : "bg-elevated-2 text-ink-2"}`}>
-        {isAgent ? <Icon name="agents" size={16} className="text-white" /> : message.authorId.slice(0, 2).toUpperCase()}
+      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[11px] font-bold text-white" style={{ backgroundColor: avatarColor(message.authorId) }}>
+        {initials(message.authorId)}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">

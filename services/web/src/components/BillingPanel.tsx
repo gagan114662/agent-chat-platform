@@ -146,7 +146,12 @@ export function BillingPanel({
                   Upgrade
                 </button>
               ) : (
-                <span className="rounded bg-elevated-2 px-2 py-1 text-xs text-ink-3">Contact sales</span>
+                <a
+                  href={`mailto:sales@getfoolish.com?subject=${encodeURIComponent(`Convene — ${p.name} plan enquiry`)}&body=${encodeURIComponent(`Hi, I'd like to talk about the ${p.name} plan for my workspace.`)}`}
+                  className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-elevated-2 hover:text-ink"
+                >
+                  Contact sales
+                </a>
               )}
             </li>
           );

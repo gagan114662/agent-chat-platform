@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
 import { threads, members } from "../db/schema.js";
-import { markRead, unreadCounts, mentionsInbox, runsInbox } from "../nav/read-state.js";
+import { markRead, unreadCounts, mentionsInbox, runsInbox, listApprovals } from "../nav/read-state.js";
 
 // Derive a member's @-mention handle from their displayName: lowercase and keep
 // only the mention charset ([a-z0-9_-]), matching parseMentions. So a member
@@ -51,5 +51,12 @@ export function registerNotifyRoutes(app: FastifyInstance, d: { db: DB }) {
     ]);
     const seen = new Set(mentions.map((i) => i.threadId));
     return [...mentions, ...runs.filter((i) => !seen.has(i.threadId))];
+  });
+
+  // #143: actionable pending approvals (held PRs + awaiting plans) so the Activity
+  // panel can offer inline Approve/Reject instead of a dead "awaiting approval" link.
+  app.get("/approvals", async (req) => {
+    const { orgId } = actor(req);
+    return { approvals: await listApprovals(d.db, orgId) };
   });
 }

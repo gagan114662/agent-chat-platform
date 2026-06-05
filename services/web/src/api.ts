@@ -266,6 +266,14 @@ export async function markThreadRead(threadId: string): Promise<void> {
   if (!res.ok) throw new Error(`markThreadRead ${res.status}`);
 }
 
+// #143: actionable pending approvals (held PRs + awaiting plans).
+export interface Approval { runId: string; threadId: string; threadTitle: string; kind: "pr" | "plan"; prNumber: number | null; }
+export async function listApprovals(): Promise<Approval[]> {
+  const res = await fetch(`/approvals`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listApprovals ${res.status}`);
+  return (await res.json()).approvals;
+}
+
 export async function getInbox(): Promise<InboxItem[]> {
   const res = await fetch(`/inbox`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`getInbox ${res.status}`);

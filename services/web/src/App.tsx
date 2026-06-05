@@ -8,7 +8,7 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, setDeployCommand, deployRepo, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listBusinesses, createBusiness, getBusiness, createPaymentIntent, decidePaymentIntent, createCampaign, decideCampaign, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, setDeployCommand, deployRepo, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listBusinesses, createBusiness, getBusiness, createPaymentIntent, decidePaymentIntent, createCampaign, decideCampaign, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes, listApprovals } from "./api.js";
 import { GoalsPanel } from "./components/GoalsPanel.js";
 import { AgentsPanel } from "./components/AgentsPanel.js";
 import { TasksPanel } from "./components/TasksPanel.js";
@@ -17,6 +17,7 @@ import { AutomationsPanel } from "./components/AutomationsPanel.js";
 import { MemoryPanel } from "./components/MemoryPanel.js";
 import { BusinessesPanel } from "./components/BusinessesPanel.js";
 import type { Channel, Thread, Repo, Principal, InboxItem } from "./types.js";
+import type { Approval } from "./api.js";
 import { useAuth } from "./useAuth.js";
 import { useTheme } from "./useTheme.js";
 import { LoginScreen } from "./components/LoginScreen.js";
@@ -42,6 +43,7 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
   const [view, setView] = useState<"thread" | "context" | "inbox" | "goals" | "agents" | "tasks" | "billing" | "automations" | "memory" | "businesses">("thread");
   const [unreads, setUnreads] = useState<Record<string, number>>({});
   const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [search, setSearch] = useState<{ q: string; nonce: number } | undefined>(undefined);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -53,7 +55,17 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
       setUnreads(Object.fromEntries(u.map((c) => [c.threadId, c.unread])));
       setInbox(ib);
     }).catch(() => {});
+    listApprovals().then(setApprovals).catch(() => {});
   }, []);
+
+  // #143: act on a pending approval inline from Activity (PR approve/decline or
+  // plan approve/reject), then refresh so it drops off the list.
+  const onApproval = (a: Approval, approve: boolean) => {
+    const act = a.kind === "plan"
+      ? (approve ? approvePlan(a.runId) : rejectPlan(a.runId))
+      : (approve ? approveRun(a.runId) : declineRun(a.runId));
+    act.then(refreshNotifications).catch(() => {});
+  };
 
   // Opening a thread marks it read, optimistically clears its badge, then refetches.
   const selectThread = (id: string) => {
@@ -250,7 +262,7 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
               loading={memory.loading}
             />
           : view === "inbox"
-            ? <InboxPanel inbox={inbox} onSelect={selectThread} />
+            ? <InboxPanel inbox={inbox} approvals={approvals} onSelect={selectThread} onAct={onApproval} />
             : view === "goals"
               ? <GoalsPanel orgId={orgId} createGoal={createGoal} decomposeGoal={decomposeGoal} runTick={runTick} listGoals={listGoals} setGoalAutonomy={setGoalAutonomy} getAutonomyStatus={getAutonomyStatus} repos={repos} connectRepo={connectRepo} ingestRepoIssues={ingestRepoIssues} setDeployCommand={setDeployCommand} deployRepo={deployRepo} threads={threads.filter((t) => t.repoId).map((t) => ({ id: t.id, title: t.title }))} agents={principals.filter((p) => p.kind === "agent").map((p) => ({ id: p.id, handle: p.name }))} />
               : view === "agents"
@@ -276,29 +288,57 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
 }
 
 // Lists threads where you were @mentioned and haven't read since (#61).
-function InboxPanel({ inbox, onSelect }: { inbox: InboxItem[]; onSelect: (id: string) => void }) {
+function InboxPanel({ inbox, approvals, onSelect, onAct }: {
+  inbox: InboxItem[];
+  approvals: Approval[];
+  onSelect: (id: string) => void;
+  onAct: (a: Approval, approve: boolean) => void;
+}) {
   return (
     <div className="flex-1 overflow-y-auto bg-surface-2 p-4">
-      {inbox.length === 0 ? (
-        <p className="text-sm text-ink-3">Nothing new. You're all caught up.</p>
-      ) : (
-        <ul className="mx-auto max-w-2xl space-y-2">
-          {inbox.map((i) => (
-            <li key={i.threadId}>
-              <button
-                onClick={() => onSelect(i.threadId)}
-                className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface px-3.5 py-3 text-left transition-colors hover:border-accent/50 hover:bg-elevated"
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><Icon name="activity" size={15} /></span>
-                <span className="min-w-0">
-                  <div className="truncate text-sm font-medium text-ink">{i.title}</div>
-                  <div className="text-xs text-ink-3">{i.reason ?? "you were mentioned"}</div>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="mx-auto max-w-2xl space-y-4">
+        {/* #143: actionable approvals — Approve/Reject inline, no hunting in the thread. */}
+        {approvals.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3">Needs your approval</h3>
+            <ul className="space-y-2">
+              {approvals.map((a) => (
+                <li key={a.runId} className="flex items-center gap-3 rounded-xl border border-warn/30 bg-warn/5 px-3.5 py-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warn/15 text-warn"><Icon name="activity" size={15} /></span>
+                  <button onClick={() => onSelect(a.threadId)} className="min-w-0 flex-1 text-left">
+                    <div className="truncate text-sm font-medium text-ink">{a.threadTitle}</div>
+                    <div className="text-xs text-ink-3">{a.kind === "plan" ? "plan awaiting your approval" : `PR #${a.prNumber ?? "?"} held for your approval`}</div>
+                  </button>
+                  <span className="flex shrink-0 gap-1.5">
+                    <button onClick={() => onAct(a, true)} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover">Approve</button>
+                    <button onClick={() => onAct(a, false)} className="rounded-lg border border-line bg-elevated px-3 py-1.5 text-xs font-semibold text-ink-2 hover:bg-elevated-2">Reject</button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {inbox.length === 0 && approvals.length === 0 ? (
+          <p className="text-sm text-ink-3">Nothing new. You're all caught up.</p>
+        ) : (
+          <ul className="space-y-2">
+            {inbox.map((i) => (
+              <li key={i.threadId}>
+                <button
+                  onClick={() => onSelect(i.threadId)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface px-3.5 py-3 text-left transition-colors hover:border-accent/50 hover:bg-elevated"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><Icon name="activity" size={15} /></span>
+                  <span className="min-w-0">
+                    <div className="truncate text-sm font-medium text-ink">{i.title}</div>
+                    <div className="text-xs text-ink-3">{i.reason ?? "you were mentioned"}</div>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

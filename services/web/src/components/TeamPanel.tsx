@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Principal } from "../types.js";
-import { Icon } from "./Icon.js";
+import { avatarColor, initials } from "../avatar.js";
 
 // Right-hand roster (reload-style "Team"): humans + agents. Agents show a LIVE
 // status — "working" (pulsing) when they have an active run, else "online" (#122)
@@ -35,8 +35,8 @@ export function TeamPanel({ principals, onStartDm, listActiveAgents }: {
         onClick={() => onStartDm?.(p.kind, p.id)}
         className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-elevated"
       >
-        <span className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold text-white ${isAgent ? "bg-gradient-to-br from-accent to-[#5b48e0]" : "bg-elevated-2 text-ink-2"}`}>
-          {isAgent ? <Icon name="agents" size={14} className="text-white" /> : p.name.slice(0, 2).toUpperCase()}
+        <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[10px] font-bold text-white" style={{ backgroundColor: avatarColor(p.id || p.name) }}>
+          {initials(p.name)}
           {isAgent && <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface ${isWorking ? "animate-pulse bg-warn" : "bg-positive"}`} />}
         </span>
         <span className="min-w-0 flex-1">

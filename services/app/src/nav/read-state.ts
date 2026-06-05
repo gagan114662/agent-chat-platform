@@ -69,6 +69,25 @@ export async function runsInbox(db: DB, orgId: string): Promise<InboxItem[]> {
   return [...rows].map((r) => ({ threadId: r.thread_id, title: r.title, latestAt: now, reason: ATTENTION_STATES[r.state] ?? r.state }));
 }
 
+// #143: actionable pending approvals — held_for_human (PR approve/decline) and
+// awaiting_plan_approval (plan approve/reject) runs, with the runId + thread + PR so
+// the Activity panel can render inline Approve/Reject (not just a dead link).
+export interface ApprovalItem { runId: string; threadId: string; threadTitle: string; kind: "pr" | "plan"; prNumber: number | null; }
+export async function listApprovals(db: DB, orgId: string): Promise<ApprovalItem[]> {
+  const rows = await db.execute<{ run_id: string; thread_id: string; title: string; state: string; pr_number: number | null }>(sql`
+    SELECT r.id AS run_id, th.id AS thread_id, th.title AS title, r.state AS state, r.pr_number AS pr_number
+    FROM runs r
+    JOIN tasks t ON t.id = r.task_id AND t.org_id = ${orgId}
+    JOIN threads th ON th.id = t.thread_id AND th.org_id = ${orgId}
+    WHERE r.org_id = ${orgId} AND r.state IN ('held_for_human','awaiting_plan_approval')
+    ORDER BY r.id DESC
+  `);
+  return [...rows].map((r) => ({
+    runId: r.run_id, threadId: r.thread_id, threadTitle: r.title,
+    kind: r.state === "awaiting_plan_approval" ? "plan" : "pr", prNumber: r.pr_number,
+  }));
+}
+
 // Threads where an unread message (createdAt > lastReadAt) mentions @<handle>
 // (case-insensitive), most recent first. Org+user scoped.
 export async function mentionsInbox(db: DB, orgId: string, userId: string, handle: string): Promise<InboxItem[]> {

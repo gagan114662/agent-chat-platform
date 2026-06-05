@@ -40,10 +40,12 @@ export async function buildAgentIntent(db: DB, orgId: string, intent: string, ag
   const recalled = await recallForIntent(db, orgId, intent);
   const preamble = formatRecall(recalled);
 
-  const parts: string[] = [];
+  // The TASK leads the prompt so the PR title (derived from the first line, #143)
+  // is the task itself — not an injected "## Instructions"/"## Skill" header. The
+  // scaffolding (instructions, skill, focus, recall) follows as labelled context.
+  const parts: string[] = [intent];
   if (prefs.systemPrompt) parts.push(`## Instructions\n${prefs.systemPrompt}`);
   if (skill && skill.trim()) parts.push(`## Skill\n${skill}`);
-  parts.push(intent);
   if (prefs.contextDirs && prefs.contextDirs.length > 0) {
     parts.push(`## Focus directories: ${prefs.contextDirs.join(", ")}`);
   }

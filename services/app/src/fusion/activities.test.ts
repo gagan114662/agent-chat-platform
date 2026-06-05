@@ -51,16 +51,16 @@ describe("buildAgentIntent (#74 systemPrompt + contextDirs)", () => {
     });
   });
 
-  it("prepends the systemPrompt + focus-dirs hint, with the original task preserved as its own task line", async () => {
+  it("leads with the task, then the systemPrompt + focus-dirs hint (clean PR title, #143)", async () => {
     const intent = "fix the login bug";
     const out = await buildAgentIntent(h.db, "o1", intent, "a-prefs");
 
-    expect(out.startsWith("## Instructions\nYou are a careful reviewer.")).toBe(true);
+    // #143: the TASK leads so the first line (→ PR title) is the task, not a header.
+    expect(out.split("\n")[0]).toBe(intent);
+    expect(out).toContain("## Instructions\nYou are a careful reviewer.");
     expect(out).toContain("## Focus directories: src/auth");
-    // The original task is preserved verbatim as its own line (clean for #26).
-    expect(out.split("\n")).toContain(intent);
-    // systemPrompt leads, the task follows, focus dirs after it.
-    expect(out.indexOf("## Instructions")).toBeLessThan(out.indexOf(intent));
+    // The task comes before the injected scaffolding.
+    expect(out.indexOf(intent)).toBeLessThan(out.indexOf("## Instructions"));
     expect(out.indexOf(intent)).toBeLessThan(out.indexOf("## Focus directories"));
   });
 

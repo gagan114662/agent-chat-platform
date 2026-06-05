@@ -1,6 +1,15 @@
 import type { SandboxRunner } from "../sandbox/sandbox-runner-client.js";
 import type { GitHubService } from "../github/github-service.js";
 
+// The PR title is the agent's task, not the prompt scaffolding. The composed intent
+// can lead with markdown blocks (## Instructions / ## Skill) injected ahead of the
+// task, so picking line 0 produced garbled titles like "agent: ## Skill". Use the
+// first non-empty, non-header line instead (#143).
+export function prTitleFromIntent(intent: string): string {
+  const line = intent.split("\n").map((l) => l.trim()).find((l) => l && !l.startsWith("#"));
+  return (line ?? intent.trim().split("\n")[0] ?? "change").slice(0, 72);
+}
+
 export interface FusionDeps {
   sandbox: SandboxRunner;
   github: GitHubService;
@@ -154,7 +163,7 @@ export async function runFusion(
     repo: input.repo,
     head: run.branch,
     base: input.baseBranch,
-    title: `agent: ${input.intent.split("\n")[0].slice(0, 72)}`,
+    title: `agent: ${prTitleFromIntent(input.intent)}`,
     body: `Automated change for intent: ${input.intent}\n\nCommit: ${run.commitSha}`,
   });
   await emit({ type: "pr_opened", prNumber: pr.number, prUrl: pr.url });

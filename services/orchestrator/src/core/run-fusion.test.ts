@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { runFusion } from "./run-fusion.js";
+import { runFusion, prTitleFromIntent } from "./run-fusion.js";
 import type { SandboxRunner } from "../sandbox/sandbox-runner-client.js";
 import type { GitHubService } from "../github/github-service.js";
 import type { ChecksStatus } from "../types.js";
@@ -280,5 +280,18 @@ describe("runFusion", () => {
     expect(d.sandbox.plan).toHaveBeenCalledTimes(1);
     expect(d.sandbox.run).toHaveBeenCalledTimes(1);
     expect(d.github.merge).toHaveBeenCalled();
+  });
+});
+
+describe("prTitleFromIntent (#143)", () => {
+  it("returns the first non-empty, non-header line (defends against a leading ## block)", () => {
+    // buildAgentIntent now leads with the task, so the title is the task itself…
+    expect(prTitleFromIntent("Add a login form\n\n## Skill\nbe concise")).toBe("Add a login form");
+    // …and even if a header slips to the front, we skip it rather than title "## Skill".
+    expect(prTitleFromIntent("## Skill\nFix the bug")).toBe("Fix the bug");
+    expect(prTitleFromIntent("Plain task with no headers")).toBe("Plain task with no headers");
+  });
+  it("caps length at 72 chars", () => {
+    expect(prTitleFromIntent("x".repeat(100)).length).toBe(72);
   });
 });
