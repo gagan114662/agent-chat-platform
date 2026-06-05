@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"os"
 	"os/exec"
 )
 
@@ -15,13 +16,25 @@ import (
 // Combined stdout+stderr is streamed line-by-line to onLine (same pattern as
 // the CLI adapters). A non-zero exit returns an error so the caller can fail
 // the run before the agent. The command honors ctx (the #50 timeout/cancel).
-func runSetupScript(ctx context.Context, repoDir, script string, onLine func(string)) error {
+//
+// env carries the per-repo, admin-configured environment variables (#73) so the
+// build/deps step sees them (e.g. private registry tokens). They are appended
+// after the inherited process env, so a configured key overrides it — an
+// intentional admin override. nil/empty env = today's behavior (inherited env).
+func runSetupScript(ctx context.Context, repoDir, script string, env map[string]string, onLine func(string)) error {
 	if script == "" {
 		return nil
 	}
 	cmd := exec.CommandContext(ctx, "bash", "-lc", script)
 	if repoDir != "" {
 		cmd.Dir = repoDir
+	}
+	if len(env) > 0 {
+		cmdEnv := os.Environ()
+		for k, v := range env {
+			cmdEnv = append(cmdEnv, k+"="+v)
+		}
+		cmd.Env = cmdEnv
 	}
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw

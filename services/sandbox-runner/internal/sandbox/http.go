@@ -57,7 +57,7 @@ func NewHandler() http.Handler {
 			return
 		}
 		ad := factory()
-		if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Intent, Model: req.Model, Provider: req.Provider, McpServers: req.McpServers}); err != nil {
+		if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Intent, Model: req.Model, Provider: req.Provider, McpServers: req.McpServers, Env: req.Env}); err != nil {
 			http.Error(w, redactCreds(err.Error()), http.StatusBadRequest)
 			return
 		}

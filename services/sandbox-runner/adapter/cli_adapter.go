@@ -27,10 +27,11 @@ type CLIAdapter struct {
 	exec     execFunc
 	planExec planExecFunc
 
-	repoDir    string   // captured from Prepare so ApplyFeedback (no dir param) knows where to run
-	model      string   // captured from Prepare; "" = the CLI default (no --model flag)
-	provider   string   // captured from Prepare; "" = default provider (no provider env)
-	mcpServers []string // captured from Prepare; nil/empty = no .mcp.json
+	repoDir    string            // captured from Prepare so ApplyFeedback (no dir param) knows where to run
+	model      string            // captured from Prepare; "" = the CLI default (no --model flag)
+	provider   string            // captured from Prepare; "" = default provider (no provider env)
+	mcpServers []string          // captured from Prepare; nil/empty = no .mcp.json
+	env        map[string]string // captured from Prepare; per-repo admin env applied after the #49 scrub
 }
 
 // newCLIAdapter builds a generic CLI adapter for the given name + binary +
@@ -56,11 +57,12 @@ func (a *CLIAdapter) Prepare(_ context.Context, p PrepareContext) error {
 	a.model = p.Model     // optional --model selection (validated upstream in Validate())
 	a.provider = p.Provider
 	a.mcpServers = p.McpServers // optional MCP servers (authz applied at provisioning)
+	a.env = p.Env               // optional per-repo env applied after the scrub
 	return nil
 }
 
 func (a *CLIAdapter) Run(ctx context.Context, repoDir, intent string, emit Emit) error {
-	return runAgentShared(ctx, a.exec, a.model, a.provider, a.mcpServers, repoDir, intent,
+	return runAgentShared(ctx, a.exec, a.model, a.provider, a.mcpServers, a.env, repoDir, intent,
 		a.name+": starting", a.name+": finished", a.name+" run failed", emit)
 }
 
@@ -68,14 +70,14 @@ func (a *CLIAdapter) Run(ctx context.Context, repoDir, intent string, emit Emit)
 // output, reusing the shared hardening (prompt-bound, quarantine, built-in
 // skills, env-scrub) via planShared.
 func (a *CLIAdapter) Plan(ctx context.Context, repoDir, intent string) (string, error) {
-	return planShared(ctx, a.planExec, a.model, a.provider, a.mcpServers, repoDir, intent, a.name+" plan failed")
+	return planShared(ctx, a.planExec, a.model, a.provider, a.mcpServers, a.env, repoDir, intent, a.name+" plan failed")
 }
 
 // ApplyFeedback runs the CLI with the feedback notes as the prompt against the
 // repo dir captured in Prepare — essentially Run with notes — reusing the same
 // hardening via runAgentShared.
 func (a *CLIAdapter) ApplyFeedback(ctx context.Context, notes string, emit Emit) error {
-	return runAgentShared(ctx, a.exec, a.model, a.provider, a.mcpServers, a.repoDir, notes,
+	return runAgentShared(ctx, a.exec, a.model, a.provider, a.mcpServers, a.env, a.repoDir, notes,
 		a.name+": applying feedback", "feedback applied", a.name+" feedback failed", emit)
 }
 
@@ -86,12 +88,12 @@ func (*CLIAdapter) Teardown(context.Context) error { return nil }
 // via provider env; the child env is scrubbed via filterChildEnv (same as
 // claude-code/codex). mcpConfig is part of the shared exec seam but unused here
 // — these CLIs have no --mcp-config flag in the best-effort argv yet.
-func (a *CLIAdapter) runCLI(ctx context.Context, dir, prompt, model, provider, mcpConfig string, onLine func(string)) error {
+func (a *CLIAdapter) runCLI(ctx context.Context, dir, prompt, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 	cmd := exec.CommandContext(ctx, a.binary, a.buildArgs(prompt, model)...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Env = append(filterChildEnv(os.Environ()), providerEnv(provider)...)
+	cmd.Env = applyRepoEnv(append(filterChildEnv(os.Environ()), providerEnv(provider)...), env)
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw
 	cmd.Stderr = pw
@@ -116,13 +118,13 @@ func (a *CLIAdapter) runCLI(ctx context.Context, dir, prompt, model, provider, m
 // runPlanCLI invokes the CLI in read-only plan mode in dir, capturing the full
 // combined stdout+stderr as the returned plan string. mcpConfig is part of the
 // shared plan seam but unused here.
-func (a *CLIAdapter) runPlanCLI(ctx context.Context, dir, intent, model, provider, mcpConfig string) (string, error) {
+func (a *CLIAdapter) runPlanCLI(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string) (string, error) {
 	args := append(a.buildArgs(intent, model), "--plan")
 	cmd := exec.CommandContext(ctx, a.binary, args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Env = append(filterChildEnv(os.Environ()), providerEnv(provider)...)
+	cmd.Env = applyRepoEnv(append(filterChildEnv(os.Environ()), providerEnv(provider)...), env)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err

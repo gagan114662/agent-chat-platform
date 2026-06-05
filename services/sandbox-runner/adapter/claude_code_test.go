@@ -12,7 +12,7 @@ import (
 func TestClaudeCodeAdapter(t *testing.T) {
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			onLine("edited README.md")
 			return nil
 		},
@@ -51,7 +51,7 @@ func TestClaudeCodeAdapterInjectsBuiltinSkills(t *testing.T) {
 	var presentDuringExec bool
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			_, statErr := os.Stat(skillPath)
 			presentDuringExec = statErr == nil
 			onLine("ran")
@@ -89,7 +89,7 @@ func TestClaudeCodeAdapterApplyFeedback(t *testing.T) {
 	var skillPresentDuringExec, claudeMdAbsentDuringExec bool
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, d, prompt, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, d, prompt, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			gotPrompt = prompt
 			_, skillErr := os.Stat(skillPath)
 			skillPresentDuringExec = skillErr == nil
@@ -150,7 +150,7 @@ func TestClaudeCodeAdapterApplyFeedbackOversize(t *testing.T) {
 	called := false
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, prompt, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, prompt, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			called = true
 			return nil
 		},
@@ -173,7 +173,7 @@ func TestClaudeCodeAdapterModelProvider(t *testing.T) {
 	var gotModel, gotProvider string
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			gotModel, gotProvider = model, provider
 			onLine("ran")
 			return nil
@@ -195,7 +195,7 @@ func TestClaudeCodeAdapterModelProvider(t *testing.T) {
 	// No model configured => exec sees empty model (default: no --model flag).
 	b := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			gotModel = model
 			return nil
 		},
@@ -223,7 +223,7 @@ func TestClaudeCodeAdapterProvisionsMcpConfig(t *testing.T) {
 	var gotMcpConfig string
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			_, statErr := os.Stat(mcpPath)
 			presentDuringExec = statErr == nil
 			gotMcpConfig = mcpConfig
@@ -267,7 +267,7 @@ func TestClaudeCodeAdapterNoMcpConfigByDefault(t *testing.T) {
 	var gotMcpConfig string
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			gotMcpConfig = mcpConfig
 			return nil
 		},
@@ -344,7 +344,7 @@ func TestClaudeCodeAdapterOversizeIntent(t *testing.T) {
 	called := false
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			called = true
 			return nil
 		},
@@ -369,7 +369,7 @@ func TestClaudeCodeAdapterPlan(t *testing.T) {
 	var absentDuringPlan bool
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		planExec: func(ctx context.Context, d, intent, model, provider, mcpConfig string) (string, error) {
+		planExec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, env map[string]string) (string, error) {
 			_, statErr := os.Stat(filepath.Join(d, "CLAUDE.md"))
 			absentDuringPlan = os.IsNotExist(statErr)
 			return "PLAN: " + intent, nil
@@ -394,7 +394,7 @@ func TestClaudeCodeAdapterPlanOversizeIntent(t *testing.T) {
 	called := false
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		planExec: func(ctx context.Context, d, intent, model, provider, mcpConfig string) (string, error) {
+		planExec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, env map[string]string) (string, error) {
 			called = true
 			return "", nil
 		},
@@ -419,7 +419,7 @@ func TestClaudeCodeAdapterQuarantinesRepoConfig(t *testing.T) {
 	var absentDuringExec bool
 	a := &ClaudeCodeAdapter{
 		lookPath: func(string) (string, error) { return "/usr/bin/claude", nil },
-		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, onLine func(string)) error {
+		exec: func(ctx context.Context, d, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 			_, statErr := os.Stat(filepath.Join(d, "CLAUDE.md"))
 			absentDuringExec = os.IsNotExist(statErr)
 			onLine("ran")

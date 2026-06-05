@@ -26,7 +26,11 @@ type FeedbackRequest struct {
 	// ever populated from trusted repo config (never cloned content), so no
 	// charset validation — it is a shell script by design.
 	SetupScript string `json:"setupScript,omitempty"`
-	WorkDir     string `json:"-"`
+	// Env is the per-repo, admin-configured environment applied to the agent's
+	// child env (after the #49 scrub) AND to the setup script (#73). Optional;
+	// nil/empty = today's behavior. Only ever populated from trusted repo config.
+	Env     map[string]string `json:"env,omitempty"`
+	WorkDir string            `json:"-"`
 }
 
 // Validate checks the request before any git command is shelled out.
@@ -80,10 +84,10 @@ func Feedback(ctx context.Context, req FeedbackRequest, ad adapter.Adapter, limi
 	}
 	// Per-repo setup runs after clone and BEFORE the agent re-applies feedback,
 	// in the workdir, bounded by ctx (#50). A non-zero exit fails the run.
-	if err := runSetupScript(ctx, req.WorkDir, req.SetupScript, nil); err != nil {
+	if err := runSetupScript(ctx, req.WorkDir, req.SetupScript, req.Env, nil); err != nil {
 		return RunResult{}, fmt.Errorf("setup: %w", err)
 	}
-	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Notes, Model: req.Model, Provider: req.Provider, McpServers: req.McpServers}); err != nil {
+	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Notes, Model: req.Model, Provider: req.Provider, McpServers: req.McpServers, Env: req.Env}); err != nil {
 		return RunResult{}, fmt.Errorf("prepare: %w", err)
 	}
 	noopEmit := func(adapter.Event) {}

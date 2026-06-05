@@ -11,7 +11,7 @@ import (
 
 // newTestCursorAdapter builds a CLIAdapter wired like the registered "cursor"
 // adapter but with an injected exec so the suite needs no real CLI binary.
-func newTestCursorAdapter(exec func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error) *CLIAdapter {
+func newTestCursorAdapter(exec func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error) *CLIAdapter {
 	a := newCLIAdapter("cursor", "cursor-agent", cursorArgs)
 	a.lookPath = func(string) (string, error) { return "/usr/bin/cursor-agent", nil }
 	a.exec = exec
@@ -40,7 +40,7 @@ func TestCLIAdapterRunQuarantinesAndInjectsSkills(t *testing.T) {
 	skillPath := filepath.Join(dir, ".claude", "skills", "code-review", "SKILL.md")
 
 	var skillPresent, claudeMdAbsent bool
-	a := newTestCursorAdapter(func(ctx context.Context, d, intent, model, provider, mcpConfig string, onLine func(string)) error {
+	a := newTestCursorAdapter(func(ctx context.Context, d, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 		_, skillErr := os.Stat(skillPath)
 		skillPresent = skillErr == nil
 		_, mdErr := os.Stat(filepath.Join(d, "CLAUDE.md"))
@@ -86,7 +86,7 @@ func TestCLIAdapterRunQuarantinesAndInjectsSkills(t *testing.T) {
 // exec (the shared prompt-bound guard).
 func TestCLIAdapterOversizeIntent(t *testing.T) {
 	called := false
-	a := newTestCursorAdapter(func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
+	a := newTestCursorAdapter(func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 		called = true
 		return nil
 	})
@@ -103,7 +103,7 @@ func TestCLIAdapterOversizeIntent(t *testing.T) {
 // into the exec seam, and no model => empty (no --model).
 func TestCLIAdapterModelThreaded(t *testing.T) {
 	var gotModel string
-	a := newTestCursorAdapter(func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
+	a := newTestCursorAdapter(func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 		gotModel = model
 		onLine("ran")
 		return nil
@@ -119,7 +119,7 @@ func TestCLIAdapterModelThreaded(t *testing.T) {
 	}
 
 	var gotModel2 string
-	b := newTestCursorAdapter(func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
+	b := newTestCursorAdapter(func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 		gotModel2 = model
 		return nil
 	})
@@ -131,6 +131,41 @@ func TestCLIAdapterModelThreaded(t *testing.T) {
 	}
 	if gotModel2 != "" {
 		t.Fatalf("expected empty model with no config, got %q", gotModel2)
+	}
+}
+
+// TestCLIAdapterEnvThreaded verifies per-repo env vars (#73) captured in Prepare
+// are threaded into the exec seam, and no env => nil/empty (unchanged behavior).
+func TestCLIAdapterEnvThreaded(t *testing.T) {
+	var gotEnv map[string]string
+	a := newTestCursorAdapter(func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
+		gotEnv = env
+		onLine("ran")
+		return nil
+	})
+	if err := a.Prepare(context.Background(), PrepareContext{RepoDir: t.TempDir(), Env: map[string]string{"FOO": "bar"}}); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if err := a.Run(context.Background(), t.TempDir(), "do work", func(Event) {}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if gotEnv["FOO"] != "bar" {
+		t.Fatalf("env not threaded to exec: got %v", gotEnv)
+	}
+
+	var gotEnv2 map[string]string
+	b := newTestCursorAdapter(func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
+		gotEnv2 = env
+		return nil
+	})
+	if err := b.Prepare(context.Background(), PrepareContext{RepoDir: t.TempDir()}); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if err := b.Run(context.Background(), t.TempDir(), "do work", func(Event) {}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(gotEnv2) != 0 {
+		t.Fatalf("expected empty env with no config, got %v", gotEnv2)
 	}
 }
 
@@ -211,7 +246,7 @@ func TestCLIAdapterPlanAndFeedback(t *testing.T) {
 	var absentDuringPlan bool
 	a := newCLIAdapter("cursor", "cursor-agent", cursorArgs)
 	a.lookPath = func(string) (string, error) { return "/usr/bin/cursor-agent", nil }
-	a.planExec = func(ctx context.Context, d, intent, model, provider, mcpConfig string) (string, error) {
+	a.planExec = func(ctx context.Context, d, intent, model, provider, mcpConfig string, env map[string]string) (string, error) {
 		_, statErr := os.Stat(filepath.Join(d, "CLAUDE.md"))
 		absentDuringPlan = os.IsNotExist(statErr)
 		return "PLAN: " + intent, nil
@@ -228,7 +263,7 @@ func TestCLIAdapterPlanAndFeedback(t *testing.T) {
 	}
 
 	var gotPrompt string
-	b := newTestCursorAdapter(func(ctx context.Context, d, prompt, model, provider, mcpConfig string, onLine func(string)) error {
+	b := newTestCursorAdapter(func(ctx context.Context, d, prompt, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 		gotPrompt = prompt
 		onLine("addressed feedback")
 		return nil
