@@ -10,7 +10,7 @@ interface ToolViewProps {
 // host document. There is NO `dangerouslySetInnerHTML` anywhere.
 export function ToolView({ name, content }: ToolViewProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-line bg-surface">
       <iframe
         title={name}
         sandbox=""

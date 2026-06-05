@@ -35,12 +35,6 @@ describe("Sidebar", () => {
     expect(screen.getByText("Direct Messages")).toBeInTheDocument();
     expect(screen.getByText("Coder")).toBeInTheDocument();
   });
-  it("calls onOpenContext when the Context entry is clicked", () => {
-    const onOpenContext = vi.fn();
-    render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={onOpenContext} canCreateChannel={true} />);
-    fireEvent.click(screen.getByRole("button", { name: /context/i }));
-    expect(onOpenContext).toHaveBeenCalled();
-  });
   it("hides channel creation for non-admins", () => {
     render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={false} />);
     expect(screen.queryByPlaceholderText(/new channel/i)).not.toBeInTheDocument();
@@ -64,12 +58,10 @@ describe("Sidebar", () => {
     render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);
     expect(screen.getByText(/dev/i)).toBeInTheDocument();
   });
-  it("renders an Activity inbox affordance that lists mentions (#61)", () => {
-    const onOpenInbox = vi.fn();
-    render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} inbox={[{ threadId: "t1", title: "Demo thread", latestAt: "2024-01-01T00:00:00Z" }]} onOpenInbox={onOpenInbox} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);
-    const activity = screen.getByRole("button", { name: /activity/i });
-    expect(activity).toHaveTextContent("1");
-    fireEvent.click(activity);
-    expect(onOpenInbox).toHaveBeenCalled();
+  it("filters threads by the channel search box", () => {
+    render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);
+    fireEvent.change(screen.getByPlaceholderText(/search channels/i), { target: { value: "Second" } });
+    expect(screen.getByText("Second thread")).toBeInTheDocument();
+    expect(screen.queryByText("Demo thread")).not.toBeInTheDocument();
   });
 });

@@ -98,14 +98,14 @@ export function AutomationsPanel({
     }
   };
 
-  const inputCls = "w-full rounded-lg border border-[#e7e7f0] px-2 py-1.5 text-sm focus:border-neutral-800 focus:outline-none";
+  const inputCls = "w-full rounded-lg border border-line px-2 py-1.5 text-sm focus:border-accent focus:outline-none";
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
-      <h2 className="mb-4 text-sm font-semibold text-neutral-800">Automations</h2>
-      {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+      <h2 className="mb-4 text-sm font-semibold text-ink">Automations</h2>
+      {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
-      <div className="mb-4 space-y-2 rounded-lg border border-[#e7e7f0] bg-white p-3">
+      <div className="mb-4 space-y-2 rounded-lg border border-line bg-surface p-3">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Automation name" className={inputCls} />
 
         <div className="flex gap-2">
@@ -150,7 +150,7 @@ export function AutomationsPanel({
         <button
           onClick={submit}
           disabled={busy || !name.trim()}
-          className="rounded-lg bg-[#5b5bd6] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#4a4ac4] disabled:opacity-50"
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
         >
           Create automation
         </button>
@@ -158,24 +158,24 @@ export function AutomationsPanel({
 
       <ul className="space-y-2">
         {rows.map((a) => (
-          <li key={a.id} className="rounded-lg border border-[#e7e7f0] bg-white px-3 py-2">
+          <li key={a.id} className="rounded-lg border border-line bg-surface px-3 py-2">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-sm font-medium text-neutral-800">{a.name}</div>
-                <div className="text-xs text-neutral-400">{triggerSummary(a.trigger)} · {actionSummary(a.action)}</div>
+                <div className="text-sm font-medium text-ink">{a.name}</div>
+                <div className="text-xs text-ink-3">{triggerSummary(a.trigger)} · {actionSummary(a.action)}</div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   onClick={() => toggle(a)}
                   aria-label={`${a.enabled ? "disable" : "enable"} ${a.name}`}
-                  className={`rounded-lg px-2 py-1 text-xs font-medium ${a.enabled ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200"}`}
+                  className={`rounded-lg px-2 py-1 text-xs font-medium ${a.enabled ? "bg-positive/10 text-positive hover:bg-positive/20" : "bg-elevated-2 text-ink-3 hover:bg-elevated"}`}
                 >
                   {a.enabled ? "Enabled" : "Disabled"}
                 </button>
                 <button
                   onClick={() => remove(a)}
                   aria-label={`delete ${a.name}`}
-                  className="rounded-lg border border-[#e7e7f0] px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-50"
+                  className="rounded-lg border border-line px-2 py-1 text-xs text-ink-3 hover:bg-elevated-2"
                 >
                   Delete
                 </button>

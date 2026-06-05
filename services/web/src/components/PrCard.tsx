@@ -5,11 +5,11 @@ import { DiffView } from "./DiffView.js";
 import { FilePreview } from "./FilePreview.js";
 
 const OUTCOME_STYLES: Record<string, string> = {
-  merged: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  checks_failed: "bg-rose-50 text-rose-700 border-rose-200",
-  timeout: "bg-amber-50 text-amber-700 border-amber-200",
-  error: "bg-rose-50 text-rose-700 border-rose-200",
-  held_for_human: "bg-amber-50 text-amber-800 border-amber-200",
+  merged: "bg-positive/10 text-positive border-positive/30",
+  checks_failed: "bg-danger/10 text-danger border-danger/30",
+  timeout: "bg-warn/10 text-warn border-warn/30",
+  error: "bg-danger/10 text-danger border-danger/30",
+  held_for_human: "bg-warn/10 text-warn border-warn/30",
 };
 
 interface PrCardProps {
@@ -117,32 +117,32 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
         <span className="text-xs font-semibold uppercase tracking-wide">{outcome.replace("_", " ")}</span>
         {m.prNumber != null && (
           safePrUrl ? (
-            <a href={safePrUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-neutral-800 underline underline-offset-2">
+            <a href={safePrUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-ink underline underline-offset-2">
               PR #{m.prNumber}
             </a>
           ) : (
-            <span className="text-sm font-medium text-neutral-800">PR #{m.prNumber}</span>
+            <span className="text-sm font-medium text-ink">PR #{m.prNumber}</span>
           )
         )}
         {parentRunId && (
-          <span className="rounded-full border border-neutral-300 bg-white/60 px-2 py-0.5 text-[11px] font-medium text-neutral-600">
+          <span className="rounded-full border border-line bg-app/40 px-2 py-0.5 text-[11px] font-medium text-ink-2">
             ⬑ stacked on {parentRunId}
           </span>
         )}
         {isSelected && (
-          <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+          <span className="rounded-full border border-positive/40 bg-positive/10 px-2 py-0.5 text-[11px] font-medium text-positive">
             ✓ selected
           </span>
         )}
       </div>
-      <p className="mt-1 text-sm">{message.body}</p>
+      <p className="mt-1 text-sm text-ink">{message.body}</p>
       {(actionable || canDiff || canEdit || canCheckpoint || canSelect) && (
         <div className="mt-3 flex gap-2">
           {actionable && (
             <button
               type="button"
               onClick={() => onApprove?.(m.runId!)}
-              className="rounded-lg bg-[#15151f] px-3 py-1.5 text-xs font-semibold text-white hover:bg-black"
+              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover"
             >
               Approve
             </button>
@@ -151,7 +151,7 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
             <button
               type="button"
               onClick={() => onDecline?.(m.runId!)}
-              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              className="rounded-lg border border-line bg-elevated px-3 py-1.5 text-xs font-semibold text-ink-2 hover:bg-elevated-2"
             >
               Decline
             </button>
@@ -160,7 +160,7 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
             <button
               type="button"
               onClick={toggleDiff}
-              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              className="rounded-lg border border-line bg-elevated px-3 py-1.5 text-xs font-semibold text-ink-2 hover:bg-elevated-2"
             >
               {diffOpen ? "Hide diff" : "View diff"}
             </button>
@@ -169,7 +169,7 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
             <button
               type="button"
               onClick={() => onSyncComments?.(m.runId!)}
-              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              className="rounded-lg border border-line bg-elevated px-3 py-1.5 text-xs font-semibold text-ink-2 hover:bg-elevated-2"
             >
               ↻ Sync comments
             </button>
@@ -178,7 +178,7 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
             <button
               type="button"
               onClick={() => setEditOpen((o) => !o)}
-              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              className="rounded-lg border border-line bg-elevated px-3 py-1.5 text-xs font-semibold text-ink-2 hover:bg-elevated-2"
             >
               Edit
             </button>
@@ -187,7 +187,7 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
             <button
               type="button"
               onClick={toggleCheckpoints}
-              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              className="rounded-lg border border-line bg-elevated px-3 py-1.5 text-xs font-semibold text-ink-2 hover:bg-elevated-2"
             >
               {cpOpen ? "Hide checkpoints" : "Checkpoints"}
             </button>
@@ -196,7 +196,7 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
             <button
               type="button"
               onClick={() => onSelectRun?.(m.runId!)}
-              className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+              className="rounded-lg border border-positive/40 bg-elevated px-3 py-1.5 text-xs font-semibold text-positive hover:bg-positive/20"
             >
               Select
             </button>
@@ -204,24 +204,24 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
         </div>
       )}
       {cpOpen && (
-        <div className="mt-3 rounded-lg border border-neutral-200 bg-white/70 p-3">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Checkpoints</p>
+        <div className="mt-3 rounded-lg border border-line bg-app/40 p-3">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-3">Checkpoints</p>
           {cpLoading ? (
-            <p className="px-1 text-xs text-neutral-400">Loading checkpoints…</p>
+            <p className="px-1 text-xs text-ink-3">Loading checkpoints…</p>
           ) : (checkpoints?.length ?? 0) === 0 ? (
-            <p className="px-1 text-xs text-neutral-400">No checkpoints yet.</p>
+            <p className="px-1 text-xs text-ink-3">No checkpoints yet.</p>
           ) : (
             <ul className="space-y-1">
               {(checkpoints ?? []).map((cp) => (
                 <li key={cp.id} className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate text-xs text-neutral-700">
+                  <span className="min-w-0 truncate text-xs text-ink-2">
                     <span className="font-medium">{cp.label}</span>{" "}
-                    <span className="font-mono text-neutral-500">{cp.branch} · {cp.commitSha.slice(0, 7)}</span>
+                    <span className="font-mono text-ink-3">{cp.branch} · {cp.commitSha.slice(0, 7)}</span>
                   </span>
                   <button
                     type="button"
                     onClick={() => m.runId && onRestoreCheckpoint?.(m.runId, cp.id)}
-                    className="shrink-0 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                    className="shrink-0 rounded-lg border border-line bg-elevated px-2.5 py-1 text-xs font-semibold text-ink-2 hover:bg-elevated-2"
                   >
                     ↩ Restore
                   </button>
@@ -232,46 +232,46 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
         </div>
       )}
       {editOpen && (
-        <div className="mt-3 flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white/70 p-3">
-          <label className="flex flex-col gap-1 text-xs font-semibold text-neutral-700">
+        <div className="mt-3 flex flex-col gap-2 rounded-lg border border-line bg-app/40 p-3">
+          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             Title
             <input
               type="text"
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
-              className="rounded border border-neutral-300 px-2 py-1 text-sm font-normal text-neutral-900"
+              className="rounded border border-line px-2 py-1 text-sm font-normal text-ink"
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold text-neutral-700">
+          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             Description
             <textarea
               value={editBody}
               onChange={(e) => setEditBody(e.target.value)}
               rows={3}
-              className="rounded border border-neutral-300 px-2 py-1 text-sm font-normal text-neutral-900"
+              className="rounded border border-line px-2 py-1 text-sm font-normal text-ink"
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold text-neutral-700">
+          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             Base branch
             <input
               type="text"
               value={editBase}
               onChange={(e) => setEditBase(e.target.value)}
-              className="rounded border border-neutral-300 px-2 py-1 text-sm font-normal text-neutral-900"
+              className="rounded border border-line px-2 py-1 text-sm font-normal text-ink"
             />
           </label>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={saveEdit}
-              className="rounded-lg bg-[#15151f] px-3 py-1.5 text-xs font-semibold text-white hover:bg-black"
+              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover"
             >
               Save
             </button>
             <button
               type="button"
               onClick={() => setEditOpen(false)}
-              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              className="rounded-lg border border-line bg-elevated px-3 py-1.5 text-xs font-semibold text-ink-2 hover:bg-elevated-2"
             >
               Cancel
             </button>
@@ -279,15 +279,15 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
         </div>
       )}
       {diffOpen && onOpenFile && (diffFiles?.length ?? 0) > 0 && (
-        <div className="mt-3 rounded-lg border border-neutral-200 bg-white/70 p-2">
-          <p className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Files</p>
+        <div className="mt-3 rounded-lg border border-line bg-app/40 p-2">
+          <p className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-ink-3">Files</p>
           <ul className="space-y-0.5">
             {(diffFiles ?? []).map((f) => (
               <li key={f.filename}>
                 <button
                   type="button"
                   onClick={() => openFile(f.filename)}
-                  className={`w-full truncate rounded px-2 py-1 text-left font-mono text-xs hover:bg-neutral-100 ${openPath === f.filename ? "bg-neutral-100 font-semibold text-neutral-900" : "text-neutral-700"}`}
+                  className={`w-full truncate rounded px-2 py-1 text-left font-mono text-xs hover:bg-elevated ${openPath === f.filename ? "bg-elevated-2 font-semibold text-ink" : "text-ink-2"}`}
                 >
                   {f.filename}
                 </button>
@@ -296,11 +296,11 @@ export function PrCard({ message, onApprove, onDecline, onLoadDiff, onOpenFile, 
           </ul>
           {openPath && (
             fileLoading ? (
-              <p className="mt-2 px-1 text-xs text-neutral-400">Loading file…</p>
+              <p className="mt-2 px-1 text-xs text-ink-3">Loading file…</p>
             ) : fileContent ? (
               <FilePreview filename={openPath} content={fileContent.content} encoding={fileContent.encoding} />
             ) : (
-              <p className="mt-2 px-1 text-xs text-neutral-400">Could not load file.</p>
+              <p className="mt-2 px-1 text-xs text-ink-3">Could not load file.</p>
             )
           )}
         </div>

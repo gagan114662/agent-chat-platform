@@ -6,28 +6,28 @@ interface DiffViewProps {
 }
 
 function rowClass(line: string): string {
-  if (line.startsWith("@@")) return "bg-indigo-50 text-indigo-700";
-  if (line.startsWith("+")) return "bg-emerald-50 text-emerald-800";
-  if (line.startsWith("-")) return "bg-rose-50 text-rose-800";
-  return "text-neutral-600";
+  if (line.startsWith("@@")) return "bg-accent-soft text-accent";
+  if (line.startsWith("+")) return "bg-positive/10 text-positive";
+  if (line.startsWith("-")) return "bg-danger/10 text-danger";
+  return "text-ink-2";
 }
 
 export function DiffView({ files, loading }: DiffViewProps) {
   if (loading) {
-    return <p className="mt-3 text-xs text-neutral-400">Loading diff…</p>;
+    return <p className="mt-3 text-xs text-ink-3">Loading diff…</p>;
   }
   if (files.length === 0) {
-    return <p className="mt-3 text-xs text-neutral-400">No changed files.</p>;
+    return <p className="mt-3 text-xs text-ink-3">No changed files.</p>;
   }
   return (
     <div className="mt-3 space-y-3">
       {files.map((f) => (
-        <div key={f.filename} className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-          <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-3 py-1.5">
-            <span className="font-mono text-xs font-medium text-neutral-800">{f.filename}</span>
-            <span className="text-xs text-neutral-500">
-              <span className="text-emerald-700">+{f.additions}</span>{" "}
-              <span className="text-rose-700">−{f.deletions}</span>
+        <div key={f.filename} className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="flex items-center justify-between border-b border-line bg-elevated px-3 py-1.5">
+            <span className="font-mono text-xs font-medium text-ink">{f.filename}</span>
+            <span className="text-xs text-ink-3">
+              <span className="text-positive">+{f.additions}</span>{" "}
+              <span className="text-danger">−{f.deletions}</span>
             </span>
           </div>
           {f.patch ? (
@@ -37,7 +37,7 @@ export function DiffView({ files, loading }: DiffViewProps) {
               ))}
             </pre>
           ) : (
-            <p className="px-3 py-2 text-xs text-neutral-400">No preview available (large or binary file).</p>
+            <p className="px-3 py-2 text-xs text-ink-3">No preview available (large or binary file).</p>
           )}
         </div>
       ))}

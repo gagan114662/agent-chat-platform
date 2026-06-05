@@ -74,51 +74,51 @@ export function TasksPanel({
           onChange={(e) => setLookup(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") load(lookup); }}
           placeholder="Task id"
-          className="min-w-0 flex-1 rounded-lg border border-[#e7e7f0] px-2 py-1.5 text-sm focus:border-neutral-800 focus:outline-none"
+          className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm focus:border-accent focus:outline-none"
         />
-        <button onClick={() => load(lookup)} className="rounded-lg bg-[#15151f] px-3 py-1.5 text-xs text-white hover:bg-black">Load</button>
+        <button onClick={() => load(lookup)} className="rounded-lg bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover">Load</button>
       </div>
 
-      {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
       {detail && (
         <div className="space-y-4">
-          <div className="rounded-lg border border-[#e7e7f0] bg-white p-3">
-            <div className="text-sm font-semibold text-neutral-800">{detail.task.title}</div>
-            <div className="mt-1 text-xs text-neutral-400">{detail.task.id}</div>
+          <div className="rounded-lg border border-line bg-surface p-3">
+            <div className="text-sm font-semibold text-ink">{detail.task.title}</div>
+            <div className="mt-1 text-xs text-ink-3">{detail.task.id}</div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-1 text-xs text-neutral-500">
+              <label className="flex items-center gap-1 text-xs text-ink-3">
                 State
                 <select
                   aria-label="state"
                   value={detail.task.state}
                   onChange={(e) => onChangeState(e.target.value as TaskState)}
-                  className="rounded-lg border border-[#e7e7f0] px-2 py-1 text-xs focus:border-neutral-800 focus:outline-none"
+                  className="rounded-lg border border-line px-2 py-1 text-xs focus:border-accent focus:outline-none"
                 >
                   {TASK_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
-              <label className="flex items-center gap-1 text-xs text-neutral-500">
+              <label className="flex items-center gap-1 text-xs text-ink-3">
                 Priority
                 <select
                   aria-label="priority"
                   value={detail.task.priority}
                   onChange={(e) => onChangePriority(e.target.value as TaskPriority)}
-                  className="rounded-lg border border-[#e7e7f0] px-2 py-1 text-xs focus:border-neutral-800 focus:outline-none"
+                  className="rounded-lg border border-line px-2 py-1 text-xs focus:border-accent focus:outline-none"
                 >
                   {TASK_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
                 </select>
               </label>
-              {detail.task.dueDate && <span className="text-xs text-neutral-500">due {detail.task.dueDate.slice(0, 10)}</span>}
+              {detail.task.dueDate && <span className="text-xs text-ink-3">due {detail.task.dueDate.slice(0, 10)}</span>}
             </div>
           </div>
 
           {detail.relations.length > 0 && (
-            <div className="rounded-lg border border-[#e7e7f0] bg-white p-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">Relations</div>
+            <div className="rounded-lg border border-line bg-surface p-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">Relations</div>
               <ul className="space-y-1">
                 {detail.relations.map((r) => (
-                  <li key={r.id} className="text-xs text-neutral-600">
+                  <li key={r.id} className="text-xs text-ink-2">
                     <span className="font-medium">{r.relation}</span> → {r.toTaskId}
                   </li>
                 ))}
@@ -126,13 +126,13 @@ export function TasksPanel({
             </div>
           )}
 
-          <div className="rounded-lg border border-[#e7e7f0] bg-white p-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">Comments</div>
+          <div className="rounded-lg border border-line bg-surface p-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">Comments</div>
             <ul className="space-y-2">
               {detail.comments.map((c) => (
-                <li key={c.id} className="rounded-lg bg-neutral-50 px-2 py-1.5">
-                  <div className="text-xs text-neutral-400">{c.authorId}</div>
-                  <div className="text-sm text-neutral-800">{c.body}</div>
+                <li key={c.id} className="rounded-lg bg-elevated px-2 py-1.5">
+                  <div className="text-xs text-ink-3">{c.authorId}</div>
+                  <div className="text-sm text-ink">{c.body}</div>
                 </li>
               ))}
             </ul>
@@ -142,9 +142,9 @@ export function TasksPanel({
                 onChange={(e) => setComment(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") onAddComment(); }}
                 placeholder="Add a comment…"
-                className="min-w-0 flex-1 rounded-lg border border-[#e7e7f0] px-2 py-1.5 text-sm focus:border-neutral-800 focus:outline-none"
+                className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm focus:border-accent focus:outline-none"
               />
-              <button onClick={onAddComment} className="rounded-lg bg-[#5b5bd6] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#4a4ac4]">Comment</button>
+              <button onClick={onAddComment} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-[#4a4ac4]">Comment</button>
             </div>
           </div>
         </div>

@@ -18,10 +18,13 @@ import { MemoryPanel } from "./components/MemoryPanel.js";
 import type { Channel, Thread, Repo, Principal, InboxItem } from "./types.js";
 import { useAuth } from "./useAuth.js";
 import { LoginScreen } from "./components/LoginScreen.js";
+import { Icon } from "./components/Icon.js";
+import { WorkspaceRail } from "./components/WorkspaceRail.js";
+import { TeamPanel } from "./components/TeamPanel.js";
 
 export function App() {
   const { principal, loading, login, logout } = useAuth();
-  if (loading) return <div className="flex h-screen items-center justify-center text-sm text-neutral-400">Loading…</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center bg-app text-sm text-ink-3">Loading…</div>;
   if (!principal) return <LoginScreen onLogin={login} />;
   return <Workspace onLogout={logout} userId={principal.userId} orgId={principal.orgId} role={principal.role ?? "member"} />;
 }
@@ -146,7 +149,21 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
   );
 
   return (
-    <div className="flex h-screen bg-[#f0f0f7] text-[#2b2b2b]">
+    <div className="flex h-screen bg-app text-ink">
+      <WorkspaceRail
+        active={view === "inbox" ? "activity" : view}
+        inboxCount={inbox.length}
+        onSelect={{
+          activity: () => setView("inbox"),
+          context: () => setView("context"),
+          memory: () => setView("memory"),
+          goals: () => setView("goals"),
+          agents: () => setView("agents"),
+          tasks: () => setView("tasks"),
+          automations: () => setView("automations"),
+          billing: () => setView("billing"),
+        }}
+      />
       <Sidebar
         channels={channels}
         threads={threads}
@@ -172,10 +189,10 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
         onOpenMemory={() => setView("memory")}
         newThreadRef={newThreadRef}
       />
-      <main className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-[#e7e7f0] bg-white px-4 py-3">
+      <main className="flex flex-1 flex-col bg-surface-2">
+        <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-2.5">
           <div>
-            <h1 className="text-sm font-semibold text-neutral-800">
+            <h1 className="text-[14px] font-semibold text-ink">
               {view === "context"
                 ? "Context Explorer"
                 : view === "inbox"
@@ -194,11 +211,13 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
                               ? "Memory"
                               : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
             </h1>
-            <p className="text-xs text-neutral-400">chat → sandboxed agent → PR → back to chat</p>
+            <p className="text-[11px] text-ink-3">chat → sandboxed agent → PR → back to chat</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <SearchBar key={search?.nonce ?? 0} onSearch={searchMessages} onSelect={setActiveThreadId} inputRef={searchRef} initialQuery={search?.q} />
-            <button onClick={onLogout} className="text-xs text-neutral-500 hover:text-neutral-800">Sign out ({userId})</button>
+            <button onClick={onLogout} title={`Sign out (${userId})`} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-ink-3 transition-colors hover:bg-elevated hover:text-ink">
+              <Icon name="logout" size={14} /> Sign out
+            </button>
           </div>
         </header>
         {view === "context"
@@ -229,6 +248,7 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
                     ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} commands={commands} onSlashSearch={focusSearch} />
                     : <div className="flex-1" />}
       </main>
+      <TeamPanel principals={principals} onStartDm={onStartDm} />
       <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
     </div>
   );
@@ -237,19 +257,22 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
 // Lists threads where you were @mentioned and haven't read since (#61).
 function InboxPanel({ inbox, onSelect }: { inbox: InboxItem[]; onSelect: (id: string) => void }) {
   return (
-    <div className="flex-1 overflow-y-auto p-4">
+    <div className="flex-1 overflow-y-auto bg-surface-2 p-4">
       {inbox.length === 0 ? (
-        <p className="text-sm text-neutral-400">Nothing new. You're all caught up.</p>
+        <p className="text-sm text-ink-3">Nothing new. You're all caught up.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="mx-auto max-w-2xl space-y-2">
           {inbox.map((i) => (
             <li key={i.threadId}>
               <button
                 onClick={() => onSelect(i.threadId)}
-                className="block w-full rounded-lg border border-[#e7e7f0] bg-white px-3 py-2 text-left hover:bg-neutral-50"
+                className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface px-3.5 py-3 text-left transition-colors hover:border-accent/50 hover:bg-elevated"
               >
-                <div className="text-sm font-medium text-neutral-800">{i.title}</div>
-                <div className="text-xs text-neutral-400">you were mentioned</div>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><Icon name="activity" size={15} /></span>
+                <span className="min-w-0">
+                  <div className="truncate text-sm font-medium text-ink">{i.title}</div>
+                  <div className="text-xs text-ink-3">you were mentioned</div>
+                </span>
               </button>
             </li>
           ))}

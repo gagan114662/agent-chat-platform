@@ -33,20 +33,20 @@ export function SearchBar({ onSearch, onSelect, inputRef, initialQuery }: {
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") run(); }}
         placeholder="Search messages…"
-        className="w-72 rounded-lg border border-[#e7e7f0] px-3 py-1.5 text-sm focus:border-neutral-800 focus:outline-none"
+        className="w-64 rounded-lg border border-line bg-elevated px-3 py-1.5 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none"
       />
       {open && (
-        <div className="absolute z-10 mt-1 w-96 rounded-xl border border-[#e7e7f0] bg-white shadow-lg">
+        <div className="absolute z-10 mt-1 w-96 rounded-xl border border-line bg-surface shadow-xl shadow-black/40">
           {results.length === 0
-            ? <div className="px-3 py-2 text-sm text-neutral-400">No matches</div>
+            ? <div className="px-3 py-2 text-sm text-ink-3">No matches</div>
             : results.map((r) => (
                 <button
                   key={r.messageId}
                   onClick={() => { onSelect(r.threadId); setOpen(false); }}
-                  className="block w-full border-b border-[#e7e7f0] px-3 py-2 text-left last:border-0 hover:bg-neutral-50"
+                  className="block w-full border-b border-line px-3 py-2 text-left last:border-0 hover:bg-elevated"
                 >
-                  <div className="text-xs font-medium text-neutral-800">{r.threadTitle}</div>
-                  <div className="truncate text-sm text-neutral-700">{r.body}</div>
+                  <div className="text-xs font-medium text-ink">{r.threadTitle}</div>
+                  <div className="truncate text-sm text-ink-2">{r.body}</div>
                 </button>
               ))}
         </div>

@@ -27,7 +27,7 @@ function ext(filename: string): string {
 // - everything else → <pre> with raw text (JSX-escaped)
 export function FilePreview({ filename, content, encoding, loading }: FilePreviewProps) {
   if (loading) {
-    return <p className="mt-3 text-xs text-neutral-400">Loading file…</p>;
+    return <p className="mt-3 text-xs text-ink-3">Loading file…</p>;
   }
 
   const e = ext(filename);
@@ -35,7 +35,7 @@ export function FilePreview({ filename, content, encoding, loading }: FilePrevie
   // Images: only meaningful when the backend returned base64.
   if (IMAGE_MIME[e] && encoding === "base64") {
     return (
-      <div className="mt-3 overflow-auto rounded-lg border border-neutral-200 bg-white p-2">
+      <div className="mt-3 overflow-auto rounded-lg border border-line bg-surface p-2">
         {/* eslint-disable-next-line jsx-a11y/alt-text */}
         <img src={`data:${IMAGE_MIME[e]};base64,${content}`} alt={filename} className="max-h-96" />
       </div>
@@ -43,12 +43,12 @@ export function FilePreview({ filename, content, encoding, loading }: FilePrevie
   }
 
   if (content === "") {
-    return <p className="mt-3 text-xs text-neutral-400">(empty file)</p>;
+    return <p className="mt-3 text-xs text-ink-3">(empty file)</p>;
   }
 
   if (e === "md" || e === "markdown") {
     return (
-      <div className="mt-3 overflow-auto rounded-lg border border-neutral-200 bg-white p-3 text-sm">
+      <div className="mt-3 overflow-auto rounded-lg border border-line bg-surface p-3 text-sm">
         {renderMarkdown(content)}
       </div>
     );
@@ -57,7 +57,7 @@ export function FilePreview({ filename, content, encoding, loading }: FilePrevie
   if (e === "html" || e === "htm") {
     // Empty sandbox = scripts, forms and navigation are all disabled → safe render.
     return (
-      <div className="mt-3 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="mt-3 overflow-hidden rounded-lg border border-line bg-surface">
         <iframe
           title={filename}
           sandbox=""
@@ -70,7 +70,7 @@ export function FilePreview({ filename, content, encoding, loading }: FilePrevie
 
   // Code / plain text: raw content in a <pre>; JSX auto-escapes it.
   return (
-    <pre className="mt-3 max-h-96 overflow-auto rounded-lg border border-neutral-200 bg-white p-3 font-mono text-xs leading-5">
+    <pre className="mt-3 max-h-96 overflow-auto rounded-lg border border-line bg-surface p-3 font-mono text-xs leading-5">
       {content}
     </pre>
   );

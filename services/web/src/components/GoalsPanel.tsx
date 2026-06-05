@@ -63,62 +63,62 @@ export function GoalsPanel({
   return (
     <div className="flex-1 overflow-y-auto p-4">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-neutral-800">Goals</h2>
+        <h2 className="text-sm font-semibold text-ink">Goals</h2>
         <button
           onClick={onRunTick}
           disabled={busy}
-          className="rounded-lg bg-[#15151f] px-3 py-1.5 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
         >
           Run tick
         </button>
       </div>
 
       {tick && (
-        <div className="mb-4 rounded-lg border border-[#e7e7f0] bg-white px-3 py-2 text-xs text-neutral-700">
+        <div className="mb-4 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink-2">
           <span className="font-medium">{tick.dispatched.length} dispatched</span>
           {" · "}
           <span>{tick.alerts} alerts</span>
           {" · "}
           <span>{tick.skipped} skipped</span>
-          <div className="mt-1 text-neutral-400">{tick.reason}</div>
+          <div className="mt-1 text-ink-3">{tick.reason}</div>
         </div>
       )}
 
-      <div className="mb-4 space-y-2 rounded-lg border border-[#e7e7f0] bg-white p-3">
+      <div className="mb-4 space-y-2 rounded-lg border border-line bg-surface p-3">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Goal title"
-          className="w-full rounded-lg border border-[#e7e7f0] px-2 py-1.5 text-sm focus:border-neutral-800 focus:outline-none"
+          className="w-full rounded-lg border border-line px-2 py-1.5 text-sm focus:border-accent focus:outline-none"
         />
         <input
           value={criteria}
           onChange={(e) => setCriteria(e.target.value)}
           placeholder="Success criteria (optional)"
-          className="w-full rounded-lg border border-[#e7e7f0] px-2 py-1.5 text-sm focus:border-neutral-800 focus:outline-none"
+          className="w-full rounded-lg border border-line px-2 py-1.5 text-sm focus:border-accent focus:outline-none"
         />
         <button
           onClick={submit}
           disabled={busy || !title.trim()}
-          className="rounded-lg bg-[#5b5bd6] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#4a4ac4] disabled:opacity-50"
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-[#4a4ac4] disabled:opacity-50"
         >
           Create goal
         </button>
       </div>
 
-      {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
       <ul className="space-y-2">
         {goals.map((g) => (
-          <li key={g.id} className="rounded-lg border border-[#e7e7f0] bg-white px-3 py-2">
+          <li key={g.id} className="rounded-lg border border-line bg-surface px-3 py-2">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium text-neutral-800">{g.title}</div>
-                <div className="text-xs text-neutral-400">{g.id}{g.criteria ? ` · ${g.criteria}` : ""}</div>
+                <div className="text-sm font-medium text-ink">{g.title}</div>
+                <div className="text-xs text-ink-3">{g.id}{g.criteria ? ` · ${g.criteria}` : ""}</div>
               </div>
               <button
                 onClick={() => decompose(g.id)}
-                className="rounded-lg border border-[#e7e7f0] px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
+                className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 hover:bg-elevated-2"
               >
                 Decompose
               </button>

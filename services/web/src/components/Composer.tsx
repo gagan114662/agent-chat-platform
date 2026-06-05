@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { filterCommands, type Command } from "../lib/commands.js";
+import { Icon } from "./Icon.js";
 
 // Maps a slash keyword to a registry command id. `/search`, `/new`, `/dm`, `/inbox`.
 const SLASH_TO_ID: Record<string, string> = {
@@ -52,32 +53,41 @@ export function Composer({ onSend, commands = [], onSlashSearch }: {
     setText("");
   };
 
+  const empty = text.trim().length === 0;
   return (
-    <div className="border-t border-[#e7e7f0] bg-white p-3">
+    <div className="bg-surface px-4 pb-4 pt-2">
       {isSlash && matches.length > 0 && (
-        <ul className="mb-2 overflow-hidden rounded-lg border border-[#e7e7f0] text-sm" aria-label="slash commands">
+        <ul className="mb-2 overflow-hidden rounded-xl border border-line bg-elevated text-sm shadow-lg shadow-black/30" aria-label="slash commands">
           {matches.map((c) => (
-            <li key={c.id} className="border-b border-[#e7e7f0] px-3 py-1.5 text-neutral-700 last:border-0">
+            <li key={c.id} className="flex items-center gap-2 border-b border-line-soft px-3 py-2 text-ink-2 last:border-0 hover:bg-elevated-2">
+              <Icon name="sparkle" size={13} className="text-ink-3" />
               {c.title}
             </li>
           ))}
         </ul>
       )}
-      <div className="flex items-end gap-2">
+      <div className="flex flex-col gap-2 rounded-2xl border border-line bg-elevated px-3 py-2.5 transition-colors focus-within:border-accent/70">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
           placeholder="Message #general — try @coder <intent> or /search"
           rows={1}
-          className="min-h-[40px] flex-1 resize-none rounded-lg border border-[#e7e7f0] px-3 py-2 text-sm focus:border-neutral-800 focus:outline-none"
+          className="max-h-40 min-h-[24px] w-full resize-none bg-transparent text-[14px] text-ink placeholder:text-ink-3 focus:outline-none"
         />
-        <button
-          onClick={submit}
-          className="rounded-lg bg-[#15151f] px-4 py-2 text-sm font-medium text-white hover:bg-black"
-        >
-          Send
-        </button>
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-ink-3">
+            <span className="text-accent">@</span>agent to dispatch · <span className="text-ink-2">/</span> for commands
+          </span>
+          <button
+            onClick={submit}
+            disabled={empty}
+            aria-label="Send"
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-elevated-2 disabled:text-ink-3"
+          >
+            <Icon name="send" size={14} /> Send
+          </button>
+        </div>
       </div>
     </div>
   );

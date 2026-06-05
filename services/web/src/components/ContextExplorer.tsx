@@ -31,7 +31,7 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
     <button
       onClick={onClick}
       className={`rounded-full px-3 py-1 text-xs ${
-        active ? "bg-[#15151f] font-medium text-white" : "border border-[#e7e7f0] bg-white text-neutral-600 hover:bg-neutral-100"
+        active ? "bg-accent font-medium text-white" : "border border-line bg-surface text-ink-2 hover:bg-elevated-2"
       }`}
     >
       {label}
@@ -76,10 +76,10 @@ export function ContextExplorer({
   const posById = new Map(nodes.map((node, i) => [node.id, pos(i)]));
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto bg-white p-6 text-sm text-neutral-800">
+    <div className="flex flex-1 flex-col overflow-y-auto bg-surface p-6 text-sm text-ink">
       <div className="mb-4">
         <h1 className="text-lg font-semibold text-[#15151f]">Context Explorer</h1>
-        <div className="text-xs text-neutral-500">
+        <div className="text-xs text-ink-3">
           {stats.nodes} memories · {stats.edges} edges{loading ? " · loading…" : ""}
         </div>
       </div>
@@ -96,17 +96,17 @@ export function ContextExplorer({
       </div>
 
       {n === 0 ? (
-        <div className="rounded-xl border border-[#e7e7f0] bg-white p-8 text-center text-neutral-400">
+        <div className="rounded-xl border border-line bg-surface p-8 text-center text-ink-3">
           No memories captured yet.
         </div>
       ) : (
         <div className="flex flex-1 gap-6">
-          <svg width={size} height={size} className="shrink-0 rounded-xl border border-[#e7e7f0]" role="img" aria-label="memory graph">
+          <svg width={size} height={size} className="shrink-0 rounded-xl border border-line" role="img" aria-label="memory graph">
             {graph.edges.map((e) => {
               const a = posById.get(e.fromId);
               const b = posById.get(e.toId);
               if (!a || !b) return null;
-              return <line key={e.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#e7e7f0" strokeWidth={1.5} />;
+              return <line key={e.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#2e2e3a" strokeWidth={1.5} />;
             })}
             {nodes.map((node) => {
               const p = posById.get(node.id)!;
@@ -126,7 +126,7 @@ export function ContextExplorer({
                   <button
                     onClick={() => setSelectedId(node.id)}
                     className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left ${
-                      node.id === selectedId ? "bg-[#15151f] text-white" : "text-neutral-700 hover:bg-neutral-100"
+                      node.id === selectedId ? "bg-accent text-white" : "text-ink-2 hover:bg-elevated-2"
                     }`}
                   >
                     <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: KIND_COLOR[node.kind] }} />
@@ -137,12 +137,12 @@ export function ContextExplorer({
             </ul>
 
             {selected && (
-              <div className="rounded-xl border border-[#e7e7f0] bg-white p-4">
+              <div className="rounded-xl border border-line bg-surface p-4">
                 <div className="text-sm font-semibold text-[#15151f]">{selected.label}</div>
-                <div className="mb-2 text-xs text-neutral-400">
+                <div className="mb-2 text-xs text-ink-3">
                   {selected.kind} · {selected.scope} · {neighborCount} neighbors
                 </div>
-                {selected.body && <div className="whitespace-pre-wrap text-sm text-neutral-700">{selected.body}</div>}
+                {selected.body && <div className="whitespace-pre-wrap text-sm text-ink-2">{selected.body}</div>}
               </div>
             )}
           </div>

@@ -1,12 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap');
 @import "tailwindcss";
 
-:root { font-synthesis-weight: none; }
+/* Dark design system (reload.chat-style app). Semantic tokens consumed as
+   Tailwind utilities (bg-surface, text-ink, border-line, etc.). */
+@theme {
+  --color-app: #0a0a0e;          /* deepest background */
+  --color-surface: #121217;      /* sidebar, header, composer bar */
+  --color-surface-2: #16161c;    /* thread background */
+  --color-elevated: #1c1c24;     /* cards, inputs, hover */
+  --color-elevated-2: #23232c;   /* active/pressed */
+  --color-line: #2a2a33;         /* borders */
+  --color-line-soft: #202028;    /* subtle dividers */
+  --color-ink: #ecedf1;          /* primary text */
+  --color-ink-2: #a2a3af;        /* secondary text */
+  --color-ink-3: #6a6b78;        /* muted text */
+  --color-accent: #7c6cff;       /* violet accent */
+  --color-accent-hover: #8d7eff;
+  --color-accent-soft: #211f3a;  /* accent tint surface */
+  --color-positive: #34d399;
+  --color-positive-soft: #10241e;
+  --color-warn: #fbbf24;
+  --color-warn-soft: #2a2310;
+  --color-danger: #f87171;
+}
+
+:root { font-synthesis-weight: none; color-scheme: dark; }
 html, body, #root { height: 100%; }
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, system-ui, 'Segoe UI', sans-serif;
-  background: #f0f0f7;
-  color: #2b2b2b;
+  background: var(--color-app);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+
+/* Slim, dark scrollbars to match the app chrome. */
+* { scrollbar-width: thin; scrollbar-color: #33333d transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: #2e2e38; border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #3a3a46; background-clip: content-box; }

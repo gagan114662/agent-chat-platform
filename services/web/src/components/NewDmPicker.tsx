@@ -12,7 +12,7 @@ export function NewDmPicker({ principals, onStartDm }: {
         const p = principals.find((x) => x.id === e.target.value);
         if (p) onStartDm(p.kind, p.id);
       }}
-      className="mx-3 mb-2 rounded-lg border border-[#e7e7f0] px-2 py-1 text-xs text-neutral-600 focus:border-neutral-800 focus:outline-none"
+      className="mx-3 mb-2 rounded-lg border border-line bg-elevated px-2 py-1 text-xs text-ink-2 focus:border-accent focus:outline-none"
     >
       <option value="">+ New DM…</option>
       {principals.map((p) => <option key={p.id} value={p.id}>{p.kind === "agent" ? "🤖 " : ""}{p.name}</option>)}
