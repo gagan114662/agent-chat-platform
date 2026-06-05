@@ -34,6 +34,7 @@ import { registerRepoRoutes } from "./http/repo-routes.js";
 import { registerDeployRoutes } from "./http/deploy-routes.js";
 import { registerBusinessRoutes } from "./http/business-routes.js";
 import { registerAuditRoutes } from "./http/audit-routes.js";
+import { registerQualityRoutes } from "./http/quality-routes.js";
 import { registerCheckpointRoutes } from "./http/checkpoint-routes.js";
 import { registerIntegrationRoutes } from "./http/integration-routes.js";
 import { registerIngestRoutes } from "./http/ingest-routes.js";
@@ -120,6 +121,7 @@ export async function buildServer() {
   registerDeployRoutes(app, { db, sandboxUrl }); // #140 deploy merged product → public URL
   registerBusinessRoutes(app, { db }); // #141/#142 business entity + P&L + gated revenue/outreach
   registerAuditRoutes(app, { db }); // #150.3 cryptographic audit log + per-action authz
+  registerQualityRoutes(app, { db }); // #151 agent quality harness + observability
   registerCheckpointRoutes(app, { db, sql, temporal, sandboxUrl });
   registerIntegrationRoutes(app, { db });
   registerIngestRoutes(app, { db, sql });
@@ -180,6 +182,7 @@ export async function buildServer() {
           !req.url.startsWith("/credits") &&
           !req.url.startsWith("/audit") &&
           !req.url.startsWith("/authz") &&
+          !req.url.startsWith("/quality") &&
           !req.url.startsWith("/memory") &&
           !req.url.startsWith("/dms") &&
           !req.url.startsWith("/repos") &&
