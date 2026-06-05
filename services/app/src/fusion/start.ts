@@ -9,6 +9,9 @@ export interface StartRepo {
   defaultBranch: string;
   tokenEnvVar: string;
   autonomy: string;
+  // #71 per-repo setup script (repos.setupScript). Nullable in the DB; surfaced
+  // into the run so the sandbox runs it after clone, before the agent.
+  setupScript?: string | null;
 }
 
 export interface StartFusionRunInput {
@@ -56,6 +59,7 @@ export async function startFusionRun(temporal: Client, i: StartFusionRunInput) {
     ...(i.model ? { model: i.model } : {}),
     ...(i.provider ? { provider: i.provider } : {}),
     ...(i.mcpServers ? { mcpServers: i.mcpServers } : {}),
+    ...(i.repo.setupScript ? { setupScript: i.repo.setupScript } : {}), // #71
     sink: { orgId: i.orgId, threadId: i.threadId, runId: i.run.id, agentId: i.agentId, mentionDepth: i.mentionDepth ?? 0, ...(i.parentRunId ? { parentRunId: i.parentRunId } : {}) },
   });
 }

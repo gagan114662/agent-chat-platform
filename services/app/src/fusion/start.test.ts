@@ -70,4 +70,19 @@ describe("startFusionRun", () => {
     await startFusionRun(client, baseInput);
     expect(calls[0].input.mcpServers).toBeUndefined();
   });
+
+  it("threads repo.setupScript into the activity input when set (#71)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, {
+      ...baseInput,
+      repo: { ...baseInput.repo, setupScript: "pnpm install" },
+    });
+    expect(calls[0].input.setupScript).toBe("pnpm install");
+  });
+
+  it("passes no setupScript when the repo has none (default unchanged, #71)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, baseInput);
+    expect(calls[0].input.setupScript).toBeUndefined();
+  });
 });

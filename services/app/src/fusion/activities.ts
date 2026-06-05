@@ -43,6 +43,9 @@ export interface RunFusionActivityInput {
   // #57 per-agent MCP servers, threaded into the sandbox run/plan and the ciFix
   // feedback identically. Optional; undefined = no MCP servers (today's behavior).
   mcpServers?: string[];
+  // #71 per-repo setup script (from repos.setupScript), threaded into the sandbox
+  // run and the ciFix feedback. Optional; empty/undefined = no setup.
+  setupScript?: string;
   sink: SinkCtx;
 }
 
@@ -77,12 +80,14 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
       model: input.model, provider: input.provider,
       // #57: thread the per-agent MCP servers (undefined = none).
       mcpServers: input.mcpServers,
+      // #71: thread the per-repo setup script (undefined = no setup).
+      setupScript: input.setupScript,
     };
     // Fix-on-red: on a red PR, re-run the agent on the same branch with the CI
     // failure as feedback. Bounded by CI_FIX_ATTEMPTS (default 2; 0 disables).
     const maxFixAttempts = Number(process.env.CI_FIX_ATTEMPTS ?? 2);
     const ciFix = async ({ branch, failure }: { branch: string; failure: string }) => {
-      const res = await sandbox.feedback({ repoUrl, branch, notes: failure, model: input.model, provider: input.provider, mcpServers: input.mcpServers });
+      const res = await sandbox.feedback({ repoUrl, branch, notes: failure, model: input.model, provider: input.provider, mcpServers: input.mcpServers, setupScript: input.setupScript });
       return { commitSha: res.commitSha };
     };
     // Plan mode: the first pass only PROPOSES a plan and parks. The planGate

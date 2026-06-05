@@ -13,6 +13,10 @@ export interface SandboxRunRequest {
   provider?: string;
   // Optional per-agent built-in MCP catalog servers (#57). Undefined = none.
   mcpServers?: string[];
+  // #71 per-repo setup script run in the sandbox workdir after clone, before the
+  // agent. Optional; empty/undefined = no setup (today's behavior). Trusted repo
+  // config only (never cloned content).
+  setupScript?: string;
 }
 
 export interface SandboxFeedbackRequest {
@@ -23,6 +27,9 @@ export interface SandboxFeedbackRequest {
   model?: string;
   provider?: string;
   mcpServers?: string[];
+  // #71 per-repo setup script (see SandboxRunRequest). Re-run before the agent
+  // re-applies feedback so the prepared repo (deps/build) is present.
+  setupScript?: string;
 }
 
 export interface SandboxPlanRequest {
