@@ -60,6 +60,7 @@ export async function tick(d: TickDeps, args: { orgId: string; budgetMax?: numbe
         envVars: repo.envVars, githubApiUrl: repo.githubApiUrl, // #73
       },
       agentId: t.assigneeId, intent: t.title, sandboxUrl: d.sandboxUrl,
+      ...(agent?.adapter ? { adapter: agent.adapter } : {}), // #120: run the real adapter, not the fake default
       ...agentModelConfig(agent), // #58: per-agent model/provider from agents.config
       ...(agentMcp(agent) ? { mcpServers: agentMcp(agent) } : {}), // #57: per-agent MCP servers
     });
