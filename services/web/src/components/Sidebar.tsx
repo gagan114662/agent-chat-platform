@@ -3,10 +3,14 @@ import type { Channel, Thread, Repo, Principal, InboxItem } from "../types.js";
 import { NewThreadForm } from "./NewThreadForm.js";
 import { NewDmPicker } from "./NewDmPicker.js";
 
+// #68: the real authenticated principal shown in the sidebar footer.
+export interface SidebarIdentity { userId: string; orgId: string; role?: "admin" | "member"; }
+
 export function Sidebar({
   channels, threads, dms, principals, repos, activeThreadId,
-  unreads = {}, inbox = [], onOpenInbox,
+  unreads = {}, inbox = [], onOpenInbox, identity,
   onSelectThread, onCreateThread, onCreateChannel, onStartDm, onOpenContext, canCreateChannel,
+  onOpenGoals, onOpenAgents, onOpenTasks,
   newThreadRef,
 }: {
   channels: Channel[];
@@ -18,12 +22,16 @@ export function Sidebar({
   unreads?: Record<string, number>;
   inbox?: InboxItem[];
   onOpenInbox?: () => void;
+  identity?: SidebarIdentity | null;
   onSelectThread: (id: string) => void;
   onCreateThread: (title: string, repoId?: string) => void;
   onCreateChannel: (name: string) => void;
   onStartDm: (peerKind: "human" | "agent", peerId: string) => void;
   onOpenContext: () => void;
   canCreateChannel: boolean;
+  onOpenGoals?: () => void;
+  onOpenAgents?: () => void;
+  onOpenTasks?: () => void;
   newThreadRef?: RefObject<HTMLInputElement>;
 }) {
   const [channelName, setChannelName] = useState("");
@@ -71,10 +79,34 @@ export function Sidebar({
         </button>
         <button
           onClick={onOpenContext}
-          className="mb-2 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
         >
           🧠 Context
         </button>
+        {onOpenGoals && (
+          <button
+            onClick={onOpenGoals}
+            className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          >
+            🎯 Goals
+          </button>
+        )}
+        {onOpenAgents && (
+          <button
+            onClick={onOpenAgents}
+            className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          >
+            🤖 Agents
+          </button>
+        )}
+        {onOpenTasks && (
+          <button
+            onClick={onOpenTasks}
+            className="mb-2 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          >
+            ✅ Tasks
+          </button>
+        )}
         {channels.map((c) => (
           <div key={c.id} className="mb-2">
             <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-400"># {c.name}</div>
@@ -100,7 +132,11 @@ export function Sidebar({
         </div>
       )}
       <NewThreadForm repos={repos} onCreate={onCreateThread} inputRef={newThreadRef} />
-      <div className="px-4 py-3 text-xs text-neutral-400">signed in as m1 · org o1 (dev stub)</div>
+      <div className="px-4 py-3 text-xs text-neutral-400">
+        {identity
+          ? <>signed in as {identity.userId} · org {identity.orgId}{identity.role ? ` · ${identity.role}` : ""}</>
+          : <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700">dev (no session)</span>}
+      </div>
     </aside>
   );
 }

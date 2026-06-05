@@ -237,3 +237,125 @@ export async function memoryStats(): Promise<MemoryStats> {
   if (!res.ok) throw new Error(`memoryStats ${res.status}`);
   return res.json();
 }
+
+// #67 autonomy — Goals. NOTE: the backend exposes POST /goals + POST
+// /goals/:id/decompose + POST /orgs/:orgId/tick, but there is no list-goals GET
+// route, so the panel is create + decompose + run-tick (no list).
+export interface Goal { id: string; orgId: string; title: string; criteria?: string | null; status?: string; threadId?: string | null; }
+
+export async function createGoal(title: string, criteria?: string): Promise<Goal> {
+  const res = await fetch(`/goals`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(criteria ? { title, criteria } : { title }),
+  });
+  if (!res.ok) throw new Error(`createGoal ${res.status}`);
+  return res.json();
+}
+
+export async function decomposeGoal(goalId: string, threadId: string): Promise<{ taskIds: string[] }> {
+  const res = await fetch(`/goals/${goalId}/decompose`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ threadId }),
+  });
+  if (!res.ok) throw new Error(`decomposeGoal ${res.status}`);
+  return res.json();
+}
+
+// #67 self-prompt tick — bounded dispatch pass for an org. Returns the dispatched
+// run ids + alert/automation counts (TickResult).
+export interface TickResult { dispatched: string[]; skipped: number; reason: string; alerts: number; automations: number; }
+
+export async function runTick(orgId: string, budgetMax?: number): Promise<TickResult> {
+  const res = await fetch(`/orgs/${orgId}/tick`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(budgetMax !== undefined ? { budgetMax } : {}),
+  });
+  if (!res.ok) throw new Error(`runTick ${res.status}`);
+  return res.json();
+}
+
+// #58/#91 agents — list + profile editing (avatar/visibility). There is no
+// set-model route, so model edits aren't exposed here.
+export type AgentVisibility = "public" | "private";
+export interface Agent {
+  id: string; orgId: string; workspaceId: string;
+  handle: string; displayName: string; adapter: string;
+  config: Record<string, unknown>; shared: boolean;
+  avatarUrl: string | null; visibility: AgentVisibility;
+}
+
+export async function listAgents(): Promise<Agent[]> {
+  const res = await fetch(`/agents`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listAgents ${res.status}`);
+  return res.json();
+}
+
+export async function setAgentProfile(agentId: string, patch: { avatarUrl?: string | null; visibility?: AgentVisibility }): Promise<Agent> {
+  const res = await fetch(`/agents/${agentId}/profile`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`setAgentProfile ${res.status}`);
+  return res.json();
+}
+
+// #81 richer tasks — the valid priority/state values mirrored from the backend
+// (services/app/src/tasks/tasks.ts) for the inline-edit dropdowns.
+export const TASK_PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+export const TASK_STATES = ["open", "backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"] as const;
+export type TaskState = (typeof TASK_STATES)[number];
+
+export interface Task {
+  id: string; orgId: string; threadId: string; title: string;
+  state: TaskState; priority: TaskPriority;
+  assigneeKind?: string | null; assigneeId?: string | null;
+  dueDate?: string | null;
+  createdByKind: string; createdById: string;
+}
+export interface TaskComment { id: string; orgId: string; taskId: string; authorKind: string; authorId: string; body: string; createdAt: string; }
+export interface TaskRelation { id: string; orgId: string; fromTaskId: string; toTaskId: string; relation: "blocks" | "related" | "duplicate"; createdAt: string; }
+export interface TaskDetail { task: Task; comments: TaskComment[]; relations: TaskRelation[]; }
+
+export async function getTask(id: string): Promise<TaskDetail> {
+  const res = await fetch(`/tasks/${id}`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getTask ${res.status}`);
+  return res.json();
+}
+
+export async function updateTask(id: string, patch: { priority?: TaskPriority; dueDate?: string | null; state?: TaskState }): Promise<Task> {
+  const res = await fetch(`/tasks/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`updateTask ${res.status}`);
+  const { task } = (await res.json()) as { task: Task };
+  return task;
+}
+
+export async function addTaskComment(id: string, body: string): Promise<TaskComment> {
+  const res = await fetch(`/tasks/${id}/comments`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ body }),
+  });
+  if (!res.ok) throw new Error(`addTaskComment ${res.status}`);
+  const { comment } = (await res.json()) as { comment: TaskComment };
+  return comment;
+}
+
+export interface BulkTaskItem { title: string; priority?: TaskPriority; state?: TaskState; }
+export async function bulkCreateTasks(threadId: string, items: BulkTaskItem[]): Promise<{ ids: string[] }> {
+  const res = await fetch(`/tasks/bulk`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ threadId, items }),
+  });
+  if (!res.ok) throw new Error(`bulkCreateTasks ${res.status}`);
+  return res.json();
+}
