@@ -51,6 +51,19 @@ describe("Sidebar", () => {
     expect(t1Badge).toHaveTextContent("2");
     expect(screen.queryByLabelText(/unread in Second thread/)).not.toBeInTheDocument();
   });
+  it("shows the real authenticated identity instead of the dev stub (#68)", () => {
+    render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} identity={{ userId: "alice", orgId: "acme", role: "admin" }} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);
+    const id = screen.getByText(/alice/);
+    expect(id).toHaveTextContent("alice");
+    expect(id).toHaveTextContent("acme");
+    expect(id).toHaveTextContent("admin");
+    expect(screen.queryByText(/dev stub/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/m1 · org o1/)).not.toBeInTheDocument();
+  });
+  it("shows a dev badge when no real identity is present (#68)", () => {
+    render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);
+    expect(screen.getByText(/dev/i)).toBeInTheDocument();
+  });
   it("renders an Activity inbox affordance that lists mentions (#61)", () => {
     const onOpenInbox = vi.fn();
     render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} inbox={[{ threadId: "t1", title: "Demo thread", latestAt: "2024-01-01T00:00:00Z" }]} onOpenInbox={onOpenInbox} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);

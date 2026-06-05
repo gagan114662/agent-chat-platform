@@ -33,12 +33,18 @@ export async function login(memberId: string, password?: string): Promise<Princi
   return { orgId: member.orgId, userId: memberId };
 }
 
+// #68: fetch the real authenticated principal (`{ orgId, userId, role }`) from
+// `GET /auth/me`. Returns null when unauthenticated (401) so dev-header mode falls
+// back to a clear "dev" badge rather than claiming a real identity.
 export async function me(): Promise<Principal | null> {
   const res = await fetch(`/auth/me`, { headers: { ...authHeaders() } });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error(`me ${res.status}`);
   return res.json();
 }
+
+// Alias used by the UI layer (#68) — same `GET /auth/me` principal fetch.
+export const getMe = me;
 
 export async function logout(): Promise<void> {
   await fetch(`/auth/logout`, { method: "POST", headers: { ...authHeaders() } });

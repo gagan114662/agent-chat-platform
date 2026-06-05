@@ -17,10 +17,10 @@ export function App() {
   const { principal, loading, login, logout } = useAuth();
   if (loading) return <div className="flex h-screen items-center justify-center text-sm text-neutral-400">Loading…</div>;
   if (!principal) return <LoginScreen onLogin={login} />;
-  return <Workspace onLogout={logout} userId={principal.userId} role={principal.role ?? "member"} />;
+  return <Workspace onLogout={logout} userId={principal.userId} orgId={principal.orgId} role={principal.role ?? "member"} />;
 }
 
-function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: string; role: "admin" | "member" }) {
+function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; userId: string; orgId: string; role: "admin" | "member" }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -151,6 +151,7 @@ function Workspace({ onLogout, userId, role }: { onLogout: () => void; userId: s
         onStartDm={onStartDm}
         onOpenContext={() => setView("context")}
         canCreateChannel={role === "admin"}
+        identity={{ userId, orgId, role }}
         newThreadRef={newThreadRef}
       />
       <main className="flex flex-1 flex-col">

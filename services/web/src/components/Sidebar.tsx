@@ -3,9 +3,12 @@ import type { Channel, Thread, Repo, Principal, InboxItem } from "../types.js";
 import { NewThreadForm } from "./NewThreadForm.js";
 import { NewDmPicker } from "./NewDmPicker.js";
 
+// #68: the real authenticated principal shown in the sidebar footer.
+export interface SidebarIdentity { userId: string; orgId: string; role?: "admin" | "member"; }
+
 export function Sidebar({
   channels, threads, dms, principals, repos, activeThreadId,
-  unreads = {}, inbox = [], onOpenInbox,
+  unreads = {}, inbox = [], onOpenInbox, identity,
   onSelectThread, onCreateThread, onCreateChannel, onStartDm, onOpenContext, canCreateChannel,
   newThreadRef,
 }: {
@@ -18,6 +21,7 @@ export function Sidebar({
   unreads?: Record<string, number>;
   inbox?: InboxItem[];
   onOpenInbox?: () => void;
+  identity?: SidebarIdentity | null;
   onSelectThread: (id: string) => void;
   onCreateThread: (title: string, repoId?: string) => void;
   onCreateChannel: (name: string) => void;
@@ -100,7 +104,11 @@ export function Sidebar({
         </div>
       )}
       <NewThreadForm repos={repos} onCreate={onCreateThread} inputRef={newThreadRef} />
-      <div className="px-4 py-3 text-xs text-neutral-400">signed in as m1 · org o1 (dev stub)</div>
+      <div className="px-4 py-3 text-xs text-neutral-400">
+        {identity
+          ? <>signed in as {identity.userId} · org {identity.orgId}{identity.role ? ` · ${identity.role}` : ""}</>
+          : <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700">dev (no session)</span>}
+      </div>
     </aside>
   );
 }
