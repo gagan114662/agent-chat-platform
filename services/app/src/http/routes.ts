@@ -4,6 +4,7 @@ import type { DB } from "../db/client.js";
 import type postgres from "postgres";
 import type { Client } from "@temporalio/client";
 import { createMessage, listMessages } from "../chat/messages.js";
+import { summarizeThread } from "../chat/summarize.js";
 import { notify } from "../db/client.js";
 import { handleMentions } from "../chat/handle-mentions.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
@@ -51,5 +52,27 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
       orgId, threadId, body, authorKind: "human", authorId: userId, depth: 0,
     });
     return reply.code(201).send({ message: msg, startedRuns: started });
+  });
+
+  // #77 Insta-Summarize: recap a thread's conversation into a posted system message.
+  // Org-scoped: a foreign thread id is invisible → 404 (before any summarization).
+  // The recap is deterministic (LLM-pluggable via summarizeThread's injectable
+  // summarizer); it is posted as an agent `system` message + broadcast, then returned.
+  app.post("/threads/:id/summarize", async (req, reply) => {
+    const { id: threadId } = req.params as { id: string };
+    const { orgId } = actor(req);
+
+    const [thread] = await d.db.select().from(threads).where(and(eq(threads.id, threadId), eq(threads.orgId, orgId)));
+    if (!thread) return reply.code(404).send({ error: "thread not found" });
+
+    const { summary } = await summarizeThread(d.db, { orgId, threadId });
+
+    const msg = await createMessage(d.db, {
+      orgId, threadId, authorKind: "agent", authorId: "summarizer",
+      kind: "system", body: summary,
+    });
+    await notify(d.sql, THREAD_CHANNEL, { threadId, message: msg });
+
+    return reply.code(200).send({ summary });
   });
 }
