@@ -195,6 +195,29 @@ describe("auth routes", () => {
     await app.close();
   });
 
+  it("GET /auth/google → 302 when configured, 400 when not (#84)", async () => {
+    const prevId = process.env.GOOGLE_CLIENT_ID;
+    const prevRedirect = process.env.GOOGLE_REDIRECT_URI;
+    delete process.env.GOOGLE_CLIENT_ID;
+    try {
+      const app = makeApp();
+      // unconfigured → 400 (still a PUBLIC path, not 401)
+      const unconf = await app.inject({ method: "GET", url: "/auth/google" });
+      expect(unconf.statusCode).toBe(400);
+
+      process.env.GOOGLE_CLIENT_ID = "cid-123";
+      process.env.GOOGLE_REDIRECT_URI = "https://app.example.com/auth/google/callback";
+      const redir = await app.inject({ method: "GET", url: "/auth/google" });
+      expect(redir.statusCode).toBe(302);
+      expect(redir.headers.location).toContain("accounts.google.com");
+      expect(redir.headers.location).toContain("client_id=cid-123");
+      await app.close();
+    } finally {
+      if (prevId === undefined) delete process.env.GOOGLE_CLIENT_ID; else process.env.GOOGLE_CLIENT_ID = prevId;
+      if (prevRedirect === undefined) delete process.env.GOOGLE_REDIRECT_URI; else process.env.GOOGLE_REDIRECT_URI = prevRedirect;
+    }
+  });
+
   it("strict mode rejects unauthenticated requests and hides /auth/members", async () => {
     delete process.env.ACP_ALLOW_DEV_HEADERS;
     try {

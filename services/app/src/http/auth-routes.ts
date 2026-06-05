@@ -3,6 +3,8 @@ import type { DB } from "../db/client.js";
 import { createSession, resolveSession, deleteSession, listMembersForLogin, verifyCredentials } from "../auth/auth.js";
 import { requestMagicLink, verifyMagicLink, peekMagicLinkMember } from "../auth/magic-link.js";
 import { enrollMfa, confirmMfa, disableMfa, mfaRequired, verifyMfaCode } from "../auth/mfa.js";
+import { googleAuthUrl, handleGoogleCallback } from "../auth/google-sso.js";
+import { randomUUID } from "node:crypto";
 import { roleOf } from "../rbac/rbac.js";
 import { devHeadersAllowed } from "../auth/dev-mode.js";
 import { resolveApiKey } from "../auth/api-keys.js";
@@ -32,9 +34,13 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
   // #84 magic-link: requesting a link and verifying it are token-gated, not
   // session-gated (the user has no session yet), so both are public like
   // /auth/login; the routes themselves validate the email/token.
+  // #84 Google SSO: starting the OAuth flow and handling the callback are
+  // token-gated by Google (the user has no app session yet), so both are public
+  // like /auth/login; the routes validate the code/state themselves.
   const PUBLIC_PATHS = new Set([
     "/auth/login", "/auth/members", "/healthz", "/invites/accept",
     "/auth/magic-link/request", "/auth/magic-link/verify",
+    "/auth/google", "/auth/google/callback",
   ]);
   app.addHook("preHandler", async (req, reply) => {
     const token = bearer(req);
@@ -185,5 +191,34 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
     if (!req.principal) return reply.code(401).send({ error: "unauthenticated" });
     await disableMfa(d.db, { orgId: req.principal.orgId, memberId: req.principal.userId });
     return reply.code(200).send({ ok: true, mfaEnabled: false });
+  });
+
+  // #84 Google SSO — PUBLIC. GET /auth/google redirects (302) to Google's consent
+  // screen with a fresh CSRF `state`; 400 when GOOGLE_CLIENT_ID is unset.
+  app.get("/auth/google", async (_req, reply) => {
+    try {
+      const state = randomUUID();
+      return reply.code(302).redirect(googleAuthUrl(state));
+    } catch {
+      return reply.code(400).send({ error: "sso not configured" });
+    }
+  });
+
+  // #84 Google SSO — PUBLIC. The callback exchanges the `code` (live exchange in
+  // prod), resolves/creates the member by email → session. 400 on a missing code
+  // or any exchange/config failure.
+  app.get("/auth/google/callback", async (req, reply) => {
+    const { code } = req.query as { code?: string; state?: string };
+    if (!code) return reply.code(400).send({ error: "missing code" });
+    try {
+      const ua = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : undefined;
+      const { token, member } = await handleGoogleCallback(d.db, { code, userAgent: ua });
+      return reply.code(200).send({
+        token,
+        member: { id: member.id, orgId: member.orgId, workspaceId: member.workspaceId, displayName: member.displayName, role: member.role },
+      });
+    } catch {
+      return reply.code(400).send({ error: "sso callback failed" });
+    }
   });
 }
