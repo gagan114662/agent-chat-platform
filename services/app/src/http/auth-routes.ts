@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { DB } from "../db/client.js";
 import { createSession, resolveSession, deleteSession, listMembersForLogin, verifyCredentials } from "../auth/auth.js";
+import { requestMagicLink, verifyMagicLink } from "../auth/magic-link.js";
 import { roleOf } from "../rbac/rbac.js";
 import { devHeadersAllowed } from "../auth/dev-mode.js";
 import { resolveApiKey } from "../auth/api-keys.js";
@@ -27,7 +28,13 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
   // #88 invites: accepting an invite is token-gated, not session-gated — a new
   // user has no session yet. So /invites/accept is public (bypasses the session
   // 401 here) like /auth/login; the route itself validates the invite token.
-  const PUBLIC_PATHS = new Set(["/auth/login", "/auth/members", "/healthz", "/invites/accept"]);
+  // #84 magic-link: requesting a link and verifying it are token-gated, not
+  // session-gated (the user has no session yet), so both are public like
+  // /auth/login; the routes themselves validate the email/token.
+  const PUBLIC_PATHS = new Set([
+    "/auth/login", "/auth/members", "/healthz", "/invites/accept",
+    "/auth/magic-link/request", "/auth/magic-link/verify",
+  ]);
   app.addHook("preHandler", async (req, reply) => {
     const token = bearer(req);
     if (token) {
@@ -81,6 +88,36 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
       return reply.code(201).send({ token, member });
     } catch (e) {
       return reply.code(400).send({ error: (e as Error).message });
+    }
+  });
+
+  // #84 PUBLIC: request a magic link. ALWAYS responds 200 regardless of whether
+  // the email matches a member (no user enumeration). The plaintext token is
+  // returned in the body ONLY when dev headers are allowed (local/dev/test) so
+  // prod never leaks it — prod delivers it via email (a thin follow-up).
+  app.post("/auth/magic-link/request", async (req, reply) => {
+    const { email } = req.body as { email?: string };
+    if (!email?.trim()) return reply.code(400).send({ error: "email required" });
+    const { token } = await requestMagicLink(d.db, { email });
+    // Only surface the plaintext token in dev; prod responds 200 with no token.
+    if (devHeadersAllowed() && token) return reply.code(200).send({ ok: true, token });
+    return reply.code(200).send({ ok: true });
+  });
+
+  // #84 PUBLIC: verify a magic link → a session + member. An invalid/expired/
+  // already-used token → 401 (single-use, 15min TTL enforced in verifyMagicLink).
+  app.post("/auth/magic-link/verify", async (req, reply) => {
+    const { token } = req.body as { token?: string };
+    if (!token) return reply.code(401).send({ error: "invalid or expired" });
+    try {
+      const ua = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : undefined;
+      const { token: sessionToken, member } = await verifyMagicLink(d.db, { token, userAgent: ua });
+      return reply.code(200).send({
+        token: sessionToken,
+        member: { id: member.id, orgId: member.orgId, workspaceId: member.workspaceId, displayName: member.displayName, role: member.role },
+      });
+    } catch {
+      return reply.code(401).send({ error: "invalid or expired" });
     }
   });
 

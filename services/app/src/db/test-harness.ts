@@ -4,6 +4,7 @@ import { makeDb } from "./client.js";
 const TABLES = [
   "subscriptions",
   "automations",
+  "magic_links",
   "invites",
   "api_keys",
   "files",

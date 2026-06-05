@@ -31,6 +31,9 @@ export const members = pgTable("members", {
   displayName: text("display_name").notNull(),
   role: text("role").notNull().default("member"), // 'admin' | 'member'
   passwordHash: text("password_hash"),
+  // #84 magic-link: a member's login email. Nullable (existing members/invite
+  // provisioning don't set it) — magic-link lookup matches on this when present.
+  email: text("email"),
 });
 
 export const agents = pgTable("agents", {
@@ -282,7 +285,27 @@ export const sessions = pgTable("sessions", {
   orgId: text("org_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  // #84 device sessions: a human-readable label for the device/client (from the
+  // login User-Agent). Nullable — existing/legacy sessions have none.
+  userAgent: text("user_agent"),
+  // #84 device sessions: best-effort last-activity marker, surfaced in the
+  // session list. Defaults to now() at create; nullable for legacy rows.
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow(),
 });
+
+// #84 magic_links: a passwordless, one-time email login token. Only the sha256
+// hex `tokenHash` of the plaintext `ml_…` token is stored — the plaintext is
+// returned ONCE at request time (dev) / emailed (prod) and never persisted or
+// logged. Single-use (`usedAt` flips on verify) and short-lived (`expiresAt`,
+// 15min). verifyMagicLink succeeds only for an unused, unexpired token.
+export const magicLinks = pgTable("magic_links", {
+  id: text("id").primaryKey(),
+  memberId: text("member_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ tokenHashIx: index("magic_links_token_hash_ix").on(t.tokenHash) }));
 
 export const memoryNodes = pgTable("memory_nodes", {
   id: text("id").primaryKey(),

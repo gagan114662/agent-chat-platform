@@ -6,13 +6,15 @@ import { verifyPassword } from "./password.js";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export async function createSession(db: DB, memberId: string) {
+export async function createSession(db: DB, memberId: string, opts?: { userAgent?: string }) {
   const [member] = await db.select().from(members).where(eq(members.id, memberId));
   if (!member) throw new Error(`member not found: ${memberId}`);
   const token = randomUUID();
   await db.insert(sessions).values({
     id: token, memberId, orgId: member.orgId,
     expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    // #84 device sessions: stamp the client User-Agent as the session label.
+    userAgent: opts?.userAgent ?? null,
   });
   return { token, member };
 }
