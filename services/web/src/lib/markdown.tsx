@@ -18,8 +18,8 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   let rest = text;
   let i = 0;
-  // Matches the first of: `code`, **bold**, *italic*, ~~strike~~, [text](url)
-  const pattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(~~[^~]+~~)|(\[[^\]]*\]\([^)]*\))/;
+  // Matches the first of: `code`, **bold**, *italic*, ~~strike~~, [text](url), @mention
+  const pattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(~~[^~]+~~)|(\[[^\]]*\]\([^)]*\))|(@[a-zA-Z0-9_-]+)/;
   while (rest.length > 0) {
     const m = pattern.exec(rest);
     if (!m) {
@@ -37,6 +37,15 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       nodes.push(<span key={key} className="line-through opacity-80">{token.slice(2, -2)}</span>);
     } else if (token.startsWith("*")) {
       nodes.push(<em key={key}>{token.slice(1, -1)}</em>);
+    } else if (token.startsWith("@")) {
+      // @mention → an accent pill. Skip when it's part of an email (prev char is a
+      // word char), e.g. "dave@test.com" — render that as plain text.
+      const prev = rest[m.index - 1];
+      if (prev && /[\w@.]/.test(prev)) {
+        nodes.push(token);
+      } else {
+        nodes.push(<span key={key} className="rounded bg-accent-soft px-1 py-0.5 text-[0.95em] font-medium text-accent">{token}</span>);
+      }
     } else {
       // [text](url)
       const linkMatch = /^\[([^\]]*)\]\(([^)]*)\)$/.exec(token);

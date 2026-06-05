@@ -3,6 +3,7 @@ import type { Channel, Thread, Repo, Principal, InboxItem } from "../types.js";
 import { NewThreadForm } from "./NewThreadForm.js";
 import { NewDmPicker } from "./NewDmPicker.js";
 import { Icon } from "./Icon.js";
+import { avatarColor, initials } from "../avatar.js";
 
 // #68: the real authenticated principal shown in the sidebar footer.
 export interface SidebarIdentity { userId: string; orgId: string; role?: "admin" | "member"; }
@@ -39,6 +40,7 @@ export function Sidebar({
 }) {
   const [channelName, setChannelName] = useState("");
   const [query, setQuery] = useState("");
+  const [showNew, setShowNew] = useState(false); // collapse the create forms behind a + (declutter)
   const createChannel = () => {
     const n = channelName.trim();
     if (!n) return;
@@ -110,24 +112,41 @@ export function Sidebar({
         </div>
       </nav>
 
-      {canCreateChannel && (
-        <div className="flex gap-1.5 border-t border-line-soft px-3 pt-2.5">
-          <input
-            value={channelName}
-            onChange={(e) => setChannelName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") createChannel(); }}
-            placeholder="New channel"
-            className="min-w-0 flex-1 rounded-lg border border-line bg-elevated px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none"
-          />
-          <button onClick={createChannel} aria-label="create channel" className="flex items-center justify-center rounded-lg bg-elevated px-2 text-ink-2 transition-colors hover:bg-elevated-2 hover:text-ink"><Icon name="plus" size={15} /></button>
+      {/* #191: creation collapsed behind a + so the sidebar isn't cluttered. */}
+      <div className="border-t border-line-soft px-3 pt-2">
+        <button onClick={() => setShowNew((v) => !v)} className="flex w-full items-center gap-1.5 rounded-lg px-1.5 py-1 text-[11px] font-medium text-ink-3 transition-colors hover:bg-elevated hover:text-ink-2">
+          <Icon name="plus" size={13} /> {showNew ? "Close" : "New channel / thread"}
+        </button>
+      </div>
+      {showNew && (
+        <div className="px-3 pb-1 pt-1">
+          {canCreateChannel && (
+            <div className="mb-1.5 flex gap-1.5">
+              <input
+                value={channelName}
+                onChange={(e) => setChannelName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") createChannel(); }}
+                placeholder="New channel"
+                className="min-w-0 flex-1 rounded-lg border border-line bg-elevated px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none"
+              />
+              <button onClick={createChannel} aria-label="create channel" className="flex items-center justify-center rounded-lg bg-elevated px-2 text-ink-2 transition-colors hover:bg-elevated-2 hover:text-ink"><Icon name="plus" size={15} /></button>
+            </div>
+          )}
+          <NewThreadForm repos={repos} onCreate={onCreateThread} inputRef={newThreadRef} />
         </div>
       )}
-      <NewThreadForm repos={repos} onCreate={onCreateThread} inputRef={newThreadRef} />
 
-      <div className="border-t border-line-soft px-3 py-3 text-[11px] text-ink-3">
-        {identity
-          ? <>signed in as {identity.userId} · org {identity.orgId}{identity.role ? ` · ${identity.role}` : ""}</>
-          : <span className="rounded bg-warn-soft px-1.5 py-0.5 font-medium text-warn">dev (no session)</span>}
+      {/* #193: clean profile (avatar + handle), not debug text. */}
+      <div className="mt-1 flex items-center gap-2.5 border-t border-line-soft px-3 py-2.5">
+        {identity ? (
+          <>
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[10px] font-bold text-white" style={{ backgroundColor: avatarColor(identity.userId) }}>{initials(identity.userId)}</span>
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-medium text-ink">{identity.userId}</span>
+              <span className="block truncate text-[11px] text-ink-3">@{identity.userId}{identity.role ? ` · ${identity.role}` : ""}</span>
+            </span>
+          </>
+        ) : <span className="rounded bg-warn-soft px-1.5 py-0.5 text-[11px] font-medium text-warn">dev (no session)</span>}
       </div>
     </aside>
   );
