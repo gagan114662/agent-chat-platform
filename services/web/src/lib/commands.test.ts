@@ -52,6 +52,9 @@ describe("buildCommands", () => {
       openNewThread: vi.fn(),
       openNewDm: vi.fn(),
       openInbox: vi.fn(),
+      openGoals: vi.fn(),
+      openAgents: vi.fn(),
+      openTasks: vi.fn(),
       focusSearch: vi.fn(),
     };
     const channels = [{ id: "c1", name: "general" }];
@@ -76,6 +79,15 @@ describe("buildCommands", () => {
 
     out.find((c) => c.title === "Open Activity (inbox)")!.run();
     expect(actions.openInbox).toHaveBeenCalled();
+
+    out.find((c) => c.title === "Open Goals")!.run();
+    expect(actions.openGoals).toHaveBeenCalled();
+
+    out.find((c) => c.title === "Open Agents")!.run();
+    expect(actions.openAgents).toHaveBeenCalled();
+
+    out.find((c) => c.title === "Open Tasks")!.run();
+    expect(actions.openTasks).toHaveBeenCalled();
 
     out.find((c) => c.title.startsWith("Search messages"))!.run();
     expect(actions.focusSearch).toHaveBeenCalled();

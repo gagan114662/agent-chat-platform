@@ -15,6 +15,9 @@ export interface CommandActions {
   openNewThread: () => void;
   openNewDm: () => void;
   openInbox: () => void;
+  openGoals: () => void;
+  openAgents: () => void;
+  openTasks: () => void;
   // `query` is used by the `/search <q>` slash command; the ⌘K entry passes none.
   focusSearch: (query?: string) => void;
 }
@@ -80,6 +83,9 @@ export function buildCommands(ctx: CommandContext): Command[] {
     { id: "new-thread", title: "New thread", keywords: "create thread", run: () => actions.openNewThread() },
     { id: "new-dm", title: "New DM", keywords: "direct message dm", run: () => actions.openNewDm() },
     { id: "inbox", title: "Open Activity (inbox)", keywords: "notifications mentions activity", run: () => actions.openInbox() },
+    { id: "goals", title: "Open Goals", keywords: "goals autonomy tick decompose", run: () => actions.openGoals() },
+    { id: "agents", title: "Open Agents", keywords: "agents visibility avatar profile", run: () => actions.openAgents() },
+    { id: "tasks", title: "Open Tasks", keywords: "tasks task detail comments", run: () => actions.openTasks() },
     { id: "search", title: "Search messages…", keywords: "find search", run: () => actions.focusSearch() },
   );
   return commands;

@@ -237,3 +237,68 @@ export async function memoryStats(): Promise<MemoryStats> {
   if (!res.ok) throw new Error(`memoryStats ${res.status}`);
   return res.json();
 }
+
+// #67 autonomy — Goals. NOTE: the backend exposes POST /goals + POST
+// /goals/:id/decompose + POST /orgs/:orgId/tick, but there is no list-goals GET
+// route, so the panel is create + decompose + run-tick (no list).
+export interface Goal { id: string; orgId: string; title: string; criteria?: string | null; status?: string; threadId?: string | null; }
+
+export async function createGoal(title: string, criteria?: string): Promise<Goal> {
+  const res = await fetch(`/goals`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(criteria ? { title, criteria } : { title }),
+  });
+  if (!res.ok) throw new Error(`createGoal ${res.status}`);
+  return res.json();
+}
+
+export async function decomposeGoal(goalId: string, threadId: string): Promise<{ taskIds: string[] }> {
+  const res = await fetch(`/goals/${goalId}/decompose`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ threadId }),
+  });
+  if (!res.ok) throw new Error(`decomposeGoal ${res.status}`);
+  return res.json();
+}
+
+// #67 self-prompt tick — bounded dispatch pass for an org. Returns the dispatched
+// run ids + alert/automation counts (TickResult).
+export interface TickResult { dispatched: string[]; skipped: number; reason: string; alerts: number; automations: number; }
+
+export async function runTick(orgId: string, budgetMax?: number): Promise<TickResult> {
+  const res = await fetch(`/orgs/${orgId}/tick`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(budgetMax !== undefined ? { budgetMax } : {}),
+  });
+  if (!res.ok) throw new Error(`runTick ${res.status}`);
+  return res.json();
+}
+
+// #58/#91 agents — list + profile editing (avatar/visibility). There is no
+// set-model route, so model edits aren't exposed here.
+export type AgentVisibility = "public" | "private";
+export interface Agent {
+  id: string; orgId: string; workspaceId: string;
+  handle: string; displayName: string; adapter: string;
+  config: Record<string, unknown>; shared: boolean;
+  avatarUrl: string | null; visibility: AgentVisibility;
+}
+
+export async function listAgents(): Promise<Agent[]> {
+  const res = await fetch(`/agents`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listAgents ${res.status}`);
+  return res.json();
+}
+
+export async function setAgentProfile(agentId: string, patch: { avatarUrl?: string | null; visibility?: AgentVisibility }): Promise<Agent> {
+  const res = await fetch(`/agents/${agentId}/profile`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`setAgentProfile ${res.status}`);
+  return res.json();
+}

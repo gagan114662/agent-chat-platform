@@ -8,7 +8,9 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listAgents, setAgentProfile } from "./api.js";
+import { GoalsPanel } from "./components/GoalsPanel.js";
+import { AgentsPanel } from "./components/AgentsPanel.js";
 import type { Channel, Thread, Repo, Principal, InboxItem } from "./types.js";
 import { useAuth } from "./useAuth.js";
 import { LoginScreen } from "./components/LoginScreen.js";
@@ -27,7 +29,7 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
   const [dms, setDms] = useState<Thread[]>([]);
   const [principals, setPrincipals] = useState<Principal[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [view, setView] = useState<"thread" | "context" | "inbox">("thread");
+  const [view, setView] = useState<"thread" | "context" | "inbox" | "goals" | "agents" | "tasks">("thread");
   const [unreads, setUnreads] = useState<Record<string, number>>({});
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -125,6 +127,9 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
         openNewThread: () => newThreadRef.current?.focus(),
         openNewDm: () => newThreadRef.current?.focus(),
         openInbox: () => setView("inbox"),
+        openGoals: () => setView("goals"),
+        openAgents: () => setView("agents"),
+        openTasks: () => setView("tasks"),
         focusSearch,
       },
     }),
@@ -152,6 +157,9 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
         onOpenContext={() => setView("context")}
         canCreateChannel={role === "admin"}
         identity={{ userId, orgId, role }}
+        onOpenGoals={() => setView("goals")}
+        onOpenAgents={() => setView("agents")}
+        onOpenTasks={() => setView("tasks")}
         newThreadRef={newThreadRef}
       />
       <main className="flex flex-1 flex-col">
@@ -162,7 +170,13 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
                 ? "Context Explorer"
                 : view === "inbox"
                   ? "Activity"
-                  : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
+                  : view === "goals"
+                    ? "Goals"
+                    : view === "agents"
+                      ? "Agents"
+                      : view === "tasks"
+                        ? "Tasks"
+                        : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
             </h1>
             <p className="text-xs text-neutral-400">chat → sandboxed agent → PR → back to chat</p>
           </div>
@@ -183,9 +197,13 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
             />
           : view === "inbox"
             ? <InboxPanel inbox={inbox} onSelect={selectThread} />
-            : activeThreadId
-              ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} commands={commands} onSlashSearch={focusSearch} />
-              : <div className="flex-1" />}
+            : view === "goals"
+              ? <GoalsPanel orgId={orgId} createGoal={createGoal} decomposeGoal={decomposeGoal} runTick={runTick} />
+              : view === "agents"
+                ? <AgentsPanel listAgents={listAgents} setAgentProfile={setAgentProfile} />
+                : activeThreadId
+                  ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} commands={commands} onSlashSearch={focusSearch} />
+                  : <div className="flex-1" />}
       </main>
       <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
     </div>

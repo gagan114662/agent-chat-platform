@@ -10,6 +10,7 @@ export function Sidebar({
   channels, threads, dms, principals, repos, activeThreadId,
   unreads = {}, inbox = [], onOpenInbox, identity,
   onSelectThread, onCreateThread, onCreateChannel, onStartDm, onOpenContext, canCreateChannel,
+  onOpenGoals, onOpenAgents, onOpenTasks,
   newThreadRef,
 }: {
   channels: Channel[];
@@ -28,6 +29,9 @@ export function Sidebar({
   onStartDm: (peerKind: "human" | "agent", peerId: string) => void;
   onOpenContext: () => void;
   canCreateChannel: boolean;
+  onOpenGoals?: () => void;
+  onOpenAgents?: () => void;
+  onOpenTasks?: () => void;
   newThreadRef?: RefObject<HTMLInputElement>;
 }) {
   const [channelName, setChannelName] = useState("");
@@ -75,10 +79,34 @@ export function Sidebar({
         </button>
         <button
           onClick={onOpenContext}
-          className="mb-2 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
         >
           🧠 Context
         </button>
+        {onOpenGoals && (
+          <button
+            onClick={onOpenGoals}
+            className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          >
+            🎯 Goals
+          </button>
+        )}
+        {onOpenAgents && (
+          <button
+            onClick={onOpenAgents}
+            className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          >
+            🤖 Agents
+          </button>
+        )}
+        {onOpenTasks && (
+          <button
+            onClick={onOpenTasks}
+            className="mb-2 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          >
+            ✅ Tasks
+          </button>
+        )}
         {channels.map((c) => (
           <div key={c.id} className="mb-2">
             <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-400"># {c.name}</div>
