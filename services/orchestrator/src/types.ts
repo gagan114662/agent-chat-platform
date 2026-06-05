@@ -8,6 +8,8 @@ export interface SandboxRunRequest {
   baseBranch: string;
   intent: string;
   branch: string;
+  // #104 per-agent adapter (claude-code | codex | fake). Undefined = sandbox default.
+  adapter?: string;
   // Optional per-agent model/provider selection (#58). Empty = sandbox default.
   model?: string;
   provider?: string;

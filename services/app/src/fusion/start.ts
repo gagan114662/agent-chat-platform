@@ -29,6 +29,9 @@ export interface StartFusionRunInput {
   agentId: string;
   intent: string;
   sandboxUrl: string;
+  // #104 the agent's adapter (claude-code | codex | fake), threaded into the
+  // sandbox run so a real mention runs the agent's CLI (not the fake no-op).
+  adapter?: string;
   // Plan mode (#20): when true, the run proposes a read-only plan and parks at
   // awaiting_plan_approval instead of executing. Defaults false (execute now).
   planMode?: boolean;
@@ -63,6 +66,7 @@ export async function startFusionRun(temporal: Client, i: StartFusionRunInput) {
     tokenEnvVar: i.repo.tokenEnvVar, sandboxUrl: i.sandboxUrl, pollMs: 5000, maxPolls: 24,
     autonomy: (i.repo.autonomy as "monitor-only" | "resolve-ci" | "autopilot-merge"),
     planMode: i.planMode ?? false,
+    ...(i.adapter ? { adapter: i.adapter } : {}),
     ...(i.model ? { model: i.model } : {}),
     ...(i.provider ? { provider: i.provider } : {}),
     ...(i.mcpServers ? { mcpServers: i.mcpServers } : {}),

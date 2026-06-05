@@ -53,6 +53,9 @@ export interface RunFusionActivityInput {
   // token inside the activity, where the worker shares the app's environment.
   tokenEnvVar: string; sandboxUrl: string; pollMs: number; maxPolls: number;
   autonomy: Autonomy;
+  // #104 per-agent adapter (claude-code | codex | fake), threaded into the sandbox
+  // run + ciFix feedback so a real mention runs the agent's CLI. Undefined = default.
+  adapter?: string;
   // Plan mode (#20): when true, the run proposes a read-only plan and parks
   // (the planGate below always declines the first pass — approval comes via the
   // approve-plan route, which starts a fresh execute run with planMode off).
@@ -118,6 +121,8 @@ export async function runChatFusionActivity(
     const fusionInput = {
       owner: input.owner, repo: input.repo, repoUrl,
       baseBranch: input.baseBranch, intent: agentIntent, branch: input.branch,
+      // #104: thread the per-agent adapter (claude-code/codex/fake) into the run.
+      adapter: input.adapter,
       // #58: thread the per-agent model/provider selection (undefined = default).
       model: input.model, provider: input.provider,
       // #57: thread the per-agent MCP servers (undefined = none).
@@ -132,7 +137,7 @@ export async function runChatFusionActivity(
     // failure as feedback. Bounded by CI_FIX_ATTEMPTS (default 2; 0 disables).
     const maxFixAttempts = Number(process.env.CI_FIX_ATTEMPTS ?? 2);
     const ciFix = async ({ branch, failure }: { branch: string; failure: string }) => {
-      const res = await sandbox.feedback({ repoUrl, branch, notes: failure, model: input.model, provider: input.provider, mcpServers: input.mcpServers, setupScript: input.setupScript, env: input.env });
+      const res = await sandbox.feedback({ repoUrl, branch, notes: failure, adapter: input.adapter, model: input.model, provider: input.provider, mcpServers: input.mcpServers, setupScript: input.setupScript, env: input.env });
       return { commitSha: res.commitSha };
     };
     // Plan mode: the first pass only PROPOSES a plan and parks. The planGate

@@ -13,6 +13,9 @@ export interface FusionInput {
   baseBranch: string;
   intent: string;
   branch: string;
+  // #104 per-agent adapter (claude-code | codex | fake). Selects which CLI the
+  // sandbox runs. Undefined = the sandbox default ("fake", the safe no-op).
+  adapter?: string;
   // Optional per-agent model/provider selection (#58), threaded into the sandbox
   // run/plan (and, via the app's ciFix closure, feedback). Empty = sandbox default.
   model?: string;
@@ -132,6 +135,7 @@ export async function runFusion(
     baseBranch: input.baseBranch,
     intent: input.intent,
     branch: input.branch,
+    adapter: input.adapter,
     model: input.model,
     provider: input.provider,
     mcpServers: input.mcpServers,

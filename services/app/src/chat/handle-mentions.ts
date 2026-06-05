@@ -72,6 +72,7 @@ export async function handleMentions(d: MentionDeps, m: MentionInput): Promise<s
     });
     await startFusionRun(d.temporal, {
       run, orgId: m.orgId, threadId: m.threadId, repo, agentId: agent.id, intent: m.body, sandboxUrl: d.sandboxUrl,
+      adapter: agent.adapter, // #104: run the agent's real adapter (claude-code/codex), not the fake default
       planMode: repo.planMode, // #20: plan-first when the repo opts in
       mentionDepth: m.depth + 1, // #27: children one level deeper
       ...agentModelConfig(agent), // #58: per-agent model/provider from agents.config
