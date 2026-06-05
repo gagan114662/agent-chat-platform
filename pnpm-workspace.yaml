@@ -3,3 +3,4 @@ packages:
   - "services/app"
   - "services/web"
   - "services/landing"
+  - "services/sdk-ts"
