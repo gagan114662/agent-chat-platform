@@ -57,6 +57,7 @@ describe("buildCommands", () => {
       openTasks: vi.fn(),
       openBilling: vi.fn(),
       openAutomations: vi.fn(),
+      openMemory: vi.fn(),
       focusSearch: vi.fn(),
     };
     const channels = [{ id: "c1", name: "general" }];
@@ -96,6 +97,9 @@ describe("buildCommands", () => {
 
     out.find((c) => c.title === "Open Automations")!.run();
     expect(actions.openAutomations).toHaveBeenCalled();
+
+    out.find((c) => c.title === "Open Memory")!.run();
+    expect(actions.openMemory).toHaveBeenCalled();
 
     out.find((c) => c.title.startsWith("Search messages"))!.run();
     expect(actions.focusSearch).toHaveBeenCalled();

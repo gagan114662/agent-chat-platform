@@ -10,7 +10,7 @@ export function Sidebar({
   channels, threads, dms, principals, repos, activeThreadId,
   unreads = {}, inbox = [], onOpenInbox, identity,
   onSelectThread, onCreateThread, onCreateChannel, onStartDm, onOpenContext, canCreateChannel,
-  onOpenGoals, onOpenAgents, onOpenTasks, onOpenBilling, onOpenAutomations,
+  onOpenGoals, onOpenAgents, onOpenTasks, onOpenBilling, onOpenAutomations, onOpenMemory,
   newThreadRef,
 }: {
   channels: Channel[];
@@ -34,6 +34,7 @@ export function Sidebar({
   onOpenTasks?: () => void;
   onOpenBilling?: () => void;
   onOpenAutomations?: () => void;
+  onOpenMemory?: () => void;
   newThreadRef?: RefObject<HTMLInputElement>;
 }) {
   const [channelName, setChannelName] = useState("");
@@ -85,6 +86,14 @@ export function Sidebar({
         >
           🧠 Context
         </button>
+        {onOpenMemory && (
+          <button
+            onClick={onOpenMemory}
+            className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          >
+            📚 Memory
+          </button>
+        )}
         {onOpenGoals && (
           <button
             onClick={onOpenGoals}
