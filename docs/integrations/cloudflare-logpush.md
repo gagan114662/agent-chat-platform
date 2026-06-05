@@ -37,10 +37,10 @@ Fly secret on the app (it is read at request time, never logged):
 
 ```sh
 ACP_INGEST_SECRET=$(openssl rand -hex 32)
-fly secrets set ACP_INGEST_SECRET="$ACP_INGEST_SECRET" --app acp-web
+fly secrets set ACP_INGEST_SECRET="$ACP_INGEST_SECRET" --app acp-convene
 # Optional: a default security thread to open Tasks in when ?threadId= is omitted
-fly secrets set INCIDENT_THREAD_ID=<thread-id> --app acp-web
-fly deploy --app acp-web   # redeploy so the new secret takes effect
+fly secrets set INCIDENT_THREAD_ID=<thread-id> --app acp-convene
+fly deploy --app acp-convene   # redeploy so the new secret takes effect
 ```
 
 Keep this value — you'll pass it as the destination header below.
