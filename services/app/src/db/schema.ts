@@ -438,3 +438,22 @@ export const notes = pgTable("notes", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ wsIx: index("notes_org_ws_ix").on(t.orgId, t.workspaceId) }));
+
+// #99 persistent internal tools: a registry of agent/admin-built tools/dashboards
+// stored as HTML content, org+workspace scoped, with a `published` flag. Content
+// is rendered ONLY in a `sandbox=""` iframe on the client (scripts disabled) — it
+// is stored verbatim. `createdByKind`/`createdById` record the author (a human
+// member or an api-key principal `apikey:<id>` #83).
+export const tools = pgTable("tools", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  workspaceId: text("workspace_id").notNull(),
+  name: text("name").notNull(),
+  kind: text("kind").notNull().default("page"),
+  content: text("content").notNull().default(""),
+  published: boolean("published").notNull().default(false),
+  createdByKind: text("created_by_kind").notNull(),
+  createdById: text("created_by_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ wsIx: index("tools_org_ws_ix").on(t.orgId, t.workspaceId) }));
