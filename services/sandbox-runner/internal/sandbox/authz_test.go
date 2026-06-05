@@ -18,6 +18,11 @@ func TestAdapterAuthorized(t *testing.T) {
 		{"fake", true},
 		{"claude-code", false},
 		{"codex", false}, // #63 codex is a non-fake adapter: default-deny without the allowlist (#38)
+		// #91 the generic CLI-factory adapters are non-fake: default-deny too.
+		{"cursor", false},
+		{"devin", false},
+		{"openclaw", false},
+		{"hermes", false},
 	}
 	for _, c := range cases {
 		if got := adapterAuthorized(c.name); got != c.want {
@@ -46,6 +51,14 @@ func TestAdapterAuthorized(t *testing.T) {
 	t.Setenv("ACP_ALLOWED_ADAPTERS", "codex")
 	if !adapterAuthorized("codex") {
 		t.Errorf("adapterAuthorized(%q) = false, want true once allowlisted", "codex")
+	}
+
+	// #91 the CLI-factory adapters pass the #38 gate once explicitly allowlisted.
+	t.Setenv("ACP_ALLOWED_ADAPTERS", "cursor, devin ,openclaw,hermes")
+	for _, name := range []string{"cursor", "devin", "openclaw", "hermes"} {
+		if !adapterAuthorized(name) {
+			t.Errorf("adapterAuthorized(%q) = false, want true once allowlisted", name)
+		}
 	}
 }
 
