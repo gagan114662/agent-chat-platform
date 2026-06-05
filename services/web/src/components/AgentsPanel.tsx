@@ -106,11 +106,15 @@ export function AgentsPanel({
             <select value={na} onChange={(e) => setNa(e.target.value)} aria-label="new agent adapter" className="rounded-lg border border-line bg-elevated px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none">
               <option value="claude-code">Claude Code</option>
               <option value="codex">Codex</option>
+              <option value="cursor">Cursor</option>
+              <option value="devin">Devin</option>
+              <option value="openclaw">Openclaw</option>
+              <option value="hermes">Hermes</option>
               <option value="fake">Demo (no-op)</option>
             </select>
             <button onClick={addAgent} disabled={adding || !nh.trim() || !nn.trim()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50">Add agent</button>
           </div>
-          <p className="mt-2 text-[11px] text-ink-3">Claude Code / Codex use your workspace subscription credentials (set on the sandbox). Demo is a safe no-op for testing the loop.</p>
+          <p className="mt-2 text-[11px] text-ink-3">Claude Code, Codex, Cursor, Devin, Openclaw &amp; Hermes run via their CLI on the sandbox (each needs its binary + credentials installed there and added to <code>ACP_ALLOWED_ADAPTERS</code>). Demo is a safe no-op for testing the loop.</p>
         </div>
       )}
       <ul className="space-y-2">

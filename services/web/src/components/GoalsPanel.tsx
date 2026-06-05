@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Goal, TickResult } from "../api.js";
+import type { Goal, TickResult, AutonomyStatus } from "../api.js";
 
 // #67/#120 autonomy panel: state a goal, decompose it into AGENT-ASSIGNED tasks on
 // a repo-bound thread (so the tick can dispatch them), and trigger a manual tick.
@@ -10,6 +10,8 @@ export function GoalsPanel({
   decomposeGoal,
   runTick,
   listGoals,
+  setGoalAutonomy,
+  getAutonomyStatus,
   threads = [],
   agents = [],
 }: {
@@ -18,6 +20,8 @@ export function GoalsPanel({
   decomposeGoal: (goalId: string, threadId: string, assigneeId?: string) => Promise<{ taskIds: string[] }>;
   runTick: (orgId: string, budgetMax?: number) => Promise<TickResult>;
   listGoals?: () => Promise<Goal[]>;
+  setGoalAutonomy?: (goalId: string, on: boolean) => Promise<Goal>;
+  getAutonomyStatus?: () => Promise<AutonomyStatus>;
   // Repo-bound threads the decomposed tasks run against, and agents to assign them to.
   threads?: { id: string; title: string }[];
   agents?: { id: string; handle: string }[];
@@ -32,10 +36,25 @@ export function GoalsPanel({
   const [threadId, setThreadId] = useState("");
   const [agentId, setAgentId] = useState("");
 
+  const [status, setStatus] = useState<AutonomyStatus | null>(null);
   const refresh = useCallback(() => {
     if (listGoals) listGoals().then(setGoals).catch((e) => setError((e as Error).message));
-  }, [listGoals]);
+    if (getAutonomyStatus) getAutonomyStatus().then(setStatus).catch(() => {});
+  }, [listGoals, getAutonomyStatus]);
   useEffect(() => { refresh(); }, [refresh]);
+  // Poll the loop status so "next tick" stays live while autonomy is on.
+  useEffect(() => {
+    if (!getAutonomyStatus) return;
+    const id = setInterval(() => getAutonomyStatus().then(setStatus).catch(() => {}), 5000);
+    return () => clearInterval(id);
+  }, [getAutonomyStatus]);
+
+  const toggleAutonomy = async (g: Goal) => {
+    if (!setGoalAutonomy) return;
+    setError(null);
+    try { await setGoalAutonomy(g.id, !g.autonomy); refresh(); }
+    catch (e) { setError((e as Error).message); }
+  };
   useEffect(() => { if (!threadId && threads[0]) setThreadId(threads[0].id); }, [threads, threadId]);
   useEffect(() => { if (!agentId && agents[0]) setAgentId(agents[0].id); }, [agents, agentId]);
 
@@ -81,6 +100,17 @@ export function GoalsPanel({
         <button onClick={onRunTick} disabled={busy} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50">Run now</button>
       </div>
 
+      {status && (
+        <div className="mb-3 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink-2">
+          <span className={status.enabled ? "font-medium text-positive" : "font-medium text-ink-3"}>
+            {status.enabled ? "Auto-pilot ON" : "Auto-pilot off"}
+          </span>
+          {status.enabled && status.nextTickAt && <span className="text-ink-3"> · next tick {Math.max(0, Math.round((status.nextTickAt - Date.now()) / 1000))}s · {status.cycles} cycles run</span>}
+          {status.lastSummary && <span className="text-ink-3"> · last: {status.lastSummary.dispatched} dispatched across {status.lastSummary.orgs} org(s)</span>}
+          {!status.enabled && <span className="text-ink-3"> · set ACP_AUTONOMY_INTERVAL_MS on the server to start the clock. Toggle a goal's autonomy below to enroll it.</span>}
+        </div>
+      )}
+
       {tick && (
         <div className="mb-4 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink-2">
           <span className="font-medium text-ink">{tick.dispatched.length} dispatched</span> · {tick.alerts} alerts · {tick.skipped} skipped
@@ -125,11 +155,18 @@ export function GoalsPanel({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-ink">{g.title}</span>
-                  {(g.state ?? g.status) && <span className="rounded bg-elevated-2 px-1.5 py-0.5 text-[10px] uppercase text-ink-3">{g.state ?? g.status}</span>}
+                  {(g.state ?? g.status) && <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase ${(g.state ?? g.status) === "done" ? "bg-positive/15 text-positive" : "bg-elevated-2 text-ink-3"}`}>{g.state ?? g.status}</span>}
+                  {g.autonomy && <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] uppercase text-accent">auto</span>}
+                  {(g.iterations ?? 0) > 0 && <span className="text-[10px] text-ink-3">iter {g.iterations}</span>}
                 </div>
                 {g.criteria && <div className="truncate text-xs text-ink-3">{g.criteria}</div>}
               </div>
-              <button onClick={() => decompose(g.id)} className="shrink-0 rounded-lg border border-line px-2 py-1 text-xs text-ink-2 hover:bg-elevated-2 hover:text-ink">Decompose</button>
+              <div className="flex shrink-0 items-center gap-1">
+                {setGoalAutonomy && (g.state ?? g.status) !== "done" && (
+                  <button onClick={() => toggleAutonomy(g)} title="When on, the scheduler advances this goal to completion with no Run-now clicks" className={`rounded-lg border px-2 py-1 text-xs ${g.autonomy ? "border-accent/40 bg-accent/10 text-accent" : "border-line text-ink-2 hover:bg-elevated-2 hover:text-ink"}`}>{g.autonomy ? "Auto: on" : "Auto: off"}</button>
+                )}
+                <button onClick={() => decompose(g.id)} className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 hover:bg-elevated-2 hover:text-ink">Decompose</button>
+              </div>
             </div>
           </li>
         ))}

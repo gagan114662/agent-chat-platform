@@ -48,6 +48,7 @@ import { eq } from "drizzle-orm";
 import { threads } from "./db/schema.js";
 import { startWorker } from "./fusion/worker.js";
 import { lazyTemporalClient } from "./fusion/bridge.js";
+import { startScheduler } from "./autonomy/scheduler.js";
 import { startTelemetry, stopTelemetry } from "./telemetry/otel-init.js";
 
 // pino redaction so credentials never reach the logs (defense-in-depth on top
@@ -126,6 +127,12 @@ export async function buildServer() {
 
   // Public liveness/health probe (in PUBLIC_PATHS so the auth preHandler won't 401 it).
   app.get("/healthz", async () => ({ ok: true }));
+
+  // #137 the unattended clock: drive every autonomy-on goal on an interval (behind
+  // ACP_AUTONOMY_INTERVAL_MS — unset/0 disables, so dev + tests never auto-run).
+  // Tied to the app lifecycle so it stops cleanly on shutdown.
+  const stopScheduler = startScheduler({ db, sql, temporal, sandboxUrl });
+  app.addHook("onClose", async () => { stopScheduler(); });
 
   // Serve the built web SPA same-origin (single-server prod). API routes are
   // registered first so they win; everything else falls back to index.html.

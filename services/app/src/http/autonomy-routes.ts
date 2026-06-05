@@ -3,8 +3,9 @@ import type { DB } from "../db/client.js";
 import type postgres from "postgres";
 import type { Client } from "@temporalio/client";
 import { and, desc, eq } from "drizzle-orm";
-import { createGoal, decomposeGoal, listGoals } from "../autonomy/goals.js";
+import { createGoal, decomposeGoal, listGoals, setGoalAutonomy, autonomousGoals } from "../autonomy/goals.js";
 import { tick, type StartRun, type TickResult } from "../autonomy/tick.js";
+import { schedulerState } from "../autonomy/scheduler.js";
 import { detectAlerts, recordAlerts } from "../autonomy/alerts.js";
 import { incidents } from "../db/schema.js";
 import { actor } from "./actor.js";
@@ -44,6 +45,35 @@ export function registerAutonomyRoutes(app: FastifyInstance, d: AutonomyDeps) {
     if (!threadId) return reply.code(400).send({ error: "threadId required" });
     const taskIds = await decomposeGoal(d.db, { orgId, goalId, threadId, assigneeId });
     return reply.code(200).send({ taskIds });
+  });
+
+  // #137: turn a goal's unattended self-drive on/off. When on, the scheduler
+  // advances it task-by-task with no "Run now". Org-scoped.
+  app.patch("/goals/:id/autonomy", async (req, reply) => {
+    const { id: goalId } = req.params as { id: string };
+    const { on } = (req.body ?? {}) as { on?: boolean };
+    const { orgId } = actor(req);
+    if (typeof on !== "boolean") return reply.code(400).send({ error: "on (boolean) required" });
+    const goal = await setGoalAutonomy(d.db, orgId, goalId, on);
+    if (!goal) return reply.code(404).send({ error: "goal not found" });
+    return reply.code(200).send(goal);
+  });
+
+  // #137: surface the unattended loop's state — is the clock running, when does it
+  // next fire, what did the last cycle do, and which goals are self-driving. Makes
+  // the loop observable instead of a black box. Org-scoped (lists this org's goals).
+  app.get("/autonomy/status", async (req, reply) => {
+    const { orgId } = actor(req);
+    const goals = await autonomousGoals(d.db, orgId);
+    return reply.code(200).send({
+      enabled: schedulerState.enabled,
+      intervalMs: schedulerState.intervalMs,
+      lastTickAt: schedulerState.lastTickAt,
+      nextTickAt: schedulerState.nextTickAt,
+      cycles: schedulerState.cycles,
+      lastSummary: schedulerState.lastSummary,
+      goals: goals.map((g) => ({ id: g.id, title: g.title, iterations: g.iterations })),
+    });
   });
 
   // The manual self-prompt trigger (the production trigger is a Temporal cron — see

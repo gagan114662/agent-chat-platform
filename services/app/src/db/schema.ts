@@ -130,6 +130,8 @@ export const tasks = pgTable("tasks", {
   // Defaulted/nullable so existing task-create paths (openTaskForMention/bulk) stay untouched.
   priority: text("priority").notNull().default("none"),
   dueDate: timestamp("due_date", { withTimezone: true }),
+  // #137/#138: the goal this task advances (nullable — mention/manual tasks have none).
+  goalId: text("goal_id"),
   createdByKind: text("created_by_kind").notNull(),
   createdById: text("created_by_id").notNull(),
 });
@@ -162,7 +164,12 @@ export const goals = pgTable("goals", {
   orgId: text("org_id").notNull(),
   title: text("title").notNull(),
   criteria: text("criteria").notNull().default(""), // done-criteria, one task per line (default planner)
-  state: text("state").notNull().default("open"),    // 'open' | 'active' | 'done'
+  state: text("state").notNull().default("open"),    // 'open' | 'active' | 'done' | 'blocked'
+  // #137 per-goal self-drive: when true, the unattended scheduler advances this
+  // goal task-by-task with no human "Run now". #138 iterations: bounded next-step
+  // generation / stuck-detection counter.
+  autonomy: boolean("autonomy").notNull().default(false),
+  iterations: integer("iterations").notNull().default(0),
   createdByKind: text("created_by_kind").notNull(),
   createdById: text("created_by_id").notNull(),
 });

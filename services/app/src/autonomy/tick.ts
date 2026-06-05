@@ -7,6 +7,7 @@ import { startFusionRun, type StartFusionRunInput } from "../fusion/start.js";
 import { agentModelConfig, agentMcp } from "../agents/agents.js";
 import { detectAlerts, recordAlerts } from "./alerts.js";
 import { runDueScheduleAutomations } from "./automations.js";
+import { autonomousGoals } from "./goals.js";
 
 // `start` is injectable so the tick can run with a FAKE temporal in tests (and so the
 // production path stays identical to the mention/hand-off starter). It defaults to the
@@ -26,14 +27,22 @@ export interface TickResult { dispatched: string[]; skipped: number; reason: str
 // (assigned to an agent, thread has a repo with a resolvable token, NOT monitor-only,
 // and no active run yet) and dispatch fusion runs for them — bounded by budgetMax.
 // Observe → decide → act. The merge/risk/approval gates still apply downstream.
-export async function tick(d: TickDeps, args: { orgId: string; budgetMax?: number }): Promise<TickResult> {
+export async function tick(d: TickDeps, args: { orgId: string; budgetMax?: number; autonomousOnly?: boolean }): Promise<TickResult> {
   const budget = args.budgetMax ?? 5;
   const start = d.start ?? ((t, i) => startFusionRun(t, i));
   const open = await d.db.select().from(tasks).where(and(eq(tasks.orgId, args.orgId), eq(tasks.state, "open")));
+  // #137: on the unattended clock, only dispatch tasks belonging to a goal whose
+  // owner turned autonomy ON — so the scheduler never auto-runs manual/mention
+  // tasks or goals an owner is still driving by hand. The manual "Run now" tick
+  // (autonomousOnly unset) keeps dispatching every ready task as before.
+  const allowGoals = args.autonomousOnly
+    ? new Set((await autonomousGoals(d.db, args.orgId)).map((g) => g.id))
+    : null;
   const dispatched: string[] = [];
   let skipped = 0;
   for (const t of open) {
     if (dispatched.length >= budget) { skipped++; continue; }
+    if (allowGoals && !(t.goalId && allowGoals.has(t.goalId))) { skipped++; continue; }
     if (t.assigneeKind !== "agent" || !t.assigneeId) { skipped++; continue; }
     const [thread] = await d.db.select().from(threads).where(and(eq(threads.id, t.threadId), eq(threads.orgId, args.orgId)));
     if (!thread?.repoId) { skipped++; continue; }

@@ -295,6 +295,13 @@
       "when": 1783350400000,
       "tag": "0041_skill_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1783436800000,
+      "tag": "0042_goal_autonomy",
+      "breakpoints": true
     }
   ]
 }

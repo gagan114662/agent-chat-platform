@@ -52,6 +52,7 @@ export async function decomposeGoal(
     const [t] = await db.insert(tasks).values({
       id: randomUUID(), orgId: args.orgId, threadId: args.threadId, title: s.title,
       state: "open", createdByKind: "agent", createdById: "planner",
+      goalId: args.goalId, // #137/#138: link the task to its goal for the autonomous loop
       ...(assigneeId ? { assigneeKind: "agent", assigneeId } : {}),
     }).returning({ id: tasks.id });
     ids.push(t.id);
@@ -73,4 +74,18 @@ export async function decomposeGoal(
 // goals persist across navigation instead of living only in component state (#120).
 export async function listGoals(db: DB, orgId: string) {
   return db.select().from(goals).where(eq(goals.orgId, orgId));
+}
+
+// #137: flip a goal's self-drive flag. When on, the unattended scheduler advances
+// it with no human "Run now". Org-scoped. Returns the updated goal (or undefined).
+export async function setGoalAutonomy(db: DB, orgId: string, goalId: string, on: boolean) {
+  const [row] = await db.update(goals).set({ autonomy: on })
+    .where(and(eq(goals.id, goalId), eq(goals.orgId, orgId))).returning();
+  return row;
+}
+
+// #137: the org's active, self-driving goals — the set the scheduler may advance.
+export async function autonomousGoals(db: DB, orgId: string) {
+  return db.select().from(goals)
+    .where(and(eq(goals.orgId, orgId), eq(goals.state, "active"), eq(goals.autonomy, true)));
 }

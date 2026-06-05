@@ -241,7 +241,7 @@ export async function memoryStats(): Promise<MemoryStats> {
 // #67 autonomy — Goals. NOTE: the backend exposes POST /goals + POST
 // /goals/:id/decompose + POST /orgs/:orgId/tick, but there is no list-goals GET
 // route, so the panel is create + decompose + run-tick (no list).
-export interface Goal { id: string; orgId: string; title: string; criteria?: string | null; status?: string; state?: string; threadId?: string | null; }
+export interface Goal { id: string; orgId: string; title: string; criteria?: string | null; status?: string; state?: string; threadId?: string | null; autonomy?: boolean; iterations?: number; }
 
 export async function listGoals(): Promise<Goal[]> {
   const res = await fetch(`/goals`, { headers: { ...authHeaders() } });
@@ -267,6 +267,29 @@ export async function decomposeGoal(goalId: string, threadId: string, assigneeId
     body: JSON.stringify(assigneeId ? { threadId, assigneeId } : { threadId }),
   });
   if (!res.ok) throw new Error(`decomposeGoal ${res.status}`);
+  return res.json();
+}
+
+// #137: flip a goal's unattended self-drive. When on, the scheduler advances it.
+export async function setGoalAutonomy(goalId: string, on: boolean): Promise<Goal> {
+  const res = await fetch(`/goals/${goalId}/autonomy`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ on }),
+  });
+  if (!res.ok) throw new Error(`setGoalAutonomy ${res.status}`);
+  return res.json();
+}
+
+// #137: the unattended loop's state (is the clock running, next tick, last cycle).
+export interface AutonomyStatus {
+  enabled: boolean; intervalMs: number; lastTickAt: number | null; nextTickAt: number | null;
+  cycles: number; lastSummary: { orgs: number; dispatched: number } | null;
+  goals: { id: string; title: string; iterations: number }[];
+}
+export async function getAutonomyStatus(): Promise<AutonomyStatus> {
+  const res = await fetch(`/autonomy/status`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getAutonomyStatus ${res.status}`);
   return res.json();
 }
 
