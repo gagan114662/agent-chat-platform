@@ -26,15 +26,19 @@ export function TasksPanel({
   getTask,
   updateTask,
   addTaskComment,
+  getTaskDelegation,
 }: {
   initialTaskId?: string;
   listTasks: () => Promise<Task[]>;
   getTask: (id: string) => Promise<TaskDetail>;
   updateTask: (id: string, patch: { priority?: TaskPriority; dueDate?: string | null; state?: TaskState }) => Promise<Task>;
   addTaskComment: (id: string, body: string) => Promise<TaskComment>;
+  // #130: trace a task's delegation chain to the accountable human.
+  getTaskDelegation?: (id: string) => Promise<{ chain: { byKind: string; byId: string; toKind: string; toId: string; at: string }[]; accountableHuman: string | null }>;
 }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [detail, setDetail] = useState<TaskDetail | null>(null);
+  const [deleg, setDeleg] = useState<{ chain: { byKind: string; byId: string; toKind: string; toId: string }[]; accountableHuman: string | null } | null>(null);
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -44,8 +48,9 @@ export function TasksPanel({
   useEffect(() => { refresh(); }, [refresh]);
 
   const open = (id: string) => {
-    setError(null);
+    setError(null); setDeleg(null);
     getTask(id).then(setDetail).catch((e) => { setDetail(null); setError((e as Error).message); });
+    getTaskDelegation?.(id).then(setDeleg).catch(() => {});
   };
   useEffect(() => { if (initialTaskId) open(initialTaskId); /* eslint-disable-next-line */ }, [initialTaskId]);
 
@@ -154,6 +159,21 @@ export function TasksPanel({
                   <li key={r.id} className="text-xs text-ink-2"><span className="font-medium">{r.relation}</span> → {r.toTaskId}</li>
                 ))}
               </ul>
+            </div>
+          )}
+          {deleg && deleg.chain.length > 0 && (
+            <div className="mb-3">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-3">Delegation chain</div>
+              <div className="flex flex-wrap items-center gap-1 text-xs text-ink-2">
+                {deleg.chain.map((l, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    {i === 0 && <span className={l.byKind === "human" ? "rounded bg-accent-soft px-1.5 py-0.5 text-accent" : "text-ink-3"}>{l.byKind === "human" ? "👤 " : "🤖 "}{l.byId}</span>}
+                    <span className="text-ink-3">→</span>
+                    <span className={l.toKind === "human" ? "rounded bg-accent-soft px-1.5 py-0.5 text-accent" : "rounded bg-elevated-2 px-1.5 py-0.5"}>{l.toKind === "human" ? "👤 " : "🤖 "}@{l.toId}</span>
+                  </span>
+                ))}
+              </div>
+              {deleg.accountableHuman && <div className="mt-1 text-[11px] text-ink-3">Accountable human: <span className="text-ink-2">{deleg.accountableHuman}</span></div>}
             </div>
           )}
           <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3">Comments</div>

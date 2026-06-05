@@ -375,6 +375,13 @@ export async function listTasks(): Promise<Task[]> {
   return tasks;
 }
 
+export interface DelegationChain { chain: { byKind: string; byId: string; toKind: string; toId: string; at: string }[]; accountableHuman: string | null; }
+export async function getTaskDelegation(id: string): Promise<DelegationChain> {
+  const res = await fetch(`/tasks/${id}/delegation`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getTaskDelegation ${res.status}`);
+  return res.json();
+}
+
 export async function getTask(id: string): Promise<TaskDetail> {
   const res = await fetch(`/tasks/${id}`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`getTask ${res.status}`);
