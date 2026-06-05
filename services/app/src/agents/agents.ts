@@ -1,6 +1,39 @@
+import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { agents, repos } from "../db/schema.js";
+import { checkQuota } from "../billing/plans.js";
+
+// QuotaError signals an org has hit its plan limit for a resource. Routes map it
+// to a 402 ("payment required" — upgrade the plan) with a clear message.
+export class QuotaError extends Error {
+  constructor(public readonly kind: string, public readonly used: number, public readonly limit: number) {
+    super(`quota reached: ${kind} ${used}/${limit}`);
+    this.name = "QuotaError";
+  }
+}
+
+// #85 createAgent provisions a new agent for an org/workspace, enforcing the
+// org's plan agent quota first (throws QuotaError when at/over the agent limit;
+// unlimited plans, agentLimit -1, never block). The handle is lowercased to
+// match resolveMention + the (orgId, handle) unique index. Org-scoped.
+export async function createAgent(
+  db: DB,
+  a: { orgId: string; workspaceId: string; handle: string; displayName: string; adapter?: string; config?: unknown },
+) {
+  const q = await checkQuota(db, a.orgId, "agents");
+  if (!q.ok) throw new QuotaError("agents", q.used, q.limit);
+  const [agent] = await db.insert(agents).values({
+    id: randomUUID(),
+    orgId: a.orgId,
+    workspaceId: a.workspaceId,
+    handle: a.handle.toLowerCase(),
+    displayName: a.displayName,
+    adapter: a.adapter ?? "fake",
+    config: (a.config ?? {}) as object,
+  }).returning();
+  return agent;
+}
 
 // AgentModelConfig is the optional per-agent model/provider selection (#58),
 // stored on the agent's jsonb `config`. Both fields are optional; empty = the

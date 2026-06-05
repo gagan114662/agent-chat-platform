@@ -1,7 +1,8 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { resolveMention, isPermittedOnRepo, agentModelConfig, agentMcp, setAgentProfile, isAgentVisibility } from "./agents.js";
+import { resolveMention, isPermittedOnRepo, agentModelConfig, agentMcp, setAgentProfile, isAgentVisibility, createAgent, QuotaError } from "./agents.js";
+import { setSubscription } from "../billing/plans.js";
 import { orgs, workspaces, agents, repos } from "../db/schema.js";
 
 const h = testDb();
@@ -113,6 +114,31 @@ describe("agent avatar + visibility (#91)", () => {
     expect(await resolveMention(h.db, "o1", "coder", { fromWorkspaceId: "w2" })).toBeUndefined();
     // No workspace scope passed → unchanged prior behavior (still resolvable).
     expect((await resolveMention(h.db, "o1", "coder"))?.id).toBe("a1");
+  });
+});
+
+describe("createAgent quota enforcement (#85)", () => {
+  it("blocks creating an agent at the plan limit (Starter agentLimit=1, already 1 agent)", async () => {
+    // o1 already has agent a1 (seeded) and defaults to Starter (agentLimit=1).
+    await expect(createAgent(h.db, { orgId: "o1", workspaceId: "w1", handle: "c2", displayName: "C2" }))
+      .rejects.toBeInstanceOf(QuotaError);
+    // No new agent was inserted.
+    expect(await resolveMention(h.db, "o1", "c2")).toBeUndefined();
+  });
+
+  it("allows creating an agent under the plan limit (Pro agentLimit=25)", async () => {
+    await setSubscription(h.db, { orgId: "o1", planId: "pro" });
+    const a = await createAgent(h.db, { orgId: "o1", workspaceId: "w1", handle: "C2", displayName: "C2", adapter: "fake" });
+    expect(a.handle).toBe("c2"); // lowercased
+    expect((await resolveMention(h.db, "o1", "c2"))?.id).toBe(a.id);
+  });
+
+  it("is org-scoped: another org at its own limit doesn't block this org", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "Org2" });
+    await h.db.insert(workspaces).values({ id: "w2", orgId: "o2", name: "WS2" });
+    // o2 has no agents → Starter agentLimit=1 has room for one.
+    const a = await createAgent(h.db, { orgId: "o2", workspaceId: "w2", handle: "first", displayName: "First" });
+    expect(a.orgId).toBe("o2");
   });
 });
 

@@ -4,6 +4,7 @@ import type { DB } from "../db/client.js";
 import { actor } from "./actor.js";
 import { roleOf, can } from "../rbac/rbac.js";
 import { createInvite, acceptInvite, listInvites, revokeInvite, seatCount, seatLimit } from "../auth/invites.js";
+import { checkQuota } from "../billing/plans.js";
 import { invites, members } from "../db/schema.js";
 
 // #88 invite + member-directory routes. Create/list/revoke are admin-gated
@@ -19,8 +20,14 @@ export function registerInviteRoutes(app: FastifyInstance, d: { db: DB }) {
     if (!can(await roleOf(d.db, userId, orgId), "team:manage")) {
       return reply.code(403).send({ error: "forbidden" });
     }
-    // Soft seat check (hard plan/quota billing is #85). Configurable via
-    // ACP_SEAT_LIMIT; at/over the limit we refuse to add seats.
+    // #85 seat quota: gate on the org's plan seat limit. `ok` is false when the
+    // org is already at/over its plan's seatLimit (unless unlimited, -1).
+    const seatQuota = await checkQuota(d.db, orgId, "seats");
+    if (!seatQuota.ok) {
+      return reply.code(402).send({ error: `seat limit reached (quota reached: ${seatQuota.used}/${seatQuota.limit})` });
+    }
+    // Legacy soft seat check (env-configurable via ACP_SEAT_LIMIT) kept as a
+    // secondary cap on top of the plan quota.
     if (await seatCount(d.db, orgId) >= seatLimit()) {
       return reply.code(402).send({ error: "seat limit reached" });
     }

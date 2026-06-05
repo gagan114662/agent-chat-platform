@@ -4,6 +4,7 @@ import { testDb, closeDb } from "../db/test-harness.js";
 import { registerAuth } from "./auth-routes.js";
 import { registerInviteRoutes } from "./invite-routes.js";
 import { _reset } from "../auth/rate-limit.js";
+import { setSubscription } from "../billing/plans.js";
 import { orgs, workspaces, members } from "../db/schema.js";
 
 const h = testDb();
@@ -26,6 +27,9 @@ beforeEach(async () => {
   await h.db.insert(members).values({ id: "adm", orgId: "o1", workspaceId: "w1", displayName: "Admin", role: "admin" });
   await h.db.insert(members).values({ id: "reg", orgId: "o1", workspaceId: "w1", displayName: "Reg", role: "member" });
   await h.db.insert(members).values({ id: "adm2", orgId: "o2", workspaceId: "w2", displayName: "Admin2", role: "admin" });
+  // #85: o1 has 2 members; put it on a plan with seat headroom so the new plan
+  // seat-quota gate (default Starter seatLimit=1) doesn't block these invites.
+  await setSubscription(h.db, { orgId: "o1", planId: "pro" });
 });
 
 const admin = { "x-org-id": "o1", "x-user-id": "adm", "content-type": "application/json" };

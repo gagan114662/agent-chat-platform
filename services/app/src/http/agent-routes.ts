@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
-import { agents } from "../db/schema.js";
+import { agents, members } from "../db/schema.js";
 import { actor } from "./actor.js";
-import { setAgentShared, setAgentProfile, isAgentVisibility } from "../agents/agents.js";
+import { setAgentShared, setAgentProfile, isAgentVisibility, createAgent, QuotaError } from "../agents/agents.js";
 import { roleOf, can } from "../rbac/rbac.js";
 
 export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
@@ -13,6 +13,34 @@ export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
     const { orgId } = actor(req);
     const rows = await d.db.select().from(agents).where(eq(agents.orgId, orgId));
     return reply.code(200).send(rows);
+  });
+
+  // #85: create an agent (admin-gated via agent:share, org-scoped). Enforces the
+  // org's plan agent quota — at/over the limit returns 402 with a clear "quota
+  // reached" message (upgrade the plan). Defaults the workspace to the creator's.
+  app.post("/agents", async (req, reply) => {
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "agent:share")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
+    const { handle, displayName, adapter, config, workspaceId } =
+      (req.body ?? {}) as { handle?: string; displayName?: string; adapter?: string; config?: unknown; workspaceId?: string };
+    if (!handle?.trim() || !displayName?.trim()) {
+      return reply.code(400).send({ error: "handle and displayName required" });
+    }
+    let ws = workspaceId;
+    if (!ws) {
+      const [me] = await d.db.select({ workspaceId: members.workspaceId }).from(members).where(and(eq(members.id, userId), eq(members.orgId, orgId)));
+      ws = me?.workspaceId;
+    }
+    if (!ws) return reply.code(400).send({ error: "workspaceId required" });
+    try {
+      const agent = await createAgent(d.db, { orgId, workspaceId: ws, handle: handle.trim(), displayName: displayName.trim(), adapter, config });
+      return reply.code(201).send(agent);
+    } catch (e) {
+      if (e instanceof QuotaError) return reply.code(402).send({ error: e.message });
+      throw e;
+    }
   });
 
   // #91: set an agent's profile — avatarUrl and/or visibility (public|private).
