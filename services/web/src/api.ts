@@ -296,7 +296,7 @@ export async function memoryStats(): Promise<MemoryStats> {
 // #67 autonomy — Goals. NOTE: the backend exposes POST /goals + POST
 // /goals/:id/decompose + POST /orgs/:orgId/tick, but there is no list-goals GET
 // route, so the panel is create + decompose + run-tick (no list).
-export interface Goal { id: string; orgId: string; title: string; criteria?: string | null; status?: string; state?: string; threadId?: string | null; autonomy?: boolean; iterations?: number; }
+export interface Goal { id: string; orgId: string; title: string; criteria?: string | null; status?: string; state?: string; threadId?: string | null; autonomy?: boolean; iterations?: number; businessId?: string | null; }
 
 export async function listGoals(): Promise<Goal[]> {
   const res = await fetch(`/goals`, { headers: { ...authHeaders() } });
@@ -305,13 +305,21 @@ export async function listGoals(): Promise<Goal[]> {
   return goals;
 }
 
-export async function createGoal(title: string, criteria?: string): Promise<Goal> {
+export async function createGoal(title: string, criteria?: string, businessId?: string): Promise<Goal> {
   const res = await fetch(`/goals`, {
     method: "POST",
     headers: { "content-type": "application/json", ...authHeaders() },
-    body: JSON.stringify(criteria ? { title, criteria } : { title }),
+    body: JSON.stringify({ title, ...(criteria ? { criteria } : {}), ...(businessId ? { businessId } : {}) }),
   });
   if (!res.ok) throw new Error(`createGoal ${res.status}`);
+  return res.json();
+}
+
+// #146: advance a business goal — execute its open tasks as funnel actions
+// (draft charges/campaigns → pending human approval).
+export async function runGoal(goalId: string): Promise<{ drafted: { kind: string; reason: string }[]; outcome: { status: string } }> {
+  const res = await fetch(`/goals/${goalId}/run`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`runGoal ${res.status}`);
   return res.json();
 }
 

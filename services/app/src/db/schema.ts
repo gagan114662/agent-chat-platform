@@ -200,6 +200,7 @@ export const paymentIntents = pgTable("payment_intents", {
   memo: text("memo").notNull().default(""),
   state: text("state").notNull().default("pending"), // 'pending'|'approved'|'declined'
   approvedBy: text("approved_by"),
+  taskId: text("task_id"), // #146: the goal task that drafted this charge (approval → task done)
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -225,6 +226,7 @@ export const outreachCampaigns = pgTable("outreach_campaigns", {
   state: text("state").notNull().default("pending"), // 'pending'|'approved'|'sent'|'declined'
   approvedBy: text("approved_by"),
   sentCount: integer("sent_count").notNull().default(0),
+  taskId: text("task_id"), // #146: the goal task that drafted this campaign
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -242,6 +244,10 @@ export const goals = pgTable("goals", {
   // #140: the public URL a deploy produced for this goal — lets a "live at a public
   // URL" success criterion auto-verify (#138). Nullable until a deploy succeeds.
   liveUrl: text("live_url"),
+  // #146: when set, this goal advances a BUSINESS's funnel (its tasks run as
+  // business actions — draft charge/campaign/signup → pending human approval) instead
+  // of opening code PRs. Nullable — a normal code goal has none.
+  businessId: text("business_id"),
   createdByKind: text("created_by_kind").notNull(),
   createdById: text("created_by_id").notNull(),
 });

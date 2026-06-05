@@ -2,8 +2,15 @@ import { randomUUID } from "node:crypto";
 import { and, eq, desc } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import {
-  businesses, businessLedger, paymentIntents, leads, outreachCampaigns, repos,
+  businesses, businessLedger, paymentIntents, leads, outreachCampaigns, repos, tasks,
 } from "../db/schema.js";
+
+// #146: when a human approves a draft a goal task created, that task's real outcome
+// is verified → mark it done (#145). Inline (not imported) to avoid a cycle.
+async function verifyDraftTask(db: DB, orgId: string, taskId: string | null | undefined) {
+  if (!taskId) return;
+  await db.update(tasks).set({ state: "done" }).where(and(eq(tasks.orgId, orgId), eq(tasks.id, taskId), eq(tasks.state, "merged")));
+}
 
 // #141/#142 the business subsystem. A first-class business bundles a repo (#139),
 // a live URL (#140), a per-business P&L, a CRM funnel, and human-gated revenue +
@@ -50,10 +57,11 @@ export async function businessPnl(db: DB, orgId: string, businessId: string): Pr
 
 // ---- human-gated revenue rails (#141) ----
 // Agents create a payment intent (draft); it stays pending until a human approves.
-export async function createPaymentIntent(db: DB, args: { orgId: string; businessId: string; amountCents: number; customer?: string; memo?: string }) {
+export async function createPaymentIntent(db: DB, args: { orgId: string; businessId: string; amountCents: number; customer?: string; memo?: string; taskId?: string }) {
   const [row] = await db.insert(paymentIntents).values({
     id: randomUUID(), orgId: args.orgId, businessId: args.businessId,
     amountCents: Math.round(args.amountCents), customer: args.customer ?? "", memo: args.memo ?? "", state: "pending",
+    taskId: args.taskId ?? null,
   }).returning();
   return row;
 }
@@ -73,6 +81,7 @@ export async function decidePaymentIntent(db: DB, args: { orgId: string; intentI
   if (args.approve) {
     await addLedgerEntry(db, { orgId: args.orgId, businessId: pi.businessId, kind: "revenue", amountCents: pi.amountCents, source: "payment", memo: `payment ${pi.customer}`.trim() });
     if (pi.customer) await addLead(db, { orgId: args.orgId, businessId: pi.businessId, identifier: pi.customer, stage: "customer", source: "payment" });
+    await verifyDraftTask(db, args.orgId, pi.taskId); // #146: close the goal task that drafted this
   }
   return row;
 }
@@ -101,10 +110,11 @@ export async function funnel(db: DB, orgId: string, businessId: string): Promise
 export type OutreachConnector = (c: { channel: string; audience: string; body: string }) => Promise<number>;
 export const noopConnector: OutreachConnector = async (c) => c.audience.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).length;
 
-export async function createCampaign(db: DB, args: { orgId: string; businessId: string; channel: string; audience?: string; body?: string }) {
+export async function createCampaign(db: DB, args: { orgId: string; businessId: string; channel: string; audience?: string; body?: string; taskId?: string }) {
   const [row] = await db.insert(outreachCampaigns).values({
     id: randomUUID(), orgId: args.orgId, businessId: args.businessId, channel: args.channel,
     audience: args.audience ?? "", body: args.body ?? "", state: "pending",
+    taskId: args.taskId ?? null,
   }).returning();
   return row;
 }
@@ -129,5 +139,6 @@ export async function decideCampaign(db: DB, args: { orgId: string; campaignId: 
   if (args.costCents) await addLedgerEntry(db, { orgId: args.orgId, businessId: c.businessId, kind: "cost", amountCents: args.costCents, source: "api", memo: `${c.channel} campaign` });
   const [row] = await db.update(outreachCampaigns).set({ state: "sent", approvedBy: args.byUserId, sentCount: reached })
     .where(and(eq(outreachCampaigns.id, args.campaignId), eq(outreachCampaigns.orgId, args.orgId))).returning();
+  await verifyDraftTask(db, args.orgId, c.taskId); // #146: close the goal task that drafted this
   return row;
 }

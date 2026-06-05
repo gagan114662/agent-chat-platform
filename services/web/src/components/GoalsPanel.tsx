@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Goal, TickResult, AutonomyStatus } from "../api.js";
+import type { Goal, TickResult, AutonomyStatus, Business } from "../api.js";
 import type { Repo } from "../types.js";
 
 // #67/#120 autonomy panel: state a goal, decompose it into AGENT-ASSIGNED tasks on
@@ -13,6 +13,8 @@ export function GoalsPanel({
   listGoals,
   setGoalAutonomy,
   getAutonomyStatus,
+  listBusinesses,
+  runGoal,
   repos = [],
   connectRepo,
   ingestRepoIssues,
@@ -22,7 +24,9 @@ export function GoalsPanel({
   agents = [],
 }: {
   orgId: string;
-  createGoal: (title: string, criteria?: string) => Promise<Goal>;
+  createGoal: (title: string, criteria?: string, businessId?: string) => Promise<Goal>;
+  listBusinesses?: () => Promise<Business[]>;
+  runGoal?: (goalId: string) => Promise<{ drafted: { kind: string; reason: string }[]; outcome: { status: string } }>;
   decomposeGoal: (goalId: string, threadId: string, assigneeId?: string) => Promise<{ taskIds: string[] }>;
   runTick: (orgId: string, budgetMax?: number) => Promise<TickResult>;
   listGoals?: () => Promise<Goal[]>;
@@ -46,6 +50,16 @@ export function GoalsPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [threadId, setThreadId] = useState("");
   const [agentId, setAgentId] = useState("");
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [businessId, setBusinessId] = useState(""); // #146: optional business target
+  useEffect(() => { if (listBusinesses) listBusinesses().then(setBusinesses).catch(() => {}); }, [listBusinesses]);
+
+  const runBiz = async (goalId: string) => {
+    if (!runGoal) return;
+    setError(null); setNotice("Drafting funnel actions…");
+    try { const r = await runGoal(goalId); setNotice(r.drafted.length ? `Drafted ${r.drafted.length}: ${r.drafted.map((d) => d.reason).join("; ")}. Approve them in Businesses.` : `No new drafts (${r.outcome.status}).`); refresh(); }
+    catch (e) { setError((e as Error).message); }
+  };
 
   const [status, setStatus] = useState<AutonomyStatus | null>(null);
   const refresh = useCallback(() => {
@@ -105,7 +119,7 @@ export function GoalsPanel({
     if (!t || busy) return;
     setBusy(true); setError(null); setNotice(null);
     try {
-      const goal = await createGoal(t, criteria.trim() || undefined);
+      const goal = await createGoal(t, criteria.trim() || undefined, businessId || undefined);
       setGoals((prev) => [goal, ...prev.filter((g) => g.id !== goal.id)]);
       setTitle(""); setCriteria("");
     } catch (e) { setError((e as Error).message); }
@@ -210,7 +224,14 @@ export function GoalsPanel({
             {agents.length === 0 && <option value="">no agent</option>}
             {agents.map((a) => <option key={a.id} value={a.id}>@{a.handle}</option>)}
           </select>
+          {businesses.length > 0 && (
+            <select aria-label="target business" value={businessId} onChange={(e) => setBusinessId(e.target.value)} title="Make this a BUSINESS goal — criteria lines become funnel actions (draft charge/campaign), human-approved" className="rounded-lg border border-line bg-elevated px-2 py-1 text-xs text-ink focus:border-accent focus:outline-none">
+              <option value="">code goal (repo)</option>
+              {businesses.map((b) => <option key={b.id} value={b.id}>🏢 {b.name}</option>)}
+            </select>
+          )}
         </div>
+        {businessId && <p className="text-[11px] text-ink-3">Business goal: each criteria line is a funnel action — e.g. <code>email campaign to a@x.com, b@x.com</code> or <code>charge $39 to dave@x.com</code>. Agents draft; you approve in Businesses.</p>}
       </div>
 
       {goals.length === 0 && (
@@ -233,6 +254,7 @@ export function GoalsPanel({
                   <span className="text-sm font-medium text-ink">{g.title}</span>
                   {(g.state ?? g.status) && <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase ${(g.state ?? g.status) === "done" ? "bg-positive/15 text-positive" : "bg-elevated-2 text-ink-3"}`}>{g.state ?? g.status}</span>}
                   {g.autonomy && <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] uppercase text-accent">auto</span>}
+                  {g.businessId && <span className="rounded bg-positive/15 px-1.5 py-0.5 text-[10px] uppercase text-positive">🏢 business</span>}
                   {(g.iterations ?? 0) > 0 && <span className="text-[10px] text-ink-3">iter {g.iterations}</span>}
                 </div>
                 {g.criteria && <div className="truncate text-xs text-ink-3">{g.criteria}</div>}
@@ -242,6 +264,9 @@ export function GoalsPanel({
                   <button onClick={() => toggleAutonomy(g)} title="When on, the scheduler advances this goal to completion with no Run-now clicks" className={`rounded-lg border px-2 py-1 text-xs ${g.autonomy ? "border-accent/40 bg-accent/10 text-accent" : "border-line text-ink-2 hover:bg-elevated-2 hover:text-ink"}`}>{g.autonomy ? "Auto: on" : "Auto: off"}</button>
                 )}
                 <button onClick={() => decompose(g.id)} className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 hover:bg-elevated-2 hover:text-ink">Decompose</button>
+                {g.businessId && runGoal && (g.state ?? g.status) !== "done" && (
+                  <button onClick={() => runBiz(g.id)} title="Execute this goal's funnel actions → pending drafts you approve in Businesses" className="rounded-lg border border-positive/40 bg-positive/10 px-2 py-1 text-xs font-medium text-positive hover:bg-positive/20">Run funnel</button>
+                )}
               </div>
             </div>
           </li>

@@ -6,6 +6,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { createGoal, decomposeGoal, listGoals, setGoalAutonomy, autonomousGoals } from "../autonomy/goals.js";
 import { tick, type StartRun, type TickResult } from "../autonomy/tick.js";
 import { schedulerState } from "../autonomy/scheduler.js";
+import { runBusinessGoal } from "../business/actions.js";
+import { progressGoal } from "../autonomy/progress.js";
 import { detectAlerts, recordAlerts } from "../autonomy/alerts.js";
 import { incidents } from "../db/schema.js";
 import { actor } from "./actor.js";
@@ -28,13 +30,25 @@ export function registerAutonomyRoutes(app: FastifyInstance, d: AutonomyDeps) {
     return reply.code(200).send({ goals: await listGoals(d.db, orgId) });
   });
 
-  // State a goal (once, by a human). Org-scoped via actor.
+  // State a goal (once, by a human). Org-scoped via actor. #146: an optional
+  // businessId makes this a BUSINESS goal — its tasks run as funnel actions.
   app.post("/goals", async (req, reply) => {
-    const { title, criteria } = (req.body ?? {}) as { title?: string; criteria?: string };
+    const { title, criteria, businessId } = (req.body ?? {}) as { title?: string; criteria?: string; businessId?: string };
     const { orgId, userId } = actor(req);
     if (!title) return reply.code(400).send({ error: "title required" });
-    const goal = await createGoal(d.db, { orgId, title, criteria, byKind: "human", byId: userId });
+    const goal = await createGoal(d.db, { orgId, title, criteria, byKind: "human", byId: userId, businessId });
     return reply.code(201).send(goal);
+  });
+
+  // #146: advance a business goal now (manual trigger, like "Run now" for code
+  // goals) — execute its open tasks as business actions → pending drafts in the
+  // approval surface, then judge completion. Org-scoped.
+  app.post("/goals/:id/run", async (req, reply) => {
+    const { id: goalId } = req.params as { id: string };
+    const { orgId } = actor(req);
+    const result = await runBusinessGoal(d.db, orgId, goalId);
+    const outcome = await progressGoal(d.db, orgId, goalId);
+    return reply.code(200).send({ ...result, outcome });
   });
 
   // Decompose an open goal into Tasks (idempotent, org-scoped). The goal carries the thread.

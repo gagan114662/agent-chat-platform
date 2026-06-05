@@ -17,11 +17,12 @@ async function bestAgentId(db: DB, orgId: string): Promise<string | undefined> {
     .sort((x, y) => y.score - x.score)[0].id;
 }
 
-export interface NewGoal { orgId: string; title: string; criteria?: string; byKind: string; byId: string; }
+export interface NewGoal { orgId: string; title: string; criteria?: string; byKind: string; byId: string; businessId?: string; }
 export async function createGoal(db: DB, g: NewGoal) {
   const [row] = await db.insert(goals).values({
     id: randomUUID(), orgId: g.orgId, title: g.title, criteria: g.criteria ?? "", state: "open",
     createdByKind: g.byKind, createdById: g.byId,
+    businessId: g.businessId ?? null, // #146: a business goal advances the funnel, not a repo
   }).returning();
   return row;
 }

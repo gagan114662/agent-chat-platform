@@ -323,6 +323,13 @@
       "when": 1783696000000,
       "tag": "0045_businesses",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1783782400000,
+      "tag": "0046_goal_business",
+      "breakpoints": true
     }
   ]
 }

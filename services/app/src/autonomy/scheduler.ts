@@ -6,6 +6,7 @@ import { goals as goalsTable } from "../db/schema.js";
 import { tick, type StartRun } from "./tick.js";
 import { autonomousGoals } from "./goals.js";
 import { progressGoal, type GoalOutcome, type NextStepGen } from "./progress.js";
+import { runBusinessGoal } from "../business/actions.js";
 
 // #137 the unattended clock. A human is no longer the clock: this drives every
 // org that has an active, autonomy-on goal, on an interval. Each cycle, per org:
@@ -43,6 +44,10 @@ export async function runAutonomyCycle(d: SchedulerDeps): Promise<CycleResult> {
   let dispatched = 0;
   for (const orgId of orgIds) {
     for (const g of await autonomousGoals(d.db, orgId)) {
+      // #146: a business goal advances the funnel — execute its open tasks as
+      // business actions (draft charges/campaigns → pending human approval) before
+      // judging completion.
+      if (g.businessId) await runBusinessGoal(d.db, orgId, g.id);
       const outcome = await progressGoal(d.db, orgId, g.id, { gen: d.gen });
       goals.push({ goalId: g.id, title: g.title, outcome });
     }
