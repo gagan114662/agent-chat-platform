@@ -79,4 +79,16 @@ describe("Composer", () => {
     expect(onSend).toHaveBeenCalledWith("hello @coder");
     expect(input.value).toBe("");
   });
+
+  it("offers @mention autocomplete and inserts the picked handle (#108)", () => {
+    const onSend = vi.fn();
+    render(<Composer onSend={onSend} mentionables={[{ kind: "agent", name: "coder" }, { kind: "human", name: "alice" }]} />);
+    const input = screen.getByPlaceholderText(/message/i) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "@co" } });
+    const opt = screen.getByText("@coder");
+    expect(opt).toBeInTheDocument();
+    fireEvent.click(opt);
+    expect(input.value).toBe("@coder ");
+  });
+
 });

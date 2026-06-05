@@ -259,7 +259,7 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
                       : view === "memory"
                         ? <MemoryPanel memoryRecall={memoryRecall} memoryConsolidate={memoryConsolidate} listMemoryNodes={listMemoryNodes} />
                         : activeThreadId
-                    ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} commands={commands} onSlashSearch={focusSearch} />
+                    ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} commands={commands} onSlashSearch={focusSearch} mentionables={principals.map((p) => ({ kind: p.kind, name: p.name }))} />
                     : <div className="flex-1" />}
       </main>
       <TeamPanel principals={principals} onStartDm={onStartDm} />
@@ -297,7 +297,7 @@ function InboxPanel({ inbox, onSelect }: { inbox: InboxItem[]; onSelect: (id: st
 }
 
 // Separate component so the stream hook re-subscribes when the active thread changes.
-function ThreadConversation({ threadId, onActivity, commands, onSlashSearch }: { threadId: string; onActivity?: () => void; commands?: Command[]; onSlashSearch?: (q: string) => void }) {
+function ThreadConversation({ threadId, onActivity, commands, onSlashSearch, mentionables }: { threadId: string; onActivity?: () => void; commands?: Command[]; onSlashSearch?: (q: string) => void; mentionables?: { kind: "human" | "agent"; name: string }[] }) {
   const { messages, send, refetch } = useThreadStream(threadId, onActivity);
   const onApprove = (runId: string) => { approveRun(runId).then(refetch).catch(() => {}); };
   const onDecline = (runId: string) => { declineRun(runId).then(refetch).catch(() => {}); };
@@ -314,7 +314,7 @@ function ThreadConversation({ threadId, onActivity, commands, onSlashSearch }: {
   return (
     <>
       <ThreadView messages={messages} onApprove={onApprove} onDecline={onDecline} onLoadDiff={onLoadDiff} onOpenFile={onOpenFile} onSyncComments={onSyncComments} onUpdatePr={onUpdatePr} onLoadCheckpoints={onLoadCheckpoints} onRestoreCheckpoint={onRestoreCheckpoint} onApprovePlan={onApprovePlan} onRejectPlan={onRejectPlan} />
-      <Composer onSend={send} commands={commands} onSlashSearch={onSlashSearch} />
+      <Composer onSend={send} commands={commands} onSlashSearch={onSlashSearch} mentionables={mentionables} />
     </>
   );
 }
