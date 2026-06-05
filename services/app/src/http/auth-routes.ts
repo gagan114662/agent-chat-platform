@@ -24,7 +24,10 @@ function isSignedFilePath(path: string): boolean {
 // plus the /auth/* routes. Must be registered BEFORE other route registrars so the
 // preHandler covers them.
 export function registerAuth(app: FastifyInstance, d: { db: DB }) {
-  const PUBLIC_PATHS = new Set(["/auth/login", "/auth/members", "/healthz"]);
+  // #88 invites: accepting an invite is token-gated, not session-gated — a new
+  // user has no session yet. So /invites/accept is public (bypasses the session
+  // 401 here) like /auth/login; the route itself validates the invite token.
+  const PUBLIC_PATHS = new Set(["/auth/login", "/auth/members", "/healthz", "/invites/accept"]);
   app.addHook("preHandler", async (req, reply) => {
     const token = bearer(req);
     if (token) {
