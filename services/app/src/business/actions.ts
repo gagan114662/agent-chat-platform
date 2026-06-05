@@ -43,6 +43,40 @@ export function parseBusinessAction(text: string): BusinessAction | null {
   return null;
 }
 
+// parseBusinessActions: a single chat directive can carry MORE than one action
+// ("draft a $25 charge to erin@x.com AND a campaign to a@x.com, b@x.com"). Parse a
+// charge, a campaign, and a signup independently and return all found (the goal-
+// loop path uses the single parseBusinessAction per task; chat uses this).
+export function parseBusinessActions(text: string): BusinessAction[] {
+  const out: BusinessAction[] = [];
+  // charge — the explicit $amount (may sit before OR after the word "charge") + the
+  // email in the charge clause (from "charge" up to "and"/"campaign").
+  if (/charge/i.test(text)) {
+    const amt = text.match(/\$\s*(\d+(?:\.\d{1,2})?)/) ?? text.match(/charge[^@]*?(\d+(?:\.\d{1,2})?)/i);
+    const seg = text.match(/charge\b([\s\S]*?)(?:\band\b|campaign|outreach|$)/i)?.[1] ?? text;
+    const cust = seg.match(EMAIL) ?? text.match(EMAIL);
+    if (amt && cust) out.push({ kind: "charge", amountCents: Math.round(parseFloat(amt[1]) * 100), customer: cust[0] });
+  }
+  // campaign — channel + the audience after "to"
+  if (/\bcampaign\b|\boutreach\b/i.test(text)) {
+    const channel = /\bsocial\b/i.test(text) ? "social" : /\bads?\b/i.test(text) ? "ads" : "email";
+    const seg = text.split(/campaign|outreach/i).slice(1).join(" ");
+    const audience = (seg.match(/[^\s,]+@[^\s,]+/g) ?? []).map((s) => s.replace(/[.,;]+$/, "")).join(", ");
+    if (audience) out.push({ kind: "campaign", channel: channel as "email" | "social" | "ads", audience });
+  }
+  return out;
+}
+
+// resolveBusinessFromText: find which business a chat directive targets — "for <X>"
+// / "<X> business", else any business whose name appears in the text.
+export async function resolveBusinessFromText(db: DB, orgId: string, text: string) {
+  const m = text.match(/\bfor (?:the )?([\w .'-]{2,40}?)(?: business)?\b/i);
+  if (m) { const b = await findBusinessByName(db, orgId, m[1]); if (b) return b; }
+  const all = await db.select().from(businesses).where(eq(businesses.orgId, orgId));
+  const lc = text.toLowerCase();
+  return all.find((b) => lc.includes(b.name.toLowerCase()));
+}
+
 // findBusinessByName: resolve "@business ResumeAI" / a goal's businessId target.
 export async function findBusinessByName(db: DB, orgId: string, name: string) {
   const all = await db.select().from(businesses).where(eq(businesses.orgId, orgId));

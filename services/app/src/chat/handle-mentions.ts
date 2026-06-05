@@ -11,6 +11,7 @@ import { openTaskForMention } from "../tasks/tasks.js";
 import { startFusionRun } from "../fusion/start.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
 import { threads, repos, agents } from "../db/schema.js";
+import { parseBusinessActions, resolveBusinessFromText, runBusinessAction } from "../business/actions.js";
 
 export interface MentionDeps { db: DB; sql: postgres.Sql; temporal: Client; sandboxUrl: string; }
 
@@ -48,6 +49,30 @@ export async function handleMentions(d: MentionDeps, m: MentionInput): Promise<s
 
   const [thread] = await d.db.select().from(threads).where(and(eq(threads.id, m.threadId), eq(threads.orgId, m.orgId)));
   if (!thread) return [];
+
+  // #146: business-directive interception. If the message @mentions an agent AND
+  // carries a business action (draft a charge / campaign) targeting a business, the
+  // agent's job is to DRAFT it into the funnel — not run a code sandbox. Create the
+  // pending draft(s) (attributed to the agent) + post a confirmation, and skip the
+  // code run. This connects the chat-dispatch path to the business economics.
+  const directives = parseBusinessActions(m.body);
+  if (directives.length > 0) {
+    const mentioned = (await Promise.all(parseMentions(m.body).map((h) => resolveMention(d.db, m.orgId, h)))).find(Boolean);
+    const business = await resolveBusinessFromText(d.db, m.orgId, m.body);
+    if (mentioned && business) {
+      const done: string[] = [];
+      for (const action of directives) {
+        const r = await runBusinessAction(d.db, { orgId: m.orgId, businessId: business.id, action });
+        done.push(r.reason);
+      }
+      const msg = await createMessage(d.db, {
+        orgId: m.orgId, threadId: m.threadId, authorKind: "agent", authorId: mentioned.id,
+        body: `For **${business.name}** I ${done.join(" and ")}. Review & approve in Businesses.`,
+      });
+      await notify(d.sql, THREAD_CHANNEL, { threadId: m.threadId, message: msg });
+      return []; // handled as a funnel action, not a code run
+    }
+  }
 
   const started: string[] = [];
   const dedup = new Set<string>(); // an agent reached via both @agent and @team starts once

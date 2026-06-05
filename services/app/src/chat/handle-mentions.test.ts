@@ -172,3 +172,34 @@ describe("handleMentions (#27 shared, loop-guarded handler)", () => {
     expect(starts.length).toBe(0);
   });
 });
+
+describe("business-directive interception (#146)", () => {
+  it("a chat directive to an agent drafts into the funnel (no code run) + confirms", async () => {
+    const { createBusiness, listPaymentIntents, listCampaigns } = await import("../business/businesses.js");
+    const biz = await createBusiness(h.db, { orgId: "o1", name: "ResumeAI" });
+    const { temporal, starts } = fakeTemporal();
+    const started = await handleMentions(deps(temporal), {
+      orgId: "o1", threadId: "t1",
+      body: "@bob for the ResumeAI business, draft a $25 charge to erin@test.com and an email campaign to fresh1@x.com, fresh2@x.com",
+      authorKind: "human", authorId: "m1", depth: 0,
+    });
+    expect(started).toEqual([]);            // NOT a code run
+    expect(starts.length).toBe(0);          // no sandbox workflow started
+    const intents = await listPaymentIntents(h.db, "o1", biz.id);
+    expect(intents.map((i) => [i.customer, i.amountCents])).toEqual([["erin@test.com", 2500]]);
+    const camps = await listCampaigns(h.db, "o1", biz.id);
+    expect(camps[0].audience).toBe("fresh1@x.com, fresh2@x.com");
+    // a confirmation message was posted to the thread
+    const msgs = await listMessages(h.db, "t1", "o1");
+    expect(msgs.at(-1)?.body).toMatch(/ResumeAI/);
+  });
+
+  it("a normal code mention still starts a run (not hijacked)", async () => {
+    const { temporal, starts } = fakeTemporal();
+    const started = await handleMentions(deps(temporal), {
+      orgId: "o1", threadId: "t1", body: "@bob fix the login bug", authorKind: "human", authorId: "m1", depth: 0,
+    });
+    expect(started.length).toBe(1);
+    expect(starts.length).toBe(1);
+  });
+});
