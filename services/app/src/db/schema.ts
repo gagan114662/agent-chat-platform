@@ -22,6 +22,11 @@ export const repos = pgTable("repos", {
   tokenEnvVar: text("token_env_var").notNull(),
   autonomy: text("autonomy").notNull().default("autopilot-merge"), // 'monitor-only'|'resolve-ci'|'autopilot-merge'
   planMode: boolean("plan_mode").notNull().default(false), // #20: mentions on this repo plan-first (propose → approve → execute)
+  // #71 per-repo setup script: admin-configured (trusted config, NOT cloned-repo
+  // content) shell script run in the sandbox workdir after clone and before the
+  // agent (install deps / build). Nullable — null/empty = no setup (today's
+  // behavior). Threaded app→orchestrator→sandbox; bounded by the run timeout.
+  setupScript: text("setup_script"),
 });
 
 export const members = pgTable("members", {

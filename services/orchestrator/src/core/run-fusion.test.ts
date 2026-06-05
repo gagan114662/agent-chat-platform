@@ -207,6 +207,21 @@ describe("runFusion", () => {
     );
   });
 
+  it("threads setupScript from the input into the sandbox run (#71)", async () => {
+    const d = deps(["success"]);
+    await runFusion(d, { ...input, setupScript: "pnpm install" }, { pollMs: 0, maxPolls: 5 });
+    expect(d.sandbox.run).toHaveBeenCalledWith(
+      expect.objectContaining({ setupScript: "pnpm install" }),
+    );
+  });
+
+  it("passes no setupScript when the input omits it (default unchanged, #71)", async () => {
+    const d = deps(["success"]);
+    await runFusion(d, input, { pollMs: 0, maxPolls: 5 });
+    const call = (d.sandbox.run as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.setupScript).toBeUndefined();
+  });
+
   it("passes no mcpServers when the input omits them (default unchanged, #57)", async () => {
     const d = deps(["success"]);
     await runFusion(d, input, { pollMs: 0, maxPolls: 5 });

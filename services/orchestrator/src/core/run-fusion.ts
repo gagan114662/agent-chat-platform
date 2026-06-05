@@ -20,6 +20,10 @@ export interface FusionInput {
   // Optional per-agent built-in MCP catalog servers (#57), threaded into the
   // sandbox run/plan identically. Undefined = none.
   mcpServers?: string[];
+  // Optional per-repo setup script (#71), threaded into the sandbox run (and,
+  // via the app's ciFix closure, feedback). Empty/undefined = no setup. The
+  // plan step never sets up (read-only, never edits/pushes).
+  setupScript?: string;
 }
 
 export type FusionOutcome = "merged" | "checks_failed" | "timeout" | "held_for_human" | "awaiting_plan";
@@ -98,6 +102,8 @@ export async function runFusion(
     model: input.model,
     provider: input.provider,
     mcpServers: input.mcpServers,
+    // #71: per-repo setup runs in the sandbox after clone, before the agent.
+    setupScript: input.setupScript,
   });
   await emit({ type: "branch_pushed", branch: run.branch, commitSha: run.commitSha });
 
