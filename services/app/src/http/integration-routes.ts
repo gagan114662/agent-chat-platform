@@ -7,6 +7,7 @@ import type { GitHubService } from "@acp/orchestrator/github/github-service.js";
 import { actor } from "./actor.js";
 import { importLinearIssues, makeLinearClient, type LinearClient } from "../integrations/linear.js";
 import { importGitHubIssues } from "../integrations/github-issues.js";
+import { startFromPr } from "../integrations/from-pr.js";
 import { listIntegrations } from "../integrations/registry.js";
 
 // Builds a Linear client from an API key. Injectable so integration-routes.test.ts
@@ -14,8 +15,10 @@ import { listIntegrations } from "../integrations/registry.js";
 export type MakeLinear = (apiKey: string) => LinearClient;
 
 // Builds a GitHub client from a token. Injectable so tests can pass a fake
-// listIssues() (no network); production uses OctokitGitHubService.
-export type MakeGitHub = (token: string) => Pick<GitHubService, "listIssues">;
+// (no network); production uses OctokitGitHubService. Covers the read seams the
+// GitHub integration routes use: listIssues (#22 import) + getChangedFiles/
+// listReviewComments (#78 start-from-PR).
+export type MakeGitHub = (token: string) => Pick<GitHubService, "listIssues" | "getChangedFiles" | "listReviewComments">;
 
 export interface IntegrationDeps {
   db: DB;
@@ -75,5 +78,33 @@ export function registerIntegrationRoutes(app: FastifyInstance, d: IntegrationDe
       orgId, threadId, owner: repo.githubOwner, repo: repo.githubName, github,
     });
     return reply.code(200).send({ imported: ids.length, ids });
+  });
+
+  // #78 start-from-PR: open a thread + task seeded from an existing GitHub PR
+  // (its changed files #17 + review comments #19). Org-scoped: the repo is
+  // resolved org-scoped by owner/repo (cross-org/unknown → 404); a missing token
+  // → 400 (no env-var-name leak). Idempotent (deterministic task + message ids).
+  app.post("/integrations/github/from-pr", async (req, reply) => {
+    const { channelId, owner, repo, prNumber } = (req.body ?? {}) as {
+      channelId?: string; owner?: string; repo?: string; prNumber?: number;
+    };
+    if (!channelId || !owner || !repo || prNumber == null) {
+      return reply.code(400).send({ error: "channelId, owner, repo, prNumber required" });
+    }
+    const { orgId } = actor(req);
+
+    // Resolve the org's repo for owner/repo (org-scoped) — cross-org/unknown → 404.
+    const [repoRow] = await d.db.select().from(repos)
+      .where(and(eq(repos.orgId, orgId), eq(repos.githubOwner, owner), eq(repos.githubName, repo)));
+    if (!repoRow) return reply.code(404).send({ error: "repo not found" });
+
+    const token = process.env[repoRow.tokenEnvVar];
+    if (!token) return reply.code(400).send({ error: "repo token not configured" });
+
+    const github = makeGitHub(token);
+    const { threadId, taskId } = await startFromPr(d.db, {
+      orgId, channelId, repoId: repoRow.id, owner, repo, prNumber, github,
+    });
+    return reply.code(200).send({ threadId, taskId });
   });
 }
