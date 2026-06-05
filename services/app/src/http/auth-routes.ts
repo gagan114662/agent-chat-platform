@@ -41,6 +41,8 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
     "/auth/login", "/auth/members", "/healthz", "/invites/accept",
     "/auth/magic-link/request", "/auth/magic-link/verify",
     "/auth/google", "/auth/google/callback",
+    // #86 public API discovery: the OpenAPI spec + Swagger UI docs page.
+    "/openapi.json", "/docs",
   ]);
   app.addHook("preHandler", async (req, reply) => {
     const token = bearer(req);
