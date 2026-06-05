@@ -409,3 +409,17 @@ export const contacts = pgTable("contacts", {
   help: text("help"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// #76 notes: a per-workspace, org-scoped note (title + body). Scoped by both
+// orgId and workspaceId so listing is workspace-local and a cross-org id is
+// invisible (the route maps that to 404). `createdById` records the author.
+export const notes = pgTable("notes", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  workspaceId: text("workspace_id").notNull(),
+  title: text("title").notNull().default(""),
+  body: text("body").notNull().default(""),
+  createdById: text("created_by_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ wsIx: index("notes_org_ws_ix").on(t.orgId, t.workspaceId) }));

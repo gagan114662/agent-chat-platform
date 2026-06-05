@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest";
-import type { GitHubService, OpenPrInput, ReviewComment, FileContent, GitHubIssue } from "./github-service.js";
+import type { GitHubService, OpenPrInput, ReviewComment, FileContent, GitHubIssue, CheckContext } from "./github-service.js";
 import type { ChecksStatus, PullRequest } from "../types.js";
 import type { ChangedFile } from "../policy/risk.js";
 import { nodeFetch } from "../http/node-fetch.js";
@@ -87,6 +87,16 @@ export class OctokitGitHubService implements GitHubService {
       return `CI failed for ${ref} (no failing status contexts reported)`;
     }
     return `CI failed: ${failing.join(", ")}`;
+  }
+
+  async getCheckContexts(owner: string, repo: string, ref: string): Promise<CheckContext[]> {
+    const res = await this.octokit.repos.getCombinedStatusForRef({ owner, repo, ref });
+    return res.data.statuses.map((s) => ({
+      context: s.context,
+      state: s.state,
+      description: s.description ?? undefined,
+      targetUrl: s.target_url ?? undefined,
+    }));
   }
 
   async getChangedFiles(owner: string, repo: string, prNumber: number): Promise<ChangedFile[]> {

@@ -4,6 +4,7 @@ import Fastify from "fastify";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { registerRoutes } from "./routes.js";
 import { createMessage } from "../chat/messages.js";
+import { createFile } from "../files/files.js";
 import { orgs, workspaces, channels, threads, repos, agents, members } from "../db/schema.js";
 
 const h = testDb();
@@ -109,6 +110,44 @@ describe("thread message routes", () => {
     // confirm nothing was written under org B for that thread
     const asOwner = await app.inject({ method: "GET", url: "/threads/t1/messages", headers: { "x-org-id": "o1" } });
     expect(asOwner.json()).toEqual([]);
+    await app.close();
+  });
+
+  it("POST /threads/:id/messages with fileIds attaches in-org files; GET resolves them with a download URL (#76)", async () => {
+    await h.db.insert(members).values({ id: "mb", orgId: "o1", workspaceId: "w1", displayName: "M", role: "member" });
+    const f = await createFile(h.db, { orgId: "o1", name: "spec.md", contentType: "text/markdown", size: 9, byKind: "human", byId: "mb" });
+    const app = makeApp();
+    const post = await app.inject({
+      method: "POST", url: "/threads/t1/messages",
+      headers: { "x-org-id": "o1", "x-user-id": "mb", "content-type": "application/json" },
+      payload: { body: "see file", fileIds: [f.id] },
+    });
+    expect(post.statusCode).toBe(201);
+    expect(post.json().message.metadata.attachments).toEqual([f.id]);
+
+    const list = await app.inject({ method: "GET", url: "/threads/t1/messages", headers: { "x-org-id": "o1" } });
+    const msg = list.json()[0];
+    expect(msg.attachments).toHaveLength(1);
+    expect(msg.attachments[0]).toMatchObject({ id: f.id, name: "spec.md", contentType: "text/markdown" });
+    expect(msg.attachments[0].downloadUrl).toContain(`/files/${f.id}/download?sig=`);
+    await app.close();
+  });
+
+  it("POST /threads/:id/messages drops a cross-org fileId (no leak) (#76)", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "O2" });
+    await h.db.insert(members).values({ id: "mb", orgId: "o1", workspaceId: "w1", displayName: "M", role: "member" });
+    const foreign = await createFile(h.db, { orgId: "o2", name: "secret.md", byKind: "human", byId: "x" });
+    const app = makeApp();
+    const post = await app.inject({
+      method: "POST", url: "/threads/t1/messages",
+      headers: { "x-org-id": "o1", "x-user-id": "mb", "content-type": "application/json" },
+      payload: { body: "x", fileIds: [foreign.id] },
+    });
+    expect(post.statusCode).toBe(201);
+    // no attachments survived → metadata.attachments absent
+    expect(post.json().message.metadata.attachments).toBeUndefined();
+    const list = await app.inject({ method: "GET", url: "/threads/t1/messages", headers: { "x-org-id": "o1" } });
+    expect(list.json()[0].attachments ?? []).toEqual([]);
     await app.close();
   });
 
