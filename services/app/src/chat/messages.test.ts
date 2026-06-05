@@ -18,6 +18,9 @@ beforeEach(async () => {
 describe("messages", () => {
   it("creates and lists messages in order", async () => {
     await createMessage(h.db, { orgId: "o1", threadId: "t1", authorKind: "human", authorId: "m1", body: "hi" });
+    // Distinct timestamps so the chronological assertion below can't flake on a
+    // same-millisecond tie (listMessages orders by (createdAt, id); id is a random UUID).
+    await new Promise((r) => setTimeout(r, 2));
     await createMessage(h.db, { orgId: "o1", threadId: "t1", authorKind: "agent", authorId: "a1", body: "hello", kind: "system" });
     const msgs = await listMessages(h.db, "t1", "o1");
     expect(msgs.map((m) => m.body)).toEqual(["hi", "hello"]);
