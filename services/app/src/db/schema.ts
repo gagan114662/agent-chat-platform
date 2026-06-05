@@ -256,6 +256,24 @@ export const files = pgTable("files", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ orgIx: index("files_org_ix").on(t.orgId) }));
 
+// #88 invites: a token-hashed, org-scoped invitation to join an org/workspace at
+// a given role. Only the sha256 hex `tokenHash` is stored — the plaintext
+// `inv_…` token is returned ONCE at create time and never persisted or logged.
+// `status` walks pending → accepted|revoked; `acceptedMemberId` links the member
+// provisioned on accept. Accept only succeeds for a pending invite.
+export const invites = pgTable("invites", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  workspaceId: text("workspace_id").notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("member"),
+  tokenHash: text("token_hash").notNull(),
+  status: text("status").notNull().default("pending"), // 'pending' | 'accepted' | 'revoked'
+  invitedById: text("invited_by_id").notNull(),
+  acceptedMemberId: text("accepted_member_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ tokenHashIx: index("invites_token_hash_ix").on(t.tokenHash) }));
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull(),
