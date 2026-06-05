@@ -294,6 +294,13 @@ export interface Agent {
   avatarUrl: string | null; visibility: AgentVisibility;
 }
 
+export async function listActiveAgents(): Promise<string[]> {
+  const res = await fetch(`/agents/active`, { headers: { ...authHeaders() } });
+  if (!res.ok) return [];
+  const { active } = (await res.json()) as { active: string[] };
+  return active;
+}
+
 export async function listAgents(): Promise<Agent[]> {
   const res = await fetch(`/agents`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`listAgents ${res.status}`);

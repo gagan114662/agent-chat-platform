@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { DB } from "../db/client.js";
-import { agents, members } from "../db/schema.js";
+import { agents, members, runs, tasks } from "../db/schema.js";
 import { actor } from "./actor.js";
 import { setAgentShared, setAgentProfile, setAgentConfig, isAgentVisibility, createAgent, QuotaError } from "../agents/agents.js";
 import { roleOf, can } from "../rbac/rbac.js";
@@ -13,6 +13,22 @@ export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
     const { orgId } = actor(req);
     const rows = await d.db.select().from(agents).where(eq(agents.orgId, orgId));
     return reply.code(200).send(rows);
+  });
+
+  // #122: which agents are actively working right now — agents whose assigned
+  // tasks have a non-terminal run (pending/running/awaiting_plan_approval). Powers
+  // the Team panel's live "working" status instead of a static "online" badge.
+  app.get("/agents/active", async (req, reply) => {
+    const { orgId } = actor(req);
+    const rows = await d.db.select({ agentId: tasks.assigneeId }).from(runs)
+      .innerJoin(tasks, and(eq(tasks.id, runs.taskId), eq(tasks.orgId, orgId)))
+      .where(and(
+        eq(runs.orgId, orgId),
+        inArray(runs.state, ["pending", "running", "awaiting_plan_approval"]),
+        eq(tasks.assigneeKind, "agent"),
+      ));
+    const active = [...new Set(rows.map((r) => r.agentId).filter((x): x is string => !!x))];
+    return reply.code(200).send({ active });
   });
 
   // #85: create an agent (admin-gated via agent:share, org-scoped). Enforces the
