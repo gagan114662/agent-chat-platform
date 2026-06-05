@@ -8,7 +8,7 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, setDeployCommand, deployRepo, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes } from "./api.js";
 import { GoalsPanel } from "./components/GoalsPanel.js";
 import { AgentsPanel } from "./components/AgentsPanel.js";
 import { TasksPanel } from "./components/TasksPanel.js";
@@ -247,7 +247,7 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
           : view === "inbox"
             ? <InboxPanel inbox={inbox} onSelect={selectThread} />
             : view === "goals"
-              ? <GoalsPanel orgId={orgId} createGoal={createGoal} decomposeGoal={decomposeGoal} runTick={runTick} listGoals={listGoals} setGoalAutonomy={setGoalAutonomy} getAutonomyStatus={getAutonomyStatus} repos={repos} connectRepo={connectRepo} ingestRepoIssues={ingestRepoIssues} threads={threads.filter((t) => t.repoId).map((t) => ({ id: t.id, title: t.title }))} agents={principals.filter((p) => p.kind === "agent").map((p) => ({ id: p.id, handle: p.name }))} />
+              ? <GoalsPanel orgId={orgId} createGoal={createGoal} decomposeGoal={decomposeGoal} runTick={runTick} listGoals={listGoals} setGoalAutonomy={setGoalAutonomy} getAutonomyStatus={getAutonomyStatus} repos={repos} connectRepo={connectRepo} ingestRepoIssues={ingestRepoIssues} setDeployCommand={setDeployCommand} deployRepo={deployRepo} threads={threads.filter((t) => t.repoId).map((t) => ({ id: t.id, title: t.title }))} agents={principals.filter((p) => p.kind === "agent").map((p) => ({ id: p.id, handle: p.name }))} />
               : view === "agents"
                 ? <AgentsPanel listAgents={listAgents} setAgentProfile={setAgentProfile} createAgent={createAgent} getAgentSkill={getAgentSkill} saveAgentSkill={saveAgentSkill} optimizeAgentSkill={optimizeAgentSkill} />
                 : view === "tasks"

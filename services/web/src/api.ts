@@ -185,6 +185,28 @@ export async function ingestRepoIssues(repoId: string): Promise<{ created: strin
   return res.json();
 }
 
+// #140: set a repo's deploy command (must print ACP_DEPLOY_URL=<url>).
+export async function setDeployCommand(repoId: string, deployCommand: string): Promise<{ id: string; deployCommand: string | null }> {
+  const res = await fetch(`/repos/${repoId}/deploy-command`, {
+    method: "PATCH", headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ deployCommand }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `setDeployCommand ${res.status}`);
+  return res.json();
+}
+
+// #140: deploy a connected repo (ships it, captures the public URL).
+export interface DeployResult { ok: boolean; url?: string; reason: string; rolledBack?: boolean; }
+export async function deployRepo(repoId: string, goalId?: string): Promise<DeployResult> {
+  const res = await fetch(`/repos/${repoId}/deploy`, {
+    method: "POST", headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(goalId ? { goalId } : {}),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 403) throw new Error("forbidden");
+  return body as DeployResult; // 200 ok or 422 with {ok:false,reason}
+}
+
 export async function createChannel(name: string): Promise<Channel> {
   const res = await fetch(`/channels`, {
     method: "POST",

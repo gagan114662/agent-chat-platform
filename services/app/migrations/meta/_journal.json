@@ -309,6 +309,13 @@
       "when": 1783523200000,
       "tag": "0043_repo_connect",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1783609600000,
+      "tag": "0044_deploy",
+      "breakpoints": true
     }
   ]
 }

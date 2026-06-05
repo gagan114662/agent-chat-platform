@@ -30,6 +30,8 @@ export const retryUnmet: NextStepGen = (_goal, unmet) =>
   unmet.map((t) => ({ ...t, title: t.title.startsWith("retry: ") ? t.title : `retry: ${t.title}` }));
 
 const ACTIVE = ["open", "in_progress"];
+// #140: a criterion about being live at a public URL is met by a successful deploy.
+const LIVE_URL_RE = /\b(live|deploy(ed)?|public url|reachable)\b/i;
 
 // progressGoal: one closed-loop step for a single active goal. Pure decision over
 // the goal's task states; mutates only the goal (state/iterations) and inserts
@@ -46,6 +48,16 @@ export async function progressGoal(
 
   const rows = await db.select().from(tasks).where(and(eq(tasks.orgId, orgId), eq(tasks.goalId, goalId)));
   if (rows.length === 0) return { status: "skip", reason: "not decomposed" };
+
+  // #140: a "live at a public URL" criterion auto-satisfies once the goal has a
+  // deployed liveUrl — close that task without needing a code-merge run.
+  if (g.liveUrl) {
+    const liveTask = rows.find((t) => t.state !== "done" && LIVE_URL_RE.test(t.title));
+    if (liveTask) {
+      await db.update(tasks).set({ state: "done" }).where(and(eq(tasks.id, liveTask.id), eq(tasks.orgId, orgId)));
+      liveTask.state = "done";
+    }
+  }
 
   const active = rows.filter((t) => ACTIVE.includes(t.state));
   const unmet = rows.filter((t) => t.state === "blocked");

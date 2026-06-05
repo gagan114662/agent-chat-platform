@@ -31,6 +31,7 @@ import { registerCommentSyncRoutes } from "./http/comment-sync-routes.js";
 import { registerPrEditRoutes } from "./http/pr-edit-routes.js";
 import { registerAutonomyRoutes } from "./http/autonomy-routes.js";
 import { registerRepoRoutes } from "./http/repo-routes.js";
+import { registerDeployRoutes } from "./http/deploy-routes.js";
 import { registerCheckpointRoutes } from "./http/checkpoint-routes.js";
 import { registerIntegrationRoutes } from "./http/integration-routes.js";
 import { registerIngestRoutes } from "./http/ingest-routes.js";
@@ -114,6 +115,7 @@ export async function buildServer() {
   registerPrEditRoutes(app, { db });
   registerAutonomyRoutes(app, { db, sql, temporal, sandboxUrl });
   registerRepoRoutes(app, { db }); // #139 connect repos + ingest issues as goals
+  registerDeployRoutes(app, { db, sandboxUrl }); // #140 deploy merged product → public URL
   registerCheckpointRoutes(app, { db, sql, temporal, sandboxUrl });
   registerIntegrationRoutes(app, { db });
   registerIngestRoutes(app, { db, sql });

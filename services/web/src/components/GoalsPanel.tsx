@@ -16,6 +16,8 @@ export function GoalsPanel({
   repos = [],
   connectRepo,
   ingestRepoIssues,
+  setDeployCommand,
+  deployRepo,
   threads = [],
   agents = [],
 }: {
@@ -29,6 +31,8 @@ export function GoalsPanel({
   repos?: Repo[];
   connectRepo?: (input: { githubOwner: string; githubName: string; production?: boolean }) => Promise<Repo>;
   ingestRepoIssues?: (repoId: string) => Promise<{ created: string[]; skipped: number }>;
+  setDeployCommand?: (repoId: string, deployCommand: string) => Promise<{ id: string; deployCommand: string | null }>;
+  deployRepo?: (repoId: string, goalId?: string) => Promise<{ ok: boolean; url?: string; reason: string }>;
   // Repo-bound threads the decomposed tasks run against, and agents to assign them to.
   threads?: { id: string; title: string }[];
   agents?: { id: string; handle: string }[];
@@ -77,6 +81,20 @@ export function GoalsPanel({
     if (!ingestRepoIssues) return;
     setError(null); setNotice(null);
     try { const out = await ingestRepoIssues(repoId); setNotice(`Ingested ${out.created.length} issue(s) as goals${out.skipped ? `, skipped ${out.skipped} already imported` : ""}. Decompose + turn Auto on to let the loop work them.`); refresh(); }
+    catch (e) { setError((e as Error).message); }
+  };
+  // #140 configure + run a repo's deploy.
+  const [deployDraft, setDeployDraft] = useState<Record<string, string>>({});
+  const saveDeployCmd = async (repoId: string) => {
+    if (!setDeployCommand) return;
+    setError(null); setNotice(null);
+    try { await setDeployCommand(repoId, deployDraft[repoId] ?? ""); setNotice("Deploy command saved. It must print ACP_DEPLOY_URL=<url>."); refresh(); }
+    catch (e) { setError((e as Error).message); }
+  };
+  const deploy = async (repoId: string) => {
+    if (!deployRepo) return;
+    setError(null); setNotice("Deploying…");
+    try { const r = await deployRepo(repoId); setNotice(r.ok ? `🚀 Live at ${r.url}` : `Deploy failed: ${r.reason}`); refresh(); }
     catch (e) { setError((e as Error).message); }
   };
   useEffect(() => { if (!threadId && threads[0]) setThreadId(threads[0].id); }, [threads, threadId]);
@@ -154,9 +172,23 @@ export function GoalsPanel({
           {repos.length > 0 && (
             <ul className="space-y-1">
               {repos.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-2 text-xs text-ink-2">
-                  <span className="truncate">{r.githubOwner}/{r.githubName}{r.production && <span className="ml-1 rounded bg-elevated-2 px-1 py-0.5 text-[10px] uppercase text-ink-3">prod</span>}</span>
-                  {ingestRepoIssues && <button onClick={() => ingest(r.id)} className="shrink-0 rounded border border-line px-2 py-0.5 text-[11px] text-ink-2 hover:bg-elevated-2 hover:text-ink">Ingest issues → goals</button>}
+                <li key={r.id} className="space-y-1 border-t border-line/50 pt-1 text-xs text-ink-2 first:border-0 first:pt-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{r.githubOwner}/{r.githubName}
+                      {r.production && <span className="ml-1 rounded bg-elevated-2 px-1 py-0.5 text-[10px] uppercase text-ink-3">prod</span>}
+                      {r.liveUrl && <a href={r.liveUrl} target="_blank" rel="noreferrer" className="ml-1 text-accent hover:underline">live ↗</a>}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {deployRepo && r.deployCommand && <button onClick={() => deploy(r.id)} className="rounded border border-line px-2 py-0.5 text-[11px] text-ink-2 hover:bg-elevated-2 hover:text-ink">Deploy</button>}
+                      {ingestRepoIssues && <button onClick={() => ingest(r.id)} className="rounded border border-line px-2 py-0.5 text-[11px] text-ink-2 hover:bg-elevated-2 hover:text-ink">Ingest issues → goals</button>}
+                    </div>
+                  </div>
+                  {setDeployCommand && (
+                    <div className="flex items-center gap-1">
+                      <input defaultValue={r.deployCommand ?? ""} onChange={(e) => setDeployDraft((p) => ({ ...p, [r.id]: e.target.value }))} placeholder="deploy command (must print ACP_DEPLOY_URL=<url>)" className="min-w-0 flex-1 rounded border border-line bg-elevated px-2 py-0.5 text-[11px] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none" />
+                      <button onClick={() => saveDeployCmd(r.id)} className="shrink-0 rounded border border-line px-2 py-0.5 text-[11px] text-ink-3 hover:bg-elevated-2 hover:text-ink">Save</button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

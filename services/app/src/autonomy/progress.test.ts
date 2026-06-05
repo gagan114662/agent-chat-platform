@@ -59,6 +59,14 @@ describe("progressGoal (#138 closed loop)", () => {
     expect((await goalRow(gid)).iterations).toBe(1);
   });
 
+  it("#140: a 'live at a public URL' criterion auto-satisfies once the goal has a liveUrl", async () => {
+    const id = await setup("Service live at a public URL");
+    await h.db.update(goals).set({ liveUrl: "https://shipped.app" }).where(eq(goals.id, id));
+    const out = await progressGoal(h.db, "o1", id);
+    expect(out.status).toBe("done");
+    expect((await goalRow(id)).state).toBe("done");
+  });
+
   it("stops for a human (stuck) after the iteration cap", async () => {
     const ts = await goalTasks();
     await setState(ts[0].id, "done");

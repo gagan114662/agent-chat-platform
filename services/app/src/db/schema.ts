@@ -40,6 +40,11 @@ export const repos = pgTable("repos", {
   // #139 production repo: a real product/own repo (not a throwaway). connectRepo
   // forces plan-first on these so merges go through the human gate (#125), not autopilot.
   production: boolean("production").notNull().default(false),
+  // #140 deploy: an admin-configured command that ships the repo and prints
+  // "ACP_DEPLOY_URL=<url>" (trusted config, run in the sandbox). liveUrl = the last
+  // successful public URL. Nullable — no deploy configured = today's behavior.
+  deployCommand: text("deploy_command"),
+  liveUrl: text("live_url"),
 });
 
 export const members = pgTable("members", {
@@ -173,6 +178,9 @@ export const goals = pgTable("goals", {
   // generation / stuck-detection counter.
   autonomy: boolean("autonomy").notNull().default(false),
   iterations: integer("iterations").notNull().default(0),
+  // #140: the public URL a deploy produced for this goal — lets a "live at a public
+  // URL" success criterion auto-verify (#138). Nullable until a deploy succeeds.
+  liveUrl: text("live_url"),
   createdByKind: text("created_by_kind").notNull(),
   createdById: text("created_by_id").notNull(),
 });
