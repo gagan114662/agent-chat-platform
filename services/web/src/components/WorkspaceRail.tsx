@@ -4,10 +4,12 @@ export type RailView = "activity" | "context" | "memory" | "goals" | "agents" | 
 
 // Slack-style far-left workspace rail: the logo plus icon-only navigation into the
 // app's section views. The channel/thread list lives in the adjacent Sidebar.
-export function WorkspaceRail({ active, inboxCount = 0, onSelect }: {
+export function WorkspaceRail({ active, inboxCount = 0, onSelect, theme = "dark", onToggleTheme }: {
   active?: string;
   inboxCount?: number;
   onSelect: Partial<Record<RailView, () => void>>;
+  theme?: "dark" | "light";
+  onToggleTheme?: () => void;
 }) {
   const items: { view: RailView; icon: IconName; label: string; badge?: number }[] = [
     { view: "activity", icon: "activity", label: "Activity", badge: inboxCount },
@@ -43,6 +45,14 @@ export function WorkspaceRail({ active, inboxCount = 0, onSelect }: {
           </button>
         );
       })}
+      <button
+        onClick={onToggleTheme}
+        title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+        aria-label="Toggle theme"
+        className="mt-auto flex h-10 w-10 items-center justify-center rounded-xl text-ink-3 transition-colors hover:bg-elevated hover:text-ink-2"
+      >
+        <Icon name={theme === "dark" ? "sun" : "moon"} size={18} />
+      </button>
     </nav>
   );
 }

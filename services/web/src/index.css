@@ -24,6 +24,30 @@
   --color-danger: #f87171;
 }
 
+/* Light theme: override the dark tokens when html.theme-light is set. The
+   accent + status hues stay; surfaces/ink/lines flip to a clean light palette. */
+html.theme-light {
+  color-scheme: light;
+  --color-app: #f3f3fa;
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f7fc;
+  --color-elevated: #f0f0f6;
+  --color-elevated-2: #e6e6ef;
+  --color-line: #e3e3ee;
+  --color-line-soft: #ededf3;
+  --color-ink: #17171f;
+  --color-ink-2: #4e4e59;
+  --color-ink-3: #8a8a97;
+  --color-accent: #6d5cf5;
+  --color-accent-hover: #5b48e0;
+  --color-accent-soft: #ece9ff;
+  --color-positive: #0f9b6c;
+  --color-positive-soft: #e6f7f0;
+  --color-warn: #b7791f;
+  --color-warn-soft: #fdf4e3;
+  --color-danger: #d64545;
+}
+
 :root { font-synthesis-weight: none; color-scheme: dark; }
 html, body, #root { height: 100%; }
 body {

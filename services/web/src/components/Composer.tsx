@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { filterCommands, type Command } from "../lib/commands.js";
-import { Icon } from "./Icon.js";
+import { Icon, type IconName } from "./Icon.js";
 
 // Maps a slash keyword to a registry command id. `/search`, `/new`, `/dm`, `/inbox`.
 const SLASH_TO_ID: Record<string, string> = {
@@ -18,6 +18,38 @@ export function Composer({ onSend, commands = [], onSlashSearch }: {
   onSlashSearch?: (query: string) => void;
 }) {
   const [text, setText] = useState("");
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Apply a markdown transform to the current selection, then restore focus/caret.
+  const edit = (fn: (t: string, s: number, e: number) => { text: string; selStart: number; selEnd: number }) => {
+    const ta = taRef.current;
+    const s = ta ? ta.selectionStart : text.length;
+    const e = ta ? ta.selectionEnd : text.length;
+    const r = fn(text, s, e);
+    setText(r.text);
+    requestAnimationFrame(() => { ta?.focus(); ta?.setSelectionRange(r.selStart, r.selEnd); });
+  };
+  // Wrap the selection in `before`/`after` (e.g. ** ** for bold).
+  const wrap = (before: string, after = before) => edit((t, s, e) => {
+    const sel = t.slice(s, e);
+    const text = t.slice(0, s) + before + sel + after + t.slice(e);
+    return { text, selStart: s + before.length, selEnd: s + before.length + sel.length };
+  });
+  // Prefix the selection's first line (e.g. "> " for quote, "- " for list).
+  const prefixLine = (p: string) => edit((t, s, e) => {
+    const ls = t.lastIndexOf("\n", s - 1) + 1;
+    const text = t.slice(0, ls) + p + t.slice(ls);
+    return { text, selStart: s + p.length, selEnd: e + p.length };
+  });
+  const tools: { key: string; label: string; glyph?: string; icon?: IconName; run: () => void }[] = [
+    { key: "b", label: "Bold", glyph: "B", run: () => wrap("**") },
+    { key: "i", label: "Italic", glyph: "I", run: () => wrap("*") },
+    { key: "s", label: "Strikethrough", glyph: "S", run: () => wrap("~~") },
+    { key: "code", label: "Code", icon: "code", run: () => wrap("`") },
+    { key: "link", label: "Link", icon: "link", run: () => wrap("[", "](https://)") },
+    { key: "quote", label: "Quote", icon: "quote", run: () => prefixLine("> ") },
+    { key: "list", label: "List", icon: "list", run: () => prefixLine("- ") },
+  ];
 
   const isSlash = text.startsWith("/");
   // Filter the registry by the text after the leading slash (first word).
@@ -66,8 +98,26 @@ export function Composer({ onSend, commands = [], onSlashSearch }: {
           ))}
         </ul>
       )}
-      <div className="flex flex-col gap-2 rounded-2xl border border-line bg-elevated px-3 py-2.5 transition-colors focus-within:border-accent/70">
+      <div className="flex flex-col gap-2 rounded-2xl border border-line bg-elevated px-3 py-2 transition-colors focus-within:border-accent/70">
+        <div className="flex items-center gap-0.5 border-b border-line-soft pb-1.5">
+          {tools.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              title={t.label}
+              aria-label={t.label}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={t.run}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-ink-3 transition-colors hover:bg-elevated-2 hover:text-ink"
+            >
+              {t.glyph
+                ? <span className={`text-[13px] ${t.key === "b" ? "font-bold" : t.key === "i" ? "italic" : t.key === "s" ? "line-through" : ""}`}>{t.glyph}</span>
+                : <Icon name={t.icon!} size={15} />}
+            </button>
+          ))}
+        </div>
         <textarea
+          ref={taRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}

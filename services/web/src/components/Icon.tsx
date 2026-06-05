@@ -3,7 +3,8 @@
 export type IconName =
   | "activity" | "context" | "memory" | "goals" | "agents" | "tasks"
   | "automations" | "billing" | "hash" | "search" | "settings" | "send"
-  | "plus" | "logout" | "dm" | "sparkle";
+  | "plus" | "logout" | "dm" | "sparkle"
+  | "copy" | "link" | "code" | "quote" | "list" | "sun" | "moon";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   activity: <path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />,
@@ -22,6 +23,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
   logout: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />,
   dm: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" />,
   sparkle: <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.8 2.8M14.9 14.9l2.8 2.8M17.7 6.3l-2.8 2.8M9.1 14.9l-2.8 2.8" />,
+  copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></>,
+  link: <path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />,
+  code: <path d="m9 18-6-6 6-6M15 6l6 6-6 6" />,
+  quote: <path d="M6 5v14M10 8h10M10 12h10M10 16h6" />,
+  list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
+  sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>,
+  moon: <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" />,
 };
 
 export function Icon({ name, className = "", size = 16, strokeWidth = 1.6 }: {

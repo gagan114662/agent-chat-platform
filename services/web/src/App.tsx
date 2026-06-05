@@ -17,6 +17,7 @@ import { AutomationsPanel } from "./components/AutomationsPanel.js";
 import { MemoryPanel } from "./components/MemoryPanel.js";
 import type { Channel, Thread, Repo, Principal, InboxItem } from "./types.js";
 import { useAuth } from "./useAuth.js";
+import { useTheme } from "./useTheme.js";
 import { LoginScreen } from "./components/LoginScreen.js";
 import { Icon } from "./components/Icon.js";
 import { WorkspaceRail } from "./components/WorkspaceRail.js";
@@ -24,12 +25,13 @@ import { TeamPanel } from "./components/TeamPanel.js";
 
 export function App() {
   const { principal, loading, login, logout } = useAuth();
+  const theme = useTheme(); // applied globally (incl. login screen) via html.theme-light
   if (loading) return <div className="flex h-screen items-center justify-center bg-app text-sm text-ink-3">Loading…</div>;
   if (!principal) return <LoginScreen onLogin={login} />;
-  return <Workspace onLogout={logout} userId={principal.userId} orgId={principal.orgId} role={principal.role ?? "member"} />;
+  return <Workspace onLogout={logout} userId={principal.userId} orgId={principal.orgId} role={principal.role ?? "member"} theme={theme.theme} onToggleTheme={theme.toggle} />;
 }
 
-function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; userId: string; orgId: string; role: "admin" | "member" }) {
+function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { onLogout: () => void; userId: string; orgId: string; role: "admin" | "member"; theme: "dark" | "light"; onToggleTheme: () => void }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -163,6 +165,8 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
           automations: () => setView("automations"),
           billing: () => setView("billing"),
         }}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
       />
       <Sidebar
         channels={channels}

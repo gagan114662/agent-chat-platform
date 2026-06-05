@@ -18,8 +18,8 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   let rest = text;
   let i = 0;
-  // Matches the first of: `code`, **bold**, [text](url)
-  const pattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[[^\]]*\]\([^)]*\))/;
+  // Matches the first of: `code`, **bold**, *italic*, ~~strike~~, [text](url)
+  const pattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(~~[^~]+~~)|(\[[^\]]*\]\([^)]*\))/;
   while (rest.length > 0) {
     const m = pattern.exec(rest);
     if (!m) {
@@ -30,9 +30,13 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     const token = m[0];
     const key = `${keyPrefix}-${i++}`;
     if (token.startsWith("`")) {
-      nodes.push(<code key={key}>{token.slice(1, -1)}</code>);
+      nodes.push(<code key={key} className="rounded bg-elevated px-1.5 py-0.5 font-mono text-[0.85em] text-accent">{token.slice(1, -1)}</code>);
     } else if (token.startsWith("**")) {
       nodes.push(<strong key={key}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith("~~")) {
+      nodes.push(<span key={key} className="line-through opacity-80">{token.slice(2, -2)}</span>);
+    } else if (token.startsWith("*")) {
+      nodes.push(<em key={key}>{token.slice(1, -1)}</em>);
     } else {
       // [text](url)
       const linkMatch = /^\[([^\]]*)\]\(([^)]*)\)$/.exec(token);
@@ -80,7 +84,7 @@ export function renderMarkdown(src: string): JSX.Element {
         fence = [];
       } else {
         blocks.push(
-          <pre key={`pre-${key++}`} className="my-2 overflow-auto rounded bg-neutral-100 p-2 font-mono text-xs">
+          <pre key={`pre-${key++}`} className="my-2 overflow-auto rounded-lg bg-elevated p-3 font-mono text-xs text-ink-2">
             {fence.join("\n")}
           </pre>
         );
@@ -105,6 +109,9 @@ export function renderMarkdown(src: string): JSX.Element {
     } else if (line.startsWith("- ")) {
       if (!listItems) listItems = [];
       listItems.push(<li key={`li-${key++}`}>{renderInline(line.slice(2), `li${key}`)}</li>);
+    } else if (line.startsWith("> ")) {
+      flushList();
+      blocks.push(<blockquote key={`bq-${key++}`} className="my-1 border-l-2 border-line pl-3 text-sm text-ink-2">{renderInline(line.slice(2), `bq${key}`)}</blockquote>);
     } else if (line.trim() === "") {
       flushList();
     } else {
@@ -115,7 +122,7 @@ export function renderMarkdown(src: string): JSX.Element {
   // Trailing unclosed fence: render whatever we gathered.
   if (fence !== null && fence.length > 0) {
     blocks.push(
-      <pre key={`pre-${key++}`} className="my-2 overflow-auto rounded bg-neutral-100 p-2 font-mono text-xs">
+      <pre key={`pre-${key++}`} className="my-2 overflow-auto rounded-lg bg-elevated p-3 font-mono text-xs text-ink-2">
         {fence.join("\n")}
       </pre>
     );
