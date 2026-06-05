@@ -37,7 +37,17 @@ export function useThreadStream(threadId: string, onLiveMessage?: () => void) {
       };
     }).catch(() => {});
 
-    return () => { cancelled = true; ws?.close(); };
+    // Poll fallback (#144): the WS push is best-effort (a dropped socket or an
+    // oversized pg_notify can miss a frame), and a live run streams ~5–8 events
+    // over ~15s. Re-pull history every 2.5s while the tab is visible so the run
+    // (sandbox → branch → PR → checks → merged) appears live even with no socket.
+    // append() dedupes by id, so this never double-renders.
+    const poll = setInterval(() => {
+      if (cancelled || document.visibilityState !== "visible") return;
+      listMessages(threadId).then((hist) => { if (!cancelled) for (const m of hist) append(m); }).catch(() => {});
+    }, 2500);
+
+    return () => { cancelled = true; clearInterval(poll); ws?.close(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
 

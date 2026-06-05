@@ -14,9 +14,9 @@
   --color-ink: #ecedf1;          /* primary text */
   --color-ink-2: #a2a3af;        /* secondary text */
   --color-ink-3: #6a6b78;        /* muted text */
-  --color-accent: #7c6cff;       /* violet accent */
-  --color-accent-hover: #8d7eff;
-  --color-accent-soft: #211f3a;  /* accent tint surface */
+  --color-accent: #5b78f6;       /* refined indigo-blue accent (not a loud violet) */
+  --color-accent-hover: #6f8aff;
+  --color-accent-soft: #15203b;  /* accent tint surface */
   --color-positive: #34d399;
   --color-positive-soft: #10241e;
   --color-warn: #fbbf24;
@@ -38,9 +38,9 @@ html.theme-light {
   --color-ink: #17171f;
   --color-ink-2: #4e4e59;
   --color-ink-3: #8a8a97;
-  --color-accent: #6d5cf5;
-  --color-accent-hover: #5b48e0;
-  --color-accent-soft: #ece9ff;
+  --color-accent: #4361e7;
+  --color-accent-hover: #3550d8;
+  --color-accent-soft: #e7ecfe;
   --color-positive: #0f9b6c;
   --color-positive-soft: #e6f7f0;
   --color-warn: #b7791f;

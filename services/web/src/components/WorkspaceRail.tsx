@@ -24,7 +24,7 @@ export function WorkspaceRail({ active, inboxCount = 0, onSelect, theme = "dark"
   ];
   return (
     <nav className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-line bg-app py-3" aria-label="Workspace">
-      <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-[#5b48e0] text-sm font-bold text-white shadow-md shadow-accent/20">C</div>
+      <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-sm font-bold text-white shadow-sm shadow-accent/25">C</div>
       {items.map((it) => {
         const isActive = active === it.view;
         return (
