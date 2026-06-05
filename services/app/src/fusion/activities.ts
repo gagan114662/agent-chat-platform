@@ -175,9 +175,10 @@ export async function runChatFusionActivity(
     if (rep) {
       const [run] = await db.select().from(runs).where(and(eq(runs.id, input.sink.runId), eq(runs.orgId, input.sink.orgId)));
       if (run?.taskId) {
-        // #138: a merged run SATISFIES its task → "done" (the closed-loop completion
-        // signal the goal loop reads); a failed run escalates to "blocked" (#129).
-        const next = rep === "success" ? "done" : "blocked";
+        // #145: a merged run lands the code → "merged" (ATTEMPTED, not yet verified);
+        // the goal loop only marks it "done" after verification (progress.ts). A
+        // failed run escalates to "blocked" (#129).
+        const next = rep === "success" ? "merged" : "blocked";
         await db.update(tasks).set({ state: next })
           .where(and(eq(tasks.id, run.taskId), eq(tasks.orgId, input.sink.orgId), eq(tasks.state, "in_progress")));
       }

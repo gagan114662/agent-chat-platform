@@ -59,6 +59,23 @@ describe("progressGoal (#138 closed loop)", () => {
     expect((await goalRow(gid)).iterations).toBe(1);
   });
 
+  it("#145: a merged CODE task auto-verifies to done (merge+green = verified)", async () => {
+    const id = await setup("refactor the auth module\nadd unit tests");
+    for (const t of await goalTasks()) await setState(t.id, "merged");
+    const out = await progressGoal(h.db, "o1", id);
+    expect(out.status).toBe("done");
+    expect((await goalTasks()).every((t) => t.state === "done")).toBe(true);
+  });
+
+  it("#145: a merged REAL-WORLD task stays 'verifying' (not faked done)", async () => {
+    const id = await setup("take a real customer payment\nship the landing page live");
+    for (const t of await goalTasks()) await setState(t.id, "merged");
+    const out = await progressGoal(h.db, "o1", id);
+    expect(out.status).toBe("verifying");
+    expect((await goalRow(id)).state).toBe("active"); // goal NOT closed on merge alone
+    expect((await goalTasks()).every((t) => t.state === "merged")).toBe(true);
+  });
+
   it("#140: a 'live at a public URL' criterion auto-satisfies once the goal has a liveUrl", async () => {
     const id = await setup("Service live at a public URL");
     await h.db.update(goals).set({ liveUrl: "https://shipped.app" }).where(eq(goals.id, id));

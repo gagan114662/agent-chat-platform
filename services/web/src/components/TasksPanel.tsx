@@ -11,8 +11,11 @@ const COLUMNS: { key: string; label: string; states: TaskState[] }[] = [
   { key: "todo", label: "To do", states: ["open", "backlog", "todo"] },
   { key: "in_progress", label: "In progress", states: ["in_progress"] },
   { key: "in_review", label: "In review", states: ["in_review"] },
+  // #145: "merged" = code landed, outcome not yet verified — a distinct column
+  // with a Verify action, so a merged PR isn't mistaken for a finished outcome.
+  { key: "merged", label: "Landed · verify", states: ["merged"] },
   { key: "blocked", label: "Blocked", states: ["blocked"] },
-  { key: "done", label: "Done", states: ["done", "cancelled"] },
+  { key: "done", label: "Verified", states: ["done", "cancelled"] },
 ];
 
 const PRIORITY_STYLE: Record<TaskPriority, string> = {
@@ -96,6 +99,9 @@ export function TasksPanel({
           {t.dueDate && <span>· due {t.dueDate.slice(0, 10)}</span>}
         </div>
       </button>
+      {t.state === "merged" && (
+        <button onClick={() => move(t.id, "done")} title="The code landed — confirm the real outcome is achieved" className="mt-2 w-full rounded-md bg-positive/15 px-1.5 py-1 text-[11px] font-semibold text-positive hover:bg-positive/25">✓ Mark verified</button>
+      )}
       <select
         aria-label={`move ${t.title}`}
         value={t.state}

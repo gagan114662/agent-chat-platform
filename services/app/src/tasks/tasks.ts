@@ -13,7 +13,9 @@ export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
 export const TASK_STATES = [
   "open", // backward-compat alias (existing default)
-  "backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled",
+  // #145: "merged" = the code landed but the real outcome isn't verified yet;
+  // "done" = verified. A merged run lands a task at "merged", not "done".
+  "backlog", "todo", "in_progress", "in_review", "merged", "blocked", "done", "cancelled",
 ] as const;
 export type TaskState = (typeof TASK_STATES)[number];
 
@@ -181,7 +183,11 @@ export async function transitionRun(db: DB, runId: string, to: RunState, fields:
   const [run] = await db.update(runs).set({ state: to, ...fields })
     .where(and(eq(runs.id, runId), eq(runs.orgId, orgId))).returning();
   if (isTerminal(to)) {
-    const taskState = to === "merged" ? "done" : "blocked";
+    // #145: a merged run LANDS the task at "merged" (code in, outcome not yet
+    // verified). The goal loop (progress.ts) verifies code tasks (merge+green) to
+    // "done" and holds real-world tasks until the actual check; a human can also
+    // mark a task verified. A failed terminal run → "blocked".
+    const taskState = to === "merged" ? "merged" : "blocked";
     await db.update(tasks).set({ state: taskState })
       .where(and(eq(tasks.id, run.taskId), eq(tasks.orgId, orgId)));
   }

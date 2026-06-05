@@ -32,7 +32,7 @@ async function seedHeldRun() {
 describe("approvals", () => {
   beforeEach(async () => { await seedHeldRun(); });
 
-  it("approveRun merges the PR, flips run→merged + task→done, posts a pr_card", async () => {
+  it("approveRun merges the PR, flips run→merged + task→merged, posts a pr_card", async () => {
     const [run] = await h.db.select().from(runs).where(eq(runs.orgId, "oA"));
     const calls: Array<[string, string, number]> = [];
     const github = { merge: async (owner: string, repo: string, prNumber: number) => { calls.push([owner, repo, prNumber]); } };
@@ -42,7 +42,7 @@ describe("approvals", () => {
     expect(calls).toEqual([["acme", "widgets", 7]]);
     expect(updated.state).toBe("merged");
     const [task] = await h.db.select().from(tasks).where(eq(tasks.id, run.taskId));
-    expect(task.state).toBe("done");
+    expect(task.state).toBe("merged"); // #145: code landed → "merged" (verify separately)
     const msgs = await listMessages(h.db, "tA", "oA");
     const last = msgs.at(-1)!;
     expect(last.kind).toBe("pr_card");

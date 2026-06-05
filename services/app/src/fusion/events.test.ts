@@ -43,7 +43,7 @@ describe("fusion sink", () => {
     const [r] = await h.db.select().from(runs).where(eq(runs.id, run.id));
     expect(r.state).toBe("merged");
     const [tk] = await h.db.select().from(tasks).where(eq(tasks.id, r.taskId));
-    expect(tk.state).toBe("done");
+    expect(tk.state).toBe("merged"); // #145: code landed → "merged" (not yet verified "done")
   });
 
   it("attaches parentRunId to the outcome (pr_card) metadata when the run is stacked (#53)", async () => {

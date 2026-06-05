@@ -440,7 +440,7 @@ export async function createAgent(input: { handle: string; displayName: string; 
 // (services/app/src/tasks/tasks.ts) for the inline-edit dropdowns.
 export const TASK_PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
-export const TASK_STATES = ["open", "backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"] as const;
+export const TASK_STATES = ["open", "backlog", "todo", "in_progress", "in_review", "merged", "blocked", "done", "cancelled"] as const;
 export type TaskState = (typeof TASK_STATES)[number];
 
 export interface Task {

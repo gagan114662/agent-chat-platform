@@ -17,6 +17,7 @@ export const MAX_ITERATIONS = 3; // bounded self-generation; then stop for a hum
 export type GoalOutcome =
   | { status: "skip"; reason: string }
   | { status: "working"; active: number }
+  | { status: "verifying"; merged: number } // #145: code landed, real outcome unverified
   | { status: "done" }
   | { status: "stuck"; blocked: number } // hit the iteration cap → human gate
   | { status: "generated"; taskIds: string[] };
@@ -32,6 +33,10 @@ export const retryUnmet: NextStepGen = (_goal, unmet) =>
 const ACTIVE = ["open", "in_progress"];
 // #140: a criterion about being live at a public URL is met by a successful deploy.
 const LIVE_URL_RE = /\b(live|deploy(ed)?|public url|reachable)\b/i;
+// #145: a task whose outcome touches the real world (a live product, money, a
+// customer) is NOT verified by merging code — it needs the actual check (a deploy,
+// a payment, a human). A pure code task is verified by merge + green checks.
+const REAL_WORLD_RE = /\b(live|deploy|url|public|reachable|payment|charge|stripe|customer|profit|revenue|launch|sell|sale|checkout|domain|email)\b/i;
 
 // progressGoal: one closed-loop step for a single active goal. Pure decision over
 // the goal's task states; mutates only the goal (state/iterations) and inserts
@@ -49,8 +54,19 @@ export async function progressGoal(
   const rows = await db.select().from(tasks).where(and(eq(tasks.orgId, orgId), eq(tasks.goalId, goalId)));
   if (rows.length === 0) return { status: "skip", reason: "not decomposed" };
 
-  // #140: a "live at a public URL" criterion auto-satisfies once the goal has a
-  // deployed liveUrl — close that task without needing a code-merge run.
+  // #145 verification gate. A "merged" task LANDED the code but isn't verified.
+  //  - a pure CODE task → merge + green checks IS the verification → promote to done
+  //    (so the loop stays autonomous for engineering work);
+  //  - a REAL-WORLD task (live product / money / customer) needs the actual check —
+  //    leave it "merged" until a deploy sets liveUrl or a human marks it verified.
+  for (const t of rows.filter((x) => x.state === "merged")) {
+    if (!REAL_WORLD_RE.test(t.title)) {
+      await db.update(tasks).set({ state: "done" }).where(and(eq(tasks.id, t.id), eq(tasks.orgId, orgId)));
+      t.state = "done";
+    }
+  }
+  // #140: a "live at a public URL" criterion is verified once the goal has a
+  // deployed liveUrl — promote that real-world task to done.
   if (g.liveUrl) {
     const liveTask = rows.find((t) => t.state !== "done" && LIVE_URL_RE.test(t.title));
     if (liveTask) {
@@ -60,15 +76,19 @@ export async function progressGoal(
   }
 
   const active = rows.filter((t) => ACTIVE.includes(t.state));
+  const verifying = rows.filter((t) => t.state === "merged"); // landed, awaiting real verification
   const unmet = rows.filter((t) => t.state === "blocked");
 
-  // All tasks satisfied → the goal's criteria are met. Close it.
+  // All tasks satisfied (verified) → the goal's criteria are met. Close it.
   if (rows.every((t) => t.state === "done")) {
     await db.update(goals).set({ state: "done" }).where(and(eq(goals.id, goalId), eq(goals.orgId, orgId)));
     return { status: "done" };
   }
   // Work still in flight (open/in-progress) → let it run; nothing to generate yet.
   if (active.length > 0) return { status: "working", active: active.length };
+  // #145: real-world work has LANDED but isn't verified — don't fake-complete and
+  // don't churn new tasks; wait for the deploy/payment/human check.
+  if (verifying.length > 0) return { status: "verifying", merged: verifying.length };
 
   // No active tasks left but criteria unmet → the blocked tasks are the gap.
   if (g.iterations >= maxIterations) return { status: "stuck", blocked: unmet.length };
