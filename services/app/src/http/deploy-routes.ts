@@ -42,7 +42,12 @@ export function registerDeployRoutes(app: FastifyInstance, d: DeployDeps) {
     if (!repo.deployCommand?.trim()) return reply.code(400).send({ error: "no deployCommand configured for this repo" });
     if (!process.env[repo.tokenEnvVar]) return reply.code(400).send({ error: "repo token not configured" });
 
-    const result = await deployRepo(d.db, { orgId, repoId, goalId, exec: makeExec(repo) });
+    let result;
+    try {
+      result = await deployRepo(d.db, { orgId, repoId, goalId, exec: makeExec(repo) });
+    } catch (e) {
+      result = { ok: false as const, reason: `deploy error: ${(e as Error).message}` };
+    }
 
     // Post the outcome back to the goal's thread (if a goal was given).
     if (goalId) {
