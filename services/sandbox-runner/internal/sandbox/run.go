@@ -18,7 +18,12 @@ type RunRequest struct {
 	Model      string   `json:"model,omitempty"`
 	Provider   string   `json:"provider,omitempty"`
 	McpServers []string `json:"mcpServers,omitempty"`
-	WorkDir    string   `json:"-"`
+	// SetupScript is the per-repo, admin-configured setup script run in the
+	// workdir after clone and before the agent. Optional; empty = no-op. It is
+	// only ever populated from trusted repo config (never cloned content), so it
+	// carries no charset validation — it is a shell script by design.
+	SetupScript string `json:"setupScript,omitempty"`
+	WorkDir     string `json:"-"`
 }
 
 type RunResult struct {
@@ -127,6 +132,12 @@ func Run(ctx context.Context, req RunRequest, agent Agent, limits Limits) (RunRe
 	}
 	if err := checkRepoSize(req.WorkDir, limits.MaxRepoBytes); err != nil {
 		return RunResult{}, err
+	}
+	// Per-repo setup (deps/build) runs after clone and BEFORE the agent, in the
+	// workdir, bounded by ctx (#50). A non-zero exit fails the run. Run takes a
+	// plain Agent with no emitter, so setup output is discarded here.
+	if err := runSetupScript(ctx, req.WorkDir, req.SetupScript, nil); err != nil {
+		return RunResult{}, fmt.Errorf("setup: %w", err)
 	}
 	if err := agent.Apply(ctx, req.WorkDir, req.Intent); err != nil {
 		return RunResult{}, fmt.Errorf("agent: %w", err)

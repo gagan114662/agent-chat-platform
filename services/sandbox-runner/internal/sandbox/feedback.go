@@ -21,7 +21,12 @@ type FeedbackRequest struct {
 	Model      string   `json:"model,omitempty"`
 	Provider   string   `json:"provider,omitempty"`
 	McpServers []string `json:"mcpServers,omitempty"`
-	WorkDir    string   `json:"-"`
+	// SetupScript is the per-repo, admin-configured setup script run in the
+	// workdir after clone and before the agent. Optional; empty = no-op. Only
+	// ever populated from trusted repo config (never cloned content), so no
+	// charset validation — it is a shell script by design.
+	SetupScript string `json:"setupScript,omitempty"`
+	WorkDir     string `json:"-"`
 }
 
 // Validate checks the request before any git command is shelled out.
@@ -72,6 +77,11 @@ func Feedback(ctx context.Context, req FeedbackRequest, ad adapter.Adapter, limi
 	}
 	if err := checkRepoSize(req.WorkDir, limits.MaxRepoBytes); err != nil {
 		return RunResult{}, err
+	}
+	// Per-repo setup runs after clone and BEFORE the agent re-applies feedback,
+	// in the workdir, bounded by ctx (#50). A non-zero exit fails the run.
+	if err := runSetupScript(ctx, req.WorkDir, req.SetupScript, nil); err != nil {
+		return RunResult{}, fmt.Errorf("setup: %w", err)
 	}
 	if err := ad.Prepare(ctx, adapter.PrepareContext{RepoDir: req.WorkDir, Intent: req.Notes, Model: req.Model, Provider: req.Provider, McpServers: req.McpServers}); err != nil {
 		return RunResult{}, fmt.Errorf("prepare: %w", err)
