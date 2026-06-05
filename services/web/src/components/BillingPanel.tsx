@@ -66,14 +66,18 @@ export function BillingPanel({
               <tbody>
                 {QUOTA_KINDS.map((k) => {
                   const q = billing.quotas[k];
+                  // "over" = strictly past the limit; at-limit (1/1) is fine. The
+                  // backend `ok` means "room to add one more", so reusing it here
+                  // wrongly flagged at-limit as over (#107).
+                  const over = q.limit >= 0 && q.used > q.limit;
                   return (
-                    <tr key={k} aria-label={`quota ${k}`} className="border-b border-[#f2f2f7] last:border-0">
+                    <tr key={k} aria-label={`quota ${k}`} className="border-b border-line-soft last:border-0">
                       <td className="px-3 py-2 capitalize text-ink-2">{k}</td>
                       <td className="px-3 py-2 text-ink">{q.used}</td>
                       <td className="px-3 py-2 text-ink-3">
                         {fmtLimit(q.limit)}
-                        {!q.ok && (
-                          <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-danger">over</span>
+                        {over && (
+                          <span className="ml-2 rounded bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold text-danger">over</span>
                         )}
                       </td>
                     </tr>
@@ -104,7 +108,7 @@ export function BillingPanel({
                   onClick={() => upgrade(p.id)}
                   disabled={busy !== null}
                   aria-label={`upgrade to ${p.name}`}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-[#4a4ac4] disabled:opacity-50"
+                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
                 >
                   Upgrade
                 </button>

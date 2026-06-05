@@ -215,7 +215,17 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
                               ? "Memory"
                               : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
             </h1>
-            <p className="text-[11px] text-ink-3">chat → sandboxed agent → PR → back to chat</p>
+            <p className="text-[11px] text-ink-3">{{
+              context: "Knowledge graph of decisions, facts & artifacts",
+              inbox: "Mentions, approvals & failed runs",
+              goals: "State a goal; agents decompose & execute it",
+              agents: "The AI agents in this workspace",
+              tasks: "Work items across humans & agents",
+              billing: "Plan, usage & quotas",
+              automations: "Scheduled & event-driven agent runs",
+              memory: "Search & consolidate workspace memory",
+              thread: "chat → sandboxed agent → PR → back to chat",
+            }[view] ?? "chat → sandboxed agent → PR → back to chat"}</p>
           </div>
           <div className="flex items-center gap-2">
             <SearchBar key={search?.nonce ?? 0} onSearch={searchMessages} onSelect={setActiveThreadId} inputRef={searchRef} initialQuery={search?.q} />

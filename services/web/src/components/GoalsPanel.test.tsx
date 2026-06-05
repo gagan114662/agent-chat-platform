@@ -19,7 +19,7 @@ describe("GoalsPanel", () => {
     const result: TickResult = { dispatched: ["run-a", "run-b"], skipped: 1, reason: "budget 5", alerts: 3, automations: 0 };
     const runTick = vi.fn(async () => result);
     render(<GoalsPanel orgId="acme" createGoal={vi.fn()} runTick={runTick} decomposeGoal={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: /run tick/i }));
+    fireEvent.click(screen.getByRole("button", { name: /run now/i }));
     await waitFor(() => expect(runTick).toHaveBeenCalledWith("acme", undefined));
     expect(await screen.findByText(/2 dispatched/)).toBeInTheDocument();
     expect(screen.getByText(/3 alerts/)).toBeInTheDocument();

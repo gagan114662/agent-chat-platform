@@ -12,7 +12,7 @@ describe("AgentsPanel", () => {
     const listAgents = vi.fn(async () => agents);
     render(<AgentsPanel listAgents={listAgents} setAgentProfile={vi.fn()} />);
     expect(await screen.findByText("coder")).toBeInTheDocument();
-    expect(screen.getByText("fake")).toBeInTheDocument();
+    expect(screen.getByText("demo")).toBeInTheDocument();
     expect(listAgents).toHaveBeenCalled();
   });
 

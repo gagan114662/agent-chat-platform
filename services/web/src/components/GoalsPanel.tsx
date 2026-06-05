@@ -69,7 +69,7 @@ export function GoalsPanel({
           disabled={busy}
           className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
         >
-          Run tick
+          Run now
         </button>
       </div>
 

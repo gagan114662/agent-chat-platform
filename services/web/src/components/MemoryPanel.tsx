@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { MemoryNode } from "../api.js";
 
 // #26/#40/#82 memory panel: a recall search box (intent → ranked nodes), a
-// "Consolidate (dream)" button that clusters recent nodes into summaries and
+// "Consolidate memory" button that clusters recent nodes into summaries and
 // shows the created count, and a list of recent nodes. Reads only-existing
 // routes: GET /memory/recall, POST /memory/consolidate, GET /memory.
 function NodeCard({ n }: { n: MemoryNode }) {
@@ -75,7 +75,7 @@ export function MemoryPanel({
           disabled={busy}
           className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
         >
-          Consolidate (dream)
+          Consolidate memory
         </button>
       </div>
 

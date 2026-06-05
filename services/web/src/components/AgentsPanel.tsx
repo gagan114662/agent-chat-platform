@@ -54,7 +54,7 @@ export function AgentsPanel({
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-elevated-2 text-[10px] text-ink-3">{a.handle.slice(0, 2)}</span>
                     )}
                     <span className="text-sm font-medium text-ink">{a.handle}</span>
-                    <span className="rounded bg-elevated-2 px-1.5 py-0.5 text-[10px] text-ink-3">{a.adapter}</span>
+                    <span className="rounded bg-elevated-2 px-1.5 py-0.5 text-[10px] text-ink-3">{a.adapter === "fake" ? "demo" : a.adapter}</span>
                   </div>
                   <div className="text-xs text-ink-3">{a.displayName}</div>
                 </div>
