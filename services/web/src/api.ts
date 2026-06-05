@@ -392,3 +392,122 @@ export async function getTool(id: string): Promise<Tool> {
   if (!res.ok) throw new Error(`getTool ${res.status}`);
   return res.json();
 }
+
+// #85 billing — the org's plan + usage + per-resource quotas, the pricing tiers,
+// and a Stripe Checkout (upgrade). Shapes mirror services/app/src/billing/plans.ts.
+// A quota `limit` of -1 means unlimited.
+export type QuotaKind = "seats" | "agents" | "messages" | "tasks";
+export interface Plan {
+  id: string; name: string;
+  seatLimit: number; agentLimit: number; messageQuota: number; taskQuota: number;
+  stripePriceId: string | null;
+}
+export interface Usage { seats: number; agents: number; messages: number; tasks: number; }
+export interface Quota { used: number; limit: number; ok: boolean; }
+export interface Billing { plan: Plan; usage: Usage; quotas: Record<QuotaKind, Quota>; }
+
+export async function getBilling(): Promise<Billing> {
+  const res = await fetch(`/billing`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getBilling ${res.status}`);
+  return res.json();
+}
+
+export async function listPlans(): Promise<Plan[]> {
+  const res = await fetch(`/billing/plans`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listPlans ${res.status}`);
+  return res.json();
+}
+
+// Builds a Stripe Checkout Session for the chosen plan and returns its URL. The
+// caller redirects to it. Admin-only on the backend (403 for members); 400 when
+// the plan has no Stripe price or Stripe isn't configured.
+export async function billingCheckout(planId: string): Promise<{ url: string }> {
+  const res = await fetch(`/billing/checkout`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ planId }),
+  });
+  if (!res.ok) throw new Error(`billingCheckout ${res.status}`);
+  return res.json();
+}
+
+// #98 automations — schedule/event trigger → message/run/slack action. Shapes
+// mirror services/app/src/autonomy/automations.ts. Mutations are admin-only.
+export type AutomationTrigger =
+  | { type: "schedule"; everyMinutes: number }
+  | { type: "event"; event: string };
+export type AutomationAction =
+  | { type: "message"; threadId: string; body: string }
+  | { type: "run"; threadId: string; agentId: string; intent: string }
+  | { type: "slack"; channel: string; text: string };
+export interface Automation {
+  id: string; orgId: string; name: string;
+  trigger: AutomationTrigger; action: AutomationAction;
+  enabled: boolean; lastFiredAt: string | null;
+  createdById: string; createdAt: string;
+}
+
+export async function listAutomations(): Promise<Automation[]> {
+  const res = await fetch(`/automations`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listAutomations ${res.status}`);
+  return res.json();
+}
+
+export async function createAutomation(name: string, trigger: AutomationTrigger, action: AutomationAction): Promise<Automation> {
+  const res = await fetch(`/automations`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ name, trigger, action }),
+  });
+  if (!res.ok) throw new Error(`createAutomation ${res.status}`);
+  return res.json();
+}
+
+export async function setAutomationEnabled(id: string, enabled: boolean): Promise<void> {
+  const res = await fetch(`/automations/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) throw new Error(`setAutomationEnabled ${res.status}`);
+}
+
+export async function deleteAutomation(id: string): Promise<void> {
+  const res = await fetch(`/automations/${id}`, { method: "DELETE", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`deleteAutomation ${res.status}`);
+}
+
+// #26/#40/#82 memory — recall search (intent → ranked nodes), consolidate
+// ("dream": cluster recent nodes into summaries), and a node list. Shapes mirror
+// services/app/src/memory/memory.ts (memoryNodes rows).
+export type MemoryNodeKind = "decision" | "fact" | "preference" | "identity" | "artifact";
+export interface MemoryNode {
+  id: string; orgId: string; kind: MemoryNodeKind; scope: string;
+  label: string; body: string;
+  metadata: Record<string, unknown>; version: number; status: string;
+  createdAt: string;
+}
+
+export async function memoryRecall(q: string, limit?: number): Promise<MemoryNode[]> {
+  const qs = new URLSearchParams({ q });
+  if (limit !== undefined) qs.set("limit", String(limit));
+  const res = await fetch(`/memory/recall?${qs.toString()}`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`memoryRecall ${res.status}`);
+  return res.json();
+}
+
+export async function memoryConsolidate(): Promise<{ created: number; clusters: number }> {
+  const res = await fetch(`/memory/consolidate`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`memoryConsolidate ${res.status}`);
+  return res.json();
+}
+
+// GET /memory lists the org's nodes (active by default). An optional `q` runs a
+// label/body search instead (searchNodes).
+export async function listMemoryNodes(q?: string): Promise<MemoryNode[]> {
+  const qs = new URLSearchParams();
+  if (q) qs.set("q", q);
+  const res = await fetch(`/memory${qs.toString() ? `?${qs}` : ""}`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listMemoryNodes ${res.status}`);
+  return res.json();
+}
