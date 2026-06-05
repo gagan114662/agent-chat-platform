@@ -166,3 +166,30 @@ describe("integration routes — GitHub", () => {
     await app.close();
   });
 });
+
+describe("integration routes — GET /integrations (registry #100)", () => {
+  const SAVED = { token: process.env.SLACK_BOT_TOKEN, webhook: process.env.SLACK_WEBHOOK_URL };
+  afterAll(() => {
+    if (SAVED.token === undefined) delete process.env.SLACK_BOT_TOKEN; else process.env.SLACK_BOT_TOKEN = SAVED.token;
+    if (SAVED.webhook === undefined) delete process.env.SLACK_WEBHOOK_URL; else process.env.SLACK_WEBHOOK_URL = SAVED.webhook;
+  });
+
+  it("reports slack configured + gmail/workspace/hubspot 'needs credentials'", async () => {
+    process.env.SLACK_BOT_TOKEN = "xoxb-fake-token";
+    delete process.env.SLACK_WEBHOOK_URL;
+    const app = Fastify();
+    registerIntegrationRoutes(app, { db: h.db });
+    const res = await app.inject({ method: "GET", url: "/integrations", headers: { "x-org-id": "oA" } });
+    expect(res.statusCode).toBe(200);
+    const byName = Object.fromEntries(
+      (res.json().integrations as { name: string; configured: boolean; status: string }[]).map((i) => [i.name, i]),
+    );
+    expect(byName["slack"].configured).toBe(true);
+    expect(byName["slack"].status).toBe("configured");
+    for (const name of ["gmail", "google-workspace", "hubspot"]) {
+      expect(byName[name].configured).toBe(false);
+      expect(byName[name].status).toBe("needs credentials");
+    }
+    await app.close();
+  });
+});

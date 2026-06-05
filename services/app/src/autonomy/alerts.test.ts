@@ -122,4 +122,53 @@ describe("recordAlerts", () => {
     const msgs = await h.db.select().from(messages).where(eq(messages.threadId, "t1"));
     expect(msgs.length).toBe(0);
   });
+
+  it("routes each NEW alert to Slack when SLACK_ALERT_CHANNEL is set (best-effort, via injected client)", async () => {
+    await h.db.insert(runs).values({ id: "r-cf", orgId: "o1", taskId: "k1", state: "checks_failed", workflowId: "wf1" });
+    const alerts = await detectAlerts(h.db, "o1");
+
+    const posts: { channel: string; text: string }[] = [];
+    const ctx = {
+      orgId: "o1",
+      slackChannel: "#alerts",
+      makeSlack: () => ({ postMessage: async (channel: string, text: string) => { posts.push({ channel, text }); } }),
+    };
+    const first = await recordAlerts(h.db, h.sql, ctx, alerts);
+    expect(first).toBe(1);
+    expect(posts).toHaveLength(1);
+    expect(posts[0].channel).toBe("#alerts");
+    expect(posts[0].text).toContain("Run r-cf");
+
+    // idempotent: re-recording the same alert posts nothing new (already recorded)
+    const second = await recordAlerts(h.db, h.sql, ctx, alerts);
+    expect(second).toBe(0);
+    expect(posts).toHaveLength(1);
+  });
+
+  it("a failing/unconfigured Slack post does not break alert recording (guarded)", async () => {
+    await h.db.insert(runs).values({ id: "r-cf", orgId: "o1", taskId: "k1", state: "checks_failed", workflowId: "wf1" });
+    const alerts = await detectAlerts(h.db, "o1");
+    const n = await recordAlerts(h.db, h.sql, {
+      orgId: "o1",
+      slackChannel: "#alerts",
+      makeSlack: () => ({ postMessage: async () => { throw new Error("slack 500"); } }),
+    }, alerts);
+    // recording still succeeds despite the Slack failure
+    expect(n).toBe(1);
+    const rows = await h.db.select().from(incidents).where(eq(incidents.orgId, "o1"));
+    expect(rows.length).toBe(1);
+  });
+
+  it("does not post to Slack when no Slack channel is configured", async () => {
+    delete process.env.SLACK_ALERT_CHANNEL;
+    await h.db.insert(runs).values({ id: "r-cf", orgId: "o1", taskId: "k1", state: "checks_failed", workflowId: "wf1" });
+    const alerts = await detectAlerts(h.db, "o1");
+    const posts: { channel: string; text: string }[] = [];
+    const n = await recordAlerts(h.db, h.sql, {
+      orgId: "o1",
+      makeSlack: () => ({ postMessage: async (channel: string, text: string) => { posts.push({ channel, text }); } }),
+    }, alerts);
+    expect(n).toBe(1);
+    expect(posts).toHaveLength(0);
+  });
 });

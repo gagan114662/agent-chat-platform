@@ -7,6 +7,7 @@ import type { GitHubService } from "@acp/orchestrator/github/github-service.js";
 import { actor } from "./actor.js";
 import { importLinearIssues, makeLinearClient, type LinearClient } from "../integrations/linear.js";
 import { importGitHubIssues } from "../integrations/github-issues.js";
+import { listIntegrations } from "../integrations/registry.js";
 
 // Builds a Linear client from an API key. Injectable so integration-routes.test.ts
 // can pass a fake (no live Linear API); production uses makeLinearClient.
@@ -25,6 +26,14 @@ export interface IntegrationDeps {
 export function registerIntegrationRoutes(app: FastifyInstance, d: IntegrationDeps) {
   const makeLinear: MakeLinear = d.makeLinear ?? makeLinearClient;
   const makeGitHub: MakeGitHub = d.makeGitHub ?? ((token: string) => new OctokitGitHubService(token));
+
+  // #100 — registry status of each cloud integration (configured vs "needs
+  // credentials"). Authed/org-scoped (actor() fails closed); the config status
+  // itself is process-global env, no cross-org data is exposed.
+  app.get("/integrations", async (req) => {
+    actor(req); // require an authenticated principal
+    return { integrations: listIntegrations() };
+  });
 
   app.post("/integrations/linear/import", async (req, reply) => {
     const { threadId } = (req.body ?? {}) as { threadId?: string };
