@@ -218,6 +218,13 @@
       "when": 1782400000000,
       "tag": "0030_repo_setup_script",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1782486400000,
+      "tag": "0031_repo_env_ghe",
+      "breakpoints": true
     }
   ]
 }

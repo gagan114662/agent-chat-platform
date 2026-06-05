@@ -85,4 +85,34 @@ describe("startFusionRun", () => {
     await startFusionRun(client, baseInput);
     expect(calls[0].input.setupScript).toBeUndefined();
   });
+
+  it("threads repo.envVars into the activity input when set (#73)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, {
+      ...baseInput,
+      repo: { ...baseInput.repo, envVars: { NPM_TOKEN: "secret" } },
+    });
+    expect(calls[0].input.env).toEqual({ NPM_TOKEN: "secret" });
+  });
+
+  it("passes no env when the repo has no envVars (default unchanged, #73)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, { ...baseInput, repo: { ...baseInput.repo, envVars: {} } });
+    expect(calls[0].input.env).toBeUndefined();
+  });
+
+  it("threads repo.githubApiUrl into the activity input when set (#73)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, {
+      ...baseInput,
+      repo: { ...baseInput.repo, githubApiUrl: "https://ghe.example.com/api/v3" },
+    });
+    expect(calls[0].input.githubApiUrl).toBe("https://ghe.example.com/api/v3");
+  });
+
+  it("passes no githubApiUrl when the repo has none (default unchanged, #73)", async () => {
+    const { client, calls } = fakeTemporal();
+    await startFusionRun(client, baseInput);
+    expect(calls[0].input.githubApiUrl).toBeUndefined();
+  });
 });

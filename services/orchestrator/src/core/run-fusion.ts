@@ -24,6 +24,15 @@ export interface FusionInput {
   // via the app's ciFix closure, feedback). Empty/undefined = no setup. The
   // plan step never sets up (read-only, never edits/pushes).
   setupScript?: string;
+  // Optional per-repo environment variables (#73), threaded into the sandbox
+  // run (and, via the app's ciFix closure, feedback) — applied to the agent's
+  // child env and the setup script. Undefined = none (today's behavior). The
+  // plan step never receives env (read-only, never edits/pushes).
+  env?: Record<string, string>;
+  // Optional GitHub Enterprise base URL (#73). The app activity constructs the
+  // GitHub client with this baseUrl; carried here so FusionInput stays the
+  // single threaded shape. Undefined = github.com (today's behavior).
+  githubApiUrl?: string;
 }
 
 export type FusionOutcome = "merged" | "checks_failed" | "timeout" | "held_for_human" | "awaiting_plan";
@@ -104,6 +113,8 @@ export async function runFusion(
     mcpServers: input.mcpServers,
     // #71: per-repo setup runs in the sandbox after clone, before the agent.
     setupScript: input.setupScript,
+    // #73: per-repo env vars applied to the agent's child env + the setup script.
+    env: input.env,
   });
   await emit({ type: "branch_pushed", branch: run.branch, commitSha: run.commitSha });
 

@@ -46,18 +46,38 @@ export interface RunFusionActivityInput {
   // #71 per-repo setup script (from repos.setupScript), threaded into the sandbox
   // run and the ciFix feedback. Optional; empty/undefined = no setup.
   setupScript?: string;
+  // #73 per-repo environment variables (from repos.envVars), threaded into the
+  // sandbox run and the ciFix feedback — applied to the agent's child env and
+  // the setup script. Optional; undefined = none (today's behavior).
+  env?: Record<string, string>;
+  // #73 GitHub Enterprise base URL (from repos.githubApiUrl). When set, the
+  // GitHub client is built against this host's API root. Optional; undefined =
+  // github.com (today's behavior).
+  githubApiUrl?: string;
   sink: SinkCtx;
 }
 
-export async function runChatFusionActivity(input: RunFusionActivityInput): Promise<FusionResult> {
+// Injectable factories so the activity can be unit-tested without a real GitHub
+// host or sandbox-runner. Production defaults construct the real clients.
+export interface RunFusionActivityDeps {
+  githubFactory?: (token: string, baseUrl?: string) => OctokitGitHubService;
+  sandboxFactory?: (baseUrl: string) => SandboxRunnerClient;
+}
+
+export async function runChatFusionActivity(
+  input: RunFusionActivityInput,
+  factories: RunFusionActivityDeps = {},
+): Promise<FusionResult> {
   const token = process.env[input.tokenEnvVar];
   if (!token) throw new Error(`GitHub token not found in env var: ${input.tokenEnvVar}`);
   const repoUrl = `https://x-access-token:${token}@github.com/${input.owner}/${input.repo}.git`;
 
   const { db, sql } = makeDb();
   try {
-    const github = new OctokitGitHubService(token);
-    const sandbox = new SandboxRunnerClient(input.sandboxUrl);
+    // #73: build the GitHub client against the repo's GHE host when set
+    // (undefined = github.com). Factory injectable for tests.
+    const github = (factories.githubFactory ?? ((t: string, b?: string) => new OctokitGitHubService(t, b)))(token, input.githubApiUrl);
+    const sandbox = (factories.sandboxFactory ?? ((b: string) => new SandboxRunnerClient(b)))(input.sandboxUrl);
     const deps = { sandbox, github };
     // #98 best-effort event-automation hook: on an outcome the sink fires matching
     // user event automations (message posts, or guarded run dispatches). A lazy
@@ -82,12 +102,15 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
       mcpServers: input.mcpServers,
       // #71: thread the per-repo setup script (undefined = no setup).
       setupScript: input.setupScript,
+      // #73: thread the per-repo env vars (undefined = none) + GHE base URL.
+      env: input.env,
+      githubApiUrl: input.githubApiUrl,
     };
     // Fix-on-red: on a red PR, re-run the agent on the same branch with the CI
     // failure as feedback. Bounded by CI_FIX_ATTEMPTS (default 2; 0 disables).
     const maxFixAttempts = Number(process.env.CI_FIX_ATTEMPTS ?? 2);
     const ciFix = async ({ branch, failure }: { branch: string; failure: string }) => {
-      const res = await sandbox.feedback({ repoUrl, branch, notes: failure, model: input.model, provider: input.provider, mcpServers: input.mcpServers, setupScript: input.setupScript });
+      const res = await sandbox.feedback({ repoUrl, branch, notes: failure, model: input.model, provider: input.provider, mcpServers: input.mcpServers, setupScript: input.setupScript, env: input.env });
       return { commitSha: res.commitSha };
     };
     // Plan mode: the first pass only PROPOSES a plan and parks. The planGate

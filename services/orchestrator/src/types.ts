@@ -17,6 +17,10 @@ export interface SandboxRunRequest {
   // agent. Optional; empty/undefined = no setup (today's behavior). Trusted repo
   // config only (never cloned content).
   setupScript?: string;
+  // #73 per-repo environment variables applied to the agent's child env (after
+  // the #49 scrub — an intentional admin override) AND to the setup script.
+  // Optional; undefined = none (today's behavior). Trusted repo config only.
+  env?: Record<string, string>;
 }
 
 export interface SandboxFeedbackRequest {
@@ -30,6 +34,9 @@ export interface SandboxFeedbackRequest {
   // #71 per-repo setup script (see SandboxRunRequest). Re-run before the agent
   // re-applies feedback so the prepared repo (deps/build) is present.
   setupScript?: string;
+  // #73 per-repo environment variables (see SandboxRunRequest). Applied to the
+  // agent's child env and the setup script on the feedback re-run too.
+  env?: Record<string, string>;
 }
 
 export interface SandboxPlanRequest {

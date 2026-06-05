@@ -27,6 +27,16 @@ export const repos = pgTable("repos", {
   // agent (install deps / build). Nullable — null/empty = no setup (today's
   // behavior). Threaded app→orchestrator→sandbox; bounded by the run timeout.
   setupScript: text("setup_script"),
+  // #73 per-repo environment variables: admin-configured (trusted config, NOT
+  // cloned-repo content) key/value secrets threaded to the sandbox and applied
+  // to the agent's child env (after the #49 scrub — an intentional admin
+  // override) AND to the setup script (#71). Default {} = none (today's
+  // behavior). Threaded app→orchestrator→sandbox.
+  envVars: jsonb("env_vars").$type<Record<string, string>>().notNull().default({}),
+  // #73 GitHub Enterprise base URL (e.g. "https://ghe.example.com/api/v3") used
+  // by the Octokit client for GHE hosts. Nullable — null = github.com (today's
+  // behavior). The clone host stays the repo URL itself (already host-agnostic).
+  githubApiUrl: text("github_api_url"),
 });
 
 export const members = pgTable("members", {
