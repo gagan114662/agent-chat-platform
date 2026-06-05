@@ -1,12 +1,18 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import type postgres from "postgres";
 import type { Client } from "@temporalio/client";
-import { goals as goalsTable } from "../db/schema.js";
+import { goals as goalsTable, tasks } from "../db/schema.js";
 import { tick, type StartRun } from "./tick.js";
-import { autonomousGoals } from "./goals.js";
+import { autonomousGoals, setGoalAutonomy } from "./goals.js";
 import { progressGoal, type GoalOutcome, type NextStepGen } from "./progress.js";
 import { runBusinessGoal } from "../business/actions.js";
+import { LoopGuard, fingerprint } from "./loop-guard.js";
+import { enforceBudget } from "./budget.js";
+
+// #149.1 one Loop-Guard for the unattended clock: trips a goal that loops without
+// making progress (same open-task state across cycles) or exceeds the iteration cap.
+export const loopGuard = new LoopGuard(Number(process.env.ACP_LOOP_MAX_ITERATIONS ?? 15));
 
 // #137 the unattended clock. A human is no longer the clock: this drives every
 // org that has an active, autonomy-on goal, on an interval. Each cycle, per org:
@@ -26,7 +32,7 @@ export interface SchedulerDeps {
   gen?: NextStepGen;
 }
 
-export interface GoalProgress { goalId: string; title: string; outcome: GoalOutcome }
+export interface GoalProgress { goalId: string; title: string; outcome: GoalOutcome; suspended?: string }
 export interface CycleResult { orgs: number; goals: GoalProgress[]; dispatched: number }
 
 // orgsWithAutonomy: distinct orgs that have at least one active, autonomy-on goal.
@@ -42,13 +48,36 @@ export async function runAutonomyCycle(d: SchedulerDeps): Promise<CycleResult> {
   const orgIds = await orgsWithAutonomy(d.db);
   const goals: GoalProgress[] = [];
   let dispatched = 0;
+  const capCents = Number(process.env.ACP_BUDGET_CAP_CENTS ?? 0);
   for (const orgId of orgIds) {
+    // #149.2 budget gate: at the hard limit, pause this org's autonomy goals and
+    // skip the cycle — no overspend. (capCents 0 = unmetered, no enforcement.)
+    const budget = await enforceBudget(d.db, orgId, capCents);
+    if (budget.tier === "hard") {
+      goals.push({ goalId: "-", title: `budget hard limit (${budget.spentCents}¢/${capCents}¢)`, outcome: { status: "stuck", blocked: budget.pausedGoals }, suspended: "budget cap reached — paused, top up to resume" });
+      continue;
+    }
     for (const g of await autonomousGoals(d.db, orgId)) {
+      // #149.1 Loop-Guard: before spending another cycle on this goal, fingerprint
+      // its current state (open task titles). If it hasn't changed for several
+      // cycles, or the cap is hit, the loop is stuck — SUSPEND it (autonomy off,
+      // state preserved) for a human instead of burning more compute.
+      const open = await d.db.select({ title: tasks.title }).from(tasks)
+        .where(and(eq(tasks.orgId, orgId), eq(tasks.goalId, g.id), inArray(tasks.state, ["open", "in_progress", "blocked"])));
+      const sig = fingerprint("goal-progress", open.map((t) => t.title).sort());
+      const v = loopGuard.check(g.id, sig);
+      if (v.trip) {
+        await setGoalAutonomy(d.db, orgId, g.id, false); // pause; resume is a human re-enabling autonomy
+        loopGuard.reset(g.id);
+        goals.push({ goalId: g.id, title: g.title, outcome: { status: "stuck", blocked: open.length }, suspended: v.reason });
+        continue;
+      }
       // #146: a business goal advances the funnel — execute its open tasks as
       // business actions (draft charges/campaigns → pending human approval) before
       // judging completion.
       if (g.businessId) await runBusinessGoal(d.db, orgId, g.id);
       const outcome = await progressGoal(d.db, orgId, g.id, { gen: d.gen });
+      if (outcome.status === "done") loopGuard.reset(g.id); // completed → clear its trail
       goals.push({ goalId: g.id, title: g.title, outcome });
     }
     const res = await tick(

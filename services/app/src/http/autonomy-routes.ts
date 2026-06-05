@@ -8,6 +8,7 @@ import { tick, type StartRun, type TickResult } from "../autonomy/tick.js";
 import { schedulerState } from "../autonomy/scheduler.js";
 import { runBusinessGoal } from "../business/actions.js";
 import { progressGoal } from "../autonomy/progress.js";
+import { orgSpendCents, budgetTier } from "../autonomy/budget.js";
 import { detectAlerts, recordAlerts } from "../autonomy/alerts.js";
 import { incidents } from "../db/schema.js";
 import { actor } from "./actor.js";
@@ -71,6 +72,16 @@ export function registerAutonomyRoutes(app: FastifyInstance, d: AutonomyDeps) {
     const goal = await setGoalAutonomy(d.db, orgId, goalId, on);
     if (!goal) return reply.code(404).send({ error: "goal not found" });
     return reply.code(200).send(goal);
+  });
+
+  // #149.2: budget status for the org (read-only) — spend vs cap + tier. Cap from
+  // ACP_BUDGET_CAP_CENTS (0 = unmetered). The scheduler enforces (pauses) at hard.
+  app.get("/autonomy/budget", async (req, reply) => {
+    const { orgId } = actor(req);
+    const capCents = Number(process.env.ACP_BUDGET_CAP_CENTS ?? 0);
+    const spentCents = await orgSpendCents(d.db, orgId);
+    const { tier, ratio } = budgetTier(spentCents, capCents);
+    return reply.code(200).send({ spentCents, capCents, tier, ratio: Number(ratio.toFixed(3)) });
   });
 
   // #137: surface the unattended loop's state — is the clock running, when does it
