@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { createGoal, decomposeGoal, defaultGoalPlanner } from "./goals.js";
+import { createGoal, decomposeGoal, defaultGoalPlanner, listGoals } from "./goals.js";
 import { orgs, workspaces, channels, threads, goals, tasks } from "../db/schema.js";
 
 const h = testDb();
@@ -72,5 +72,32 @@ describe("createGoal + decomposeGoal", () => {
     expect(g.state).toBe("open");
     const t = await h.db.select().from(tasks);
     expect(t.length).toBe(0);
+  });
+});
+
+describe("decomposeGoal assignment + listGoals (#120)", () => {
+  it("assigns decomposed tasks to the given agent so the tick can dispatch them", async () => {
+    const g = await createGoal(h.db, { orgId: "o1", title: "Launch service", criteria: "build landing\ntake a payment", byKind: "human", byId: "m1" });
+    const ids = await decomposeGoal(h.db, { orgId: "o1", goalId: g.id, threadId: "t1", assigneeId: "ag1" });
+    expect(ids.length).toBe(2);
+    const rows = await h.db.select().from(tasks).where(eq(tasks.orgId, "o1"));
+    expect(rows.length).toBe(2);
+    expect(rows.every((t) => t.assigneeKind === "agent" && t.assigneeId === "ag1")).toBe(true);
+    expect(rows.every((t) => t.state === "open" && t.threadId === "t1")).toBe(true);
+  });
+
+  it("leaves tasks unassigned when no agent is given (back-compat)", async () => {
+    const g = await createGoal(h.db, { orgId: "o1", title: "Solo", criteria: "do a thing", byKind: "human", byId: "m1" });
+    await decomposeGoal(h.db, { orgId: "o1", goalId: g.id, threadId: "t1" });
+    const [t] = await h.db.select().from(tasks).where(eq(tasks.orgId, "o1"));
+    expect(t.assigneeId).toBeNull();
+  });
+
+  it("listGoals returns the org's goals (so they persist across nav)", async () => {
+    await createGoal(h.db, { orgId: "o1", title: "G1", byKind: "human", byId: "m1" });
+    await createGoal(h.db, { orgId: "o2", title: "Other", byKind: "human", byId: "m2" });
+    const gs = await listGoals(h.db, "o1");
+    expect(gs.length).toBe(1);
+    expect(gs[0].title).toBe("G1");
   });
 });

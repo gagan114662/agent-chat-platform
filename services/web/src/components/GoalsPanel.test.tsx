@@ -12,7 +12,8 @@ describe("GoalsPanel", () => {
     fireEvent.change(screen.getByPlaceholderText(/criteria/i), { target: { value: "done" } });
     fireEvent.click(screen.getByRole("button", { name: /create goal/i }));
     await waitFor(() => expect(createGoal).toHaveBeenCalledWith("Ship it", "done"));
-    expect(await screen.findByText(/g1/)).toBeInTheDocument();
+    // The created goal renders in the list (by title now, not raw id).
+    expect(await screen.findByText("Ship it")).toBeInTheDocument();
   });
 
   it("Run tick calls runTick and shows the dispatched/alert counts (#67)", async () => {

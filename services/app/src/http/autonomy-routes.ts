@@ -3,7 +3,7 @@ import type { DB } from "../db/client.js";
 import type postgres from "postgres";
 import type { Client } from "@temporalio/client";
 import { and, desc, eq } from "drizzle-orm";
-import { createGoal, decomposeGoal } from "../autonomy/goals.js";
+import { createGoal, decomposeGoal, listGoals } from "../autonomy/goals.js";
 import { tick, type StartRun, type TickResult } from "../autonomy/tick.js";
 import { detectAlerts, recordAlerts } from "../autonomy/alerts.js";
 import { incidents } from "../db/schema.js";
@@ -21,6 +21,12 @@ export interface AutonomyDeps {
 }
 
 export function registerAutonomyRoutes(app: FastifyInstance, d: AutonomyDeps) {
+  // List the org's goals (#120: so the Goals panel persists them across nav).
+  app.get("/goals", async (req, reply) => {
+    const { orgId } = actor(req);
+    return reply.code(200).send({ goals: await listGoals(d.db, orgId) });
+  });
+
   // State a goal (once, by a human). Org-scoped via actor.
   app.post("/goals", async (req, reply) => {
     const { title, criteria } = (req.body ?? {}) as { title?: string; criteria?: string };
@@ -33,10 +39,10 @@ export function registerAutonomyRoutes(app: FastifyInstance, d: AutonomyDeps) {
   // Decompose an open goal into Tasks (idempotent, org-scoped). The goal carries the thread.
   app.post("/goals/:id/decompose", async (req, reply) => {
     const { id: goalId } = req.params as { id: string };
-    const { threadId } = (req.body ?? {}) as { threadId?: string };
+    const { threadId, assigneeId } = (req.body ?? {}) as { threadId?: string; assigneeId?: string };
     const { orgId } = actor(req);
     if (!threadId) return reply.code(400).send({ error: "threadId required" });
-    const taskIds = await decomposeGoal(d.db, { orgId, goalId, threadId });
+    const taskIds = await decomposeGoal(d.db, { orgId, goalId, threadId, assigneeId });
     return reply.code(200).send({ taskIds });
   });
 

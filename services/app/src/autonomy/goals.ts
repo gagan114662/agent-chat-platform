@@ -22,8 +22,10 @@ export const defaultGoalPlanner: GoalPlanner = (goal) => {
 
 // decomposeGoal: turn an open goal into Tasks (org-scoped), mark it active. Idempotent:
 // a goal already 'active'/'done' is skipped. Returns the created task ids.
+// #120: tasks are ASSIGNED to an agent when `assigneeId` is given — otherwise the
+// autonomy tick can never dispatch them (it only runs agent-assigned tasks).
 export async function decomposeGoal(
-  db: DB, args: { orgId: string; goalId: string; threadId: string; planner?: GoalPlanner },
+  db: DB, args: { orgId: string; goalId: string; threadId: string; assigneeId?: string; planner?: GoalPlanner },
 ): Promise<string[]> {
   const [g] = await db.select().from(goals).where(and(eq(goals.id, args.goalId), eq(goals.orgId, args.orgId)));
   if (!g || g.state !== "open") return [];
@@ -34,9 +36,16 @@ export async function decomposeGoal(
     const [t] = await db.insert(tasks).values({
       id: randomUUID(), orgId: args.orgId, threadId: args.threadId, title: s.title,
       state: "open", createdByKind: "agent", createdById: "planner",
+      ...(args.assigneeId ? { assigneeKind: "agent", assigneeId: args.assigneeId } : {}),
     }).returning({ id: tasks.id });
     ids.push(t.id);
   }
   await db.update(goals).set({ state: "active" }).where(and(eq(goals.id, g.id), eq(goals.orgId, args.orgId)));
   return ids;
+}
+
+// listGoals: the org's goals (newest-ish; small table). Powers the Goals panel so
+// goals persist across navigation instead of living only in component state (#120).
+export async function listGoals(db: DB, orgId: string) {
+  return db.select().from(goals).where(eq(goals.orgId, orgId));
 }

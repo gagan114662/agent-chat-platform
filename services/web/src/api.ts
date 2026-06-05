@@ -241,7 +241,14 @@ export async function memoryStats(): Promise<MemoryStats> {
 // #67 autonomy — Goals. NOTE: the backend exposes POST /goals + POST
 // /goals/:id/decompose + POST /orgs/:orgId/tick, but there is no list-goals GET
 // route, so the panel is create + decompose + run-tick (no list).
-export interface Goal { id: string; orgId: string; title: string; criteria?: string | null; status?: string; threadId?: string | null; }
+export interface Goal { id: string; orgId: string; title: string; criteria?: string | null; status?: string; state?: string; threadId?: string | null; }
+
+export async function listGoals(): Promise<Goal[]> {
+  const res = await fetch(`/goals`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listGoals ${res.status}`);
+  const { goals } = (await res.json()) as { goals: Goal[] };
+  return goals;
+}
 
 export async function createGoal(title: string, criteria?: string): Promise<Goal> {
   const res = await fetch(`/goals`, {
@@ -253,11 +260,11 @@ export async function createGoal(title: string, criteria?: string): Promise<Goal
   return res.json();
 }
 
-export async function decomposeGoal(goalId: string, threadId: string): Promise<{ taskIds: string[] }> {
+export async function decomposeGoal(goalId: string, threadId: string, assigneeId?: string): Promise<{ taskIds: string[] }> {
   const res = await fetch(`/goals/${goalId}/decompose`, {
     method: "POST",
     headers: { "content-type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ threadId }),
+    body: JSON.stringify(assigneeId ? { threadId, assigneeId } : { threadId }),
   });
   if (!res.ok) throw new Error(`decomposeGoal ${res.status}`);
   return res.json();
