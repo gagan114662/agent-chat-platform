@@ -20,6 +20,7 @@ function deps(checks: ChecksStatus[]) {
     listIssues: vi.fn().mockResolvedValue([]),
     getFileContent: vi.fn().mockResolvedValue({ content: "", encoding: "utf8", size: 0 }),
     getCheckFailureContext: vi.fn().mockResolvedValue("ci: lint failed"),
+    getCheckContexts: vi.fn().mockResolvedValue([]),
     listReviewComments: vi.fn().mockResolvedValue([]),
     updatePr: vi.fn().mockResolvedValue(undefined),
   };

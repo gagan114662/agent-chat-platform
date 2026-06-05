@@ -75,6 +75,22 @@ describe("OctokitGitHubService", () => {
     expect(ctx).not.toContain("ci/test");
   });
 
+  it("lists all check contexts for a ref (name + state + url)", async () => {
+    nock(api).get("/repos/o/r/commits/abc/status").reply(200, {
+      state: "failure",
+      statuses: [
+        { context: "ci/lint", state: "failure", description: "2 errors", target_url: "https://ci/lint" },
+        { context: "ci/test", state: "success", description: null, target_url: null },
+      ],
+    });
+    const svc = new OctokitGitHubService("tok");
+    const contexts = await svc.getCheckContexts("o", "r", "abc");
+    expect(contexts).toEqual([
+      { context: "ci/lint", state: "failure", description: "2 errors", targetUrl: "https://ci/lint" },
+      { context: "ci/test", state: "success", description: undefined, targetUrl: undefined },
+    ]);
+  });
+
   it("lists review comments for a PR", async () => {
     nock(api).get("/repos/o/r/pulls/7/comments").reply(200, [
       { id: 101, body: "fix this", user: { login: "alice" }, path: "src/a.ts", line: 12 },

@@ -232,6 +232,13 @@
       "when": 1782572800000,
       "tag": "0032_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1782659200000,
+      "tag": "0033_notes",
+      "breakpoints": true
     }
   ]
 }

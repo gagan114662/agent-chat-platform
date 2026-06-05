@@ -32,6 +32,15 @@ export interface GitHubIssue {
   htmlUrl: string;
 }
 
+// A single CI status context for a ref (#76 checks endpoint): the context name,
+// its state, and an optional target URL + description from GitHub.
+export interface CheckContext {
+  context: string;
+  state: string; // "success" | "pending" | "failure" | "error"
+  description?: string;
+  targetUrl?: string;
+}
+
 export interface GitHubService {
   openPr(input: OpenPrInput): Promise<PullRequest>;
   // Find-or-create support (#70): returns the first open PR whose head is `head`
@@ -51,6 +60,10 @@ export interface GitHubService {
   // Summarizes the failing check/status contexts for a ref into a short string,
   // used as feedback notes for the agent on a fix-on-red attempt.
   getCheckFailureContext(owner: string, repo: string, ref: string): Promise<string>;
+  // #76: lists every CI status context for a ref (name + state + optional
+  // description/url), used to render a run's checks in-thread. Unlike
+  // getCheckFailureContext (failing-only summary string), this returns the full list.
+  getCheckContexts(owner: string, repo: string, ref: string): Promise<CheckContext[]>;
   // Lists the PR review comments (the request-changes inflow), pulled on demand into the thread.
   listReviewComments(owner: string, repo: string, prNumber: number): Promise<ReviewComment[]>;
   // Edits a PR's title/body and/or switches its base branch. Only the provided fields are sent.
