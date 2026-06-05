@@ -13,7 +13,8 @@ import { reportRunUsage } from "../billing/report.js";
 import { captureDecision } from "../memory/capture.js";
 import { recallForIntent, formatRecall } from "../memory/memory.js";
 import { agentPrefs } from "../agents/agents.js";
-import { agents } from "../db/schema.js";
+import { agents, runs, tasks } from "../db/schema.js";
+import { recordOutcome } from "../delegation/reputation-store.js";
 import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 
@@ -155,6 +156,22 @@ export async function runChatFusionActivity(
       orgId: input.sink.orgId, runId: input.sink.runId, agentId: input.sink.agentId, threadId: input.sink.threadId,
       intent: input.intent, outcome: result.outcome, prNumber: result.prNumber,
     });
+    // #128 reputation + #129 adaptive coordination, at the outcome boundary: a
+    // decisive outcome updates the assignee's track record, and a failed run
+    // escalates its task to "blocked" (visible on the board) instead of leaving it
+    // stuck "in_progress" — the silent-stall failure mode.
+    const decisive: Record<string, "success" | "fail"> = { merged: "success", checks_failed: "fail", timeout: "fail", error: "fail" };
+    const rep = decisive[result.outcome];
+    if (rep && input.sink.agentId) {
+      await recordOutcome(db, input.sink.orgId, input.sink.agentId, rep);
+    }
+    if (rep === "fail") {
+      const [run] = await db.select().from(runs).where(and(eq(runs.id, input.sink.runId), eq(runs.orgId, input.sink.orgId)));
+      if (run?.taskId) {
+        await db.update(tasks).set({ state: "blocked" })
+          .where(and(eq(tasks.id, run.taskId), eq(tasks.orgId, input.sink.orgId), eq(tasks.state, "in_progress")));
+      }
+    }
     return result;
   } finally {
     await sql.end();

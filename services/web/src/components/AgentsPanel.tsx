@@ -87,6 +87,11 @@ export function AgentsPanel({
                     )}
                     <span className="text-sm font-medium text-ink">{a.handle}</span>
                     <span className="rounded bg-elevated-2 px-1.5 py-0.5 text-[10px] text-ink-3">{a.adapter === "fake" ? "demo" : a.adapter}</span>
+                    {a.reputation && (
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${a.reputation.runs === 0 ? "bg-elevated-2 text-ink-3" : a.reputation.scorePct >= 70 ? "bg-positive/10 text-positive" : a.reputation.scorePct >= 40 ? "bg-warn/10 text-warn" : "bg-danger/10 text-danger"}`} title="Reputation from verified run outcomes">
+                        {a.reputation.runs === 0 ? "new" : `rep ${a.reputation.scorePct}% · ${a.reputation.runs} run${a.reputation.runs === 1 ? "" : "s"}`}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-ink-3">{a.displayName}</div>
                 </div>

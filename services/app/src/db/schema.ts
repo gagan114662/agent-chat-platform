@@ -499,3 +499,13 @@ export const invoices = pgTable("invoices", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
 }, (t) => ({ orgIx: index("invoices_org_ix").on(t.orgId, t.status) }));
+
+// #128 reputation: per-agent track record from verified run outcomes (merged =
+// success; checks_failed/timeout/error = fail). Feeds capability matching (#127)
+// and standing-permission thresholds. PK (orgId, agentId).
+export const agentReputation = pgTable("agent_reputation", {
+  orgId: text("org_id").notNull(),
+  agentId: text("agent_id").notNull(),
+  success: integer("success").notNull().default(0),
+  fail: integer("fail").notNull().default(0),
+}, (t) => ({ pk: primaryKey({ columns: [t.orgId, t.agentId] }) }));

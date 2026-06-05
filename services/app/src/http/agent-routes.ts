@@ -5,6 +5,7 @@ import { agents, members, runs, tasks } from "../db/schema.js";
 import { actor } from "./actor.js";
 import { setAgentShared, setAgentProfile, setAgentConfig, isAgentVisibility, createAgent, QuotaError } from "../agents/agents.js";
 import { roleOf, can } from "../rbac/rbac.js";
+import { listReputations } from "../delegation/reputation-store.js";
 
 export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
   // #91: list the org's agents, exposing the profile fields (avatarUrl,
@@ -12,7 +13,8 @@ export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
   app.get("/agents", async (req, reply) => {
     const { orgId } = actor(req);
     const rows = await d.db.select().from(agents).where(eq(agents.orgId, orgId));
-    return reply.code(200).send(rows);
+    const reps = await listReputations(d.db, orgId); // #128: live track record
+    return reply.code(200).send(rows.map((a) => ({ ...a, reputation: reps[a.id] ?? { scorePct: 50, runs: 0, success: 0, fail: 0 } })));
   });
 
   // #122: which agents are actively working right now — agents whose assigned

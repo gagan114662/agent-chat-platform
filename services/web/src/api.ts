@@ -292,6 +292,8 @@ export interface Agent {
   handle: string; displayName: string; adapter: string;
   config: Record<string, unknown>; shared: boolean;
   avatarUrl: string | null; visibility: AgentVisibility;
+  // #128 live reputation from verified run outcomes.
+  reputation?: { scorePct: number; runs: number };
 }
 
 export async function listActiveAgents(): Promise<string[]> {
