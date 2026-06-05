@@ -51,6 +51,7 @@ export interface Principal { kind: "human" | "agent"; id: string; name: string; 
 export interface Repo {
   id: string; orgId: string; workspaceId: string;
   githubOwner: string; githubName: string; defaultBranch: string; tokenEnvVar: string;
+  production?: boolean;
 }
 
 export interface SearchResult {

@@ -167,6 +167,24 @@ export async function listRepos(): Promise<Repo[]> {
   return res.json();
 }
 
+// #139: connect an existing GitHub repo (incl. the platform's own) to the workspace.
+export async function connectRepo(input: { githubOwner: string; githubName: string; defaultBranch?: string; production?: boolean }): Promise<Repo> {
+  const res = await fetch(`/repos`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `connectRepo ${res.status}`);
+  return res.json();
+}
+
+// #139: ingest a connected repo's open GitHub issues as goals (idempotent).
+export async function ingestRepoIssues(repoId: string): Promise<{ created: string[]; skipped: number }> {
+  const res = await fetch(`/repos/${repoId}/ingest-issues`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `ingestRepoIssues ${res.status}`);
+  return res.json();
+}
+
 export async function createChannel(name: string): Promise<Channel> {
   const res = await fetch(`/channels`, {
     method: "POST",

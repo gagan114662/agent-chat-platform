@@ -302,6 +302,13 @@
       "when": 1783436800000,
       "tag": "0042_goal_autonomy",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1783523200000,
+      "tag": "0043_repo_connect",
+      "breakpoints": true
     }
   ]
 }

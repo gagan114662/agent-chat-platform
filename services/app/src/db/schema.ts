@@ -37,6 +37,9 @@ export const repos = pgTable("repos", {
   // by the Octokit client for GHE hosts. Nullable — null = github.com (today's
   // behavior). The clone host stays the repo URL itself (already host-agnostic).
   githubApiUrl: text("github_api_url"),
+  // #139 production repo: a real product/own repo (not a throwaway). connectRepo
+  // forces plan-first on these so merges go through the human gate (#125), not autopilot.
+  production: boolean("production").notNull().default(false),
 });
 
 export const members = pgTable("members", {

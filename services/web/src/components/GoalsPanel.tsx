@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Goal, TickResult, AutonomyStatus } from "../api.js";
+import type { Repo } from "../types.js";
 
 // #67/#120 autonomy panel: state a goal, decompose it into AGENT-ASSIGNED tasks on
 // a repo-bound thread (so the tick can dispatch them), and trigger a manual tick.
@@ -12,6 +13,9 @@ export function GoalsPanel({
   listGoals,
   setGoalAutonomy,
   getAutonomyStatus,
+  repos = [],
+  connectRepo,
+  ingestRepoIssues,
   threads = [],
   agents = [],
 }: {
@@ -22,6 +26,9 @@ export function GoalsPanel({
   listGoals?: () => Promise<Goal[]>;
   setGoalAutonomy?: (goalId: string, on: boolean) => Promise<Goal>;
   getAutonomyStatus?: () => Promise<AutonomyStatus>;
+  repos?: Repo[];
+  connectRepo?: (input: { githubOwner: string; githubName: string; production?: boolean }) => Promise<Repo>;
+  ingestRepoIssues?: (repoId: string) => Promise<{ created: string[]; skipped: number }>;
   // Repo-bound threads the decomposed tasks run against, and agents to assign them to.
   threads?: { id: string; title: string }[];
   agents?: { id: string; handle: string }[];
@@ -53,6 +60,23 @@ export function GoalsPanel({
     if (!setGoalAutonomy) return;
     setError(null);
     try { await setGoalAutonomy(g.id, !g.autonomy); refresh(); }
+    catch (e) { setError((e as Error).message); }
+  };
+
+  // #139 connect-a-repo (incl. the platform's own) + ingest its open issues as goals.
+  const [repoSpec, setRepoSpec] = useState("");
+  const connect = async () => {
+    if (!connectRepo) return;
+    const [owner, name] = repoSpec.trim().split("/");
+    if (!owner || !name) { setError("Enter a repo as owner/name (e.g. gagan114662/agent-chat-platform)."); return; }
+    setError(null); setNotice(null);
+    try { const r = await connectRepo({ githubOwner: owner, githubName: name }); setNotice(`Connected ${r.githubOwner}/${r.githubName}${r.production ? " (production — merges go through the human gate)" : ""}. Create a thread on it (or ingest its issues) to point goals at it.`); setRepoSpec(""); }
+    catch (e) { setError((e as Error).message); }
+  };
+  const ingest = async (repoId: string) => {
+    if (!ingestRepoIssues) return;
+    setError(null); setNotice(null);
+    try { const out = await ingestRepoIssues(repoId); setNotice(`Ingested ${out.created.length} issue(s) as goals${out.skipped ? `, skipped ${out.skipped} already imported` : ""}. Decompose + turn Auto on to let the loop work them.`); refresh(); }
     catch (e) { setError((e as Error).message); }
   };
   useEffect(() => { if (!threadId && threads[0]) setThreadId(threads[0].id); }, [threads, threadId]);
@@ -119,6 +143,26 @@ export function GoalsPanel({
       )}
       {notice && <div className="mb-3 rounded-lg border border-positive/30 bg-positive/10 px-3 py-2 text-xs text-positive">{notice}</div>}
       {error && <p className="mb-3 text-xs text-danger">{error}</p>}
+
+      {connectRepo && (
+        <div className="mb-4 space-y-2 rounded-lg border border-line bg-surface p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">Repos — point the loop at any repo, including its own</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input value={repoSpec} onChange={(e) => setRepoSpec(e.target.value)} placeholder="owner/name — e.g. gagan114662/agent-chat-platform" className="min-w-0 flex-1 rounded-lg border border-line bg-elevated px-2 py-1.5 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none" />
+            <button onClick={connect} disabled={!repoSpec.trim()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50">Connect repo</button>
+          </div>
+          {repos.length > 0 && (
+            <ul className="space-y-1">
+              {repos.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-2 text-xs text-ink-2">
+                  <span className="truncate">{r.githubOwner}/{r.githubName}{r.production && <span className="ml-1 rounded bg-elevated-2 px-1 py-0.5 text-[10px] uppercase text-ink-3">prod</span>}</span>
+                  {ingestRepoIssues && <button onClick={() => ingest(r.id)} className="shrink-0 rounded border border-line px-2 py-0.5 text-[11px] text-ink-2 hover:bg-elevated-2 hover:text-ink">Ingest issues → goals</button>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="mb-4 space-y-2 rounded-lg border border-line bg-surface p-3">
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Goal title — e.g. Launch a paid resume-review service & land the first customer" className={inputCls} />
