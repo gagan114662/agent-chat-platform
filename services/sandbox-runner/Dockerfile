@@ -1,4 +1,4 @@
-FROM golang:1.25 AS build
+FROM golang:1.25.11 AS build
 WORKDIR /src
 COPY . .
 RUN go build -o /bin/sandbox-runner ./cmd/server
