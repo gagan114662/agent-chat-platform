@@ -305,3 +305,22 @@ export const memoryEdges = pgTable("memory_edges", {
   relation: text("relation").notNull(),         // 'derived_from'|'relates_to'|'authored_by'|...
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ ux: uniqueIndex("memory_edges_ux").on(t.fromId, t.toId, t.relation) }));
+
+// #98 automations: user-defined automations. A `trigger` (jsonb) is either a
+// schedule (`{type:"schedule", everyMinutes}`) — fired from the #67 tick when
+// `lastFiredAt` is older than `everyMinutes` (or null) — or an event
+// (`{type:"event", event}` e.g. `outcome:checks_failed`) — fired from the fusion
+// sink. The `action` (jsonb) either posts a message (`{type:"message", threadId,
+// body}`) or starts an agent run (`{type:"run", threadId, agentId, intent}`).
+// Org-scoped; `enabled` gates firing; `lastFiredAt` records the last schedule fire.
+export const automations = pgTable("automations", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  name: text("name").notNull(),
+  trigger: jsonb("trigger").notNull().default({}),
+  action: jsonb("action").notNull().default({}),
+  enabled: boolean("enabled").notNull().default(true),
+  lastFiredAt: timestamp("last_fired_at", { withTimezone: true }),
+  createdById: text("created_by_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ orgIx: index("automations_org_ix").on(t.orgId) }));

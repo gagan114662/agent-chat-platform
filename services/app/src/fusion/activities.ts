@@ -5,6 +5,8 @@ import { OctokitGitHubService } from "@acp/orchestrator/github/octokit-github-se
 import type { Autonomy } from "@acp/orchestrator/policy/policy.js";
 import { makeDb } from "../db/client.js";
 import { makeFusionSink, type SinkCtx } from "./events.js";
+import { fireEventAutomations } from "../autonomy/automations.js";
+import { lazyTemporalClient } from "./bridge.js";
 import { buildMergeGate } from "./gate.js";
 import { reporterFromEnv } from "../billing/billing.js";
 import { reportRunUsage } from "../billing/report.js";
@@ -54,7 +56,15 @@ export async function runChatFusionActivity(input: RunFusionActivityInput): Prom
     const github = new OctokitGitHubService(token);
     const sandbox = new SandboxRunnerClient(input.sandboxUrl);
     const deps = { sandbox, github };
-    const sink = makeFusionSink(db, sql, input.sink);
+    // #98 best-effort event-automation hook: on an outcome the sink fires matching
+    // user event automations (message posts, or guarded run dispatches). A lazy
+    // temporal client backs run-actions; the hook is guarded inside the sink so a
+    // failure can't break message delivery / the run-state transition.
+    const sink = makeFusionSink(db, sql, input.sink, {
+      fireEvents: (event) => fireEventAutomations(db, {
+        db, sql, temporal: lazyTemporalClient(), sandboxUrl: input.sandboxUrl,
+      }, { orgId: input.sink.orgId, event }).then(() => undefined),
+    });
     const mergeGate = buildMergeGate(github, { owner: input.owner, repo: input.repo, autonomy: input.autonomy });
     // #26: feed recalled org memory into the intent the agent sees (first line
     // stays the original task → PR title stays clean). captureDecision below still
