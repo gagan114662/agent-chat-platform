@@ -183,6 +183,13 @@
       "when": 1781950000000,
       "tag": "0025_agent_avatar_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1782040000000,
+      "tag": "0026_automations",
+      "breakpoints": true
     }
   ]
 }
