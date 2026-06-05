@@ -237,6 +237,25 @@ export const apiKeys = pgTable("api_keys", {
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
 }, (t) => ({ keyHashIx: index("api_keys_key_hash_ix").on(t.keyHash) }));
 
+// #80 files: an org-scoped uploaded file / typed artifact. The bytes live in a
+// StorageBackend (local-disk now; S3/R2 later) under `storageKey`; the row is the
+// metadata. `artifactKind` is inferred from contentType/extension at create time
+// (code|document|markdown|image|other). `uploaded` flips true only after a valid
+// signed PUT stores the bytes. Access is org-scoped (a foreign file id → 404).
+export const files = pgTable("files", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  name: text("name").notNull(),
+  contentType: text("content_type").notNull().default("application/octet-stream"),
+  artifactKind: text("artifact_kind").notNull().default("other"), // code|document|markdown|image|other
+  size: integer("size").notNull().default(0),
+  storageKey: text("storage_key").notNull(),
+  uploaded: boolean("uploaded").notNull().default(false),
+  uploadedByKind: text("uploaded_by_kind").notNull(),
+  uploadedById: text("uploaded_by_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ orgIx: index("files_org_ix").on(t.orgId) }));
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull(),
