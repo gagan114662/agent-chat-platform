@@ -7,6 +7,7 @@ import { setAgentShared, setAgentProfile, setAgentConfig, isAgentVisibility, cre
 import { roleOf, can } from "../rbac/rbac.js";
 import { listReputations } from "../delegation/reputation-store.js";
 import { latestSkill, listSkillVersions, saveSkillVersion } from "../agents/skills.js";
+import { optimizeAgentSkill } from "../skillopt/runner.js";
 
 export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
   // #91: list the org's agents, exposing the profile fields (avatarUrl,
@@ -39,6 +40,21 @@ export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
     const { content } = (req.body ?? {}) as { content?: string };
     const row = await saveSkillVersion(d.db, orgId, agentId, content ?? "");
     return reply.code(201).send(row);
+  });
+
+  // #132: run one live SkillOpt step for this agent — gather the agent's recent
+  // runs as scored rollouts, propose a bounded edit, validate it on a held-out
+  // score, and (only if it strictly improves) save a NEW skill version. Admin-gated.
+  // The proposer/evaluator default to deterministic heuristics over real run data;
+  // an LLM proposer / held-out-replay evaluator can be injected in production.
+  app.post("/agents/:id/optimize-skill", async (req, reply) => {
+    const { id: agentId } = req.params as { id: string };
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "agent:share")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
+    const outcome = await optimizeAgentSkill(d.db, orgId, agentId);
+    return reply.code(200).send(outcome);
   });
 
   // #122: which agents are actively working right now — agents whose assigned

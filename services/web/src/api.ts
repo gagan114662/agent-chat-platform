@@ -324,6 +324,14 @@ export async function saveAgentSkill(agentId: string, content: string): Promise<
   if (!res.ok) throw new Error(`saveAgentSkill ${res.status}`);
   return res.json();
 }
+// #132: trigger one live SkillOpt step — the server learns from the agent's
+// recent runs and, only if it strictly improves, saves a new skill version.
+export interface OptimizeOutcome { accepted: boolean; version?: number; reason: string; beforeScore: number; afterScore?: number; }
+export async function optimizeAgentSkill(agentId: string): Promise<OptimizeOutcome> {
+  const res = await fetch(`/agents/${agentId}/optimize-skill`, { method: "POST", headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`optimizeAgentSkill ${res.status}`);
+  return res.json();
+}
 
 export async function setAgentProfile(agentId: string, patch: { avatarUrl?: string | null; visibility?: AgentVisibility }): Promise<Agent> {
   const res = await fetch(`/agents/${agentId}/profile`, {

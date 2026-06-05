@@ -10,12 +10,14 @@ export function AgentsPanel({
   createAgent,
   getAgentSkill,
   saveAgentSkill,
+  optimizeAgentSkill,
 }: {
   listAgents: () => Promise<Agent[]>;
   setAgentProfile: (agentId: string, patch: { avatarUrl?: string | null; visibility?: AgentVisibility }) => Promise<Agent>;
   createAgent?: (input: { handle: string; displayName: string; adapter?: string }) => Promise<Agent>;
   getAgentSkill?: (agentId: string) => Promise<{ latest: SkillDoc | null; versions: SkillDoc[] }>;
   saveAgentSkill?: (agentId: string, content: string) => Promise<SkillDoc>;
+  optimizeAgentSkill?: (agentId: string) => Promise<{ accepted: boolean; version?: number; reason: string; beforeScore: number; afterScore?: number }>;
 }) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [draft, setDraft] = useState<Record<string, { visibility: AgentVisibility; avatarUrl: string }>>({});
@@ -26,6 +28,23 @@ export function AgentsPanel({
   const [skillOpen, setSkillOpen] = useState<string | null>(null);
   const [skillText, setSkillText] = useState("");
   const [skillVer, setSkillVer] = useState(0);
+  const [optimizing, setOptimizing] = useState(false);
+  const [optMsg, setOptMsg] = useState<string | null>(null);
+
+  const optimizeSkill = async (agentId: string) => {
+    if (!optimizeAgentSkill || optimizing) return;
+    setOptimizing(true); setOptMsg(null);
+    try {
+      const r = await optimizeAgentSkill(agentId);
+      if (r.accepted) {
+        setOptMsg(`Learned a lesson → v${r.version} (score ${r.beforeScore.toFixed(2)} → ${r.afterScore?.toFixed(2)})`);
+        if (getAgentSkill) { const s = await getAgentSkill(agentId); setSkillText(s.latest?.content ?? ""); setSkillVer(s.latest?.version ?? 0); }
+      } else {
+        setOptMsg(`No improvement — kept v${skillVer} (${r.reason})`);
+      }
+    } catch (e) { setError((e as Error).message); }
+    finally { setOptimizing(false); }
+  };
 
   const openSkill = async (agentId: string) => {
     if (skillOpen === agentId) { setSkillOpen(null); return; }
@@ -150,8 +169,14 @@ export function AgentsPanel({
                 <div className="mt-2 rounded-lg border border-line bg-elevated p-2">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">Skill document {skillVer > 0 ? `· v${skillVer}` : "· new"}</span>
-                    <button onClick={() => saveSkill(a.id)} className="rounded bg-accent px-2 py-0.5 text-[11px] font-medium text-white hover:bg-accent-hover">Save new version</button>
+                    <div className="flex items-center gap-1">
+                      {optimizeAgentSkill && (
+                        <button onClick={() => optimizeSkill(a.id)} disabled={optimizing} title="Learn from this agent's recent runs and save an improved version if it strictly beats the current one" className="rounded border border-line px-2 py-0.5 text-[11px] font-medium text-ink-2 hover:bg-elevated-2 hover:text-ink disabled:opacity-50">{optimizing ? "Optimizing…" : "Optimize from runs"}</button>
+                      )}
+                      <button onClick={() => saveSkill(a.id)} className="rounded bg-accent px-2 py-0.5 text-[11px] font-medium text-white hover:bg-accent-hover">Save new version</button>
+                    </div>
                   </div>
+                  {optMsg && <div className="mb-1 text-[11px] text-ink-3">{optMsg}</div>}
                   <textarea
                     value={skillText}
                     onChange={(e) => setSkillText(e.target.value)}
