@@ -7,15 +7,47 @@ const fields = [
   { name: "website", label: "Website", type: "url", placeholder: "company.com" },
 ] as const;
 
-/** Contact section: TALK TO US heading + controlled form. Submit is a no-op. */
+/** Contact section: TALK TO US heading + controlled form. Submit posts the lead
+ * to the app's public POST /contact endpoint (#69); on success it shows a thanks
+ * state, and on failure (e.g. standalone dev with no backend) it falls back to a
+ * console.log so the form still "works" locally. */
 export function Contact() {
   const [form, setForm] = useState({ name: "", email: "", website: "", help: "" });
+  const [status, setStatus] = useState<"idle" | "sending" | "thanks" | "error">("idle");
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // No backend yet — log for now.
-    console.log("contact submit", form);
+    setStatus("sending");
+    try {
+      const res = await fetch("/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error(`contact failed: ${res.status}`);
+      setStatus("thanks");
+    } catch (err) {
+      // Fallback so standalone dev (no backend) still captures the submission.
+      console.log("contact submit", form, err);
+      setStatus("error");
+    }
   };
+
+  if (status === "thanks") {
+    return (
+      <section id="contact" className="mx-auto max-w-2xl px-6 pb-28 pt-12">
+        <div className="mb-2 text-sm font-semibold uppercase tracking-widest text-[#2563eb]">
+          Talk to us
+        </div>
+        <h2 className="mb-4 text-3xl font-black tracking-tight text-[#15151f] sm:text-4xl">
+          Thanks — we'll be in touch.
+        </h2>
+        <p className="text-[#15151f]/70">
+          Your message is on its way to the team.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section id="contact" className="mx-auto max-w-2xl px-6 pb-28 pt-12">
@@ -52,11 +84,17 @@ export function Contact() {
         </label>
         <button
           type="submit"
-          className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+          disabled={status === "sending"}
+          className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
           style={{ background: theme.colors.accent }}
         >
-          Send message <span aria-hidden>→</span>
+          {status === "sending" ? "Sending…" : "Send message"} <span aria-hidden>→</span>
         </button>
+        {status === "error" && (
+          <p className="text-sm text-[#b91c1c]">
+            Couldn't send right now — please try again or email us directly.
+          </p>
+        )}
       </form>
     </section>
   );

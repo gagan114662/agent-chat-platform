@@ -37,6 +37,7 @@ import { registerInviteRoutes } from "./http/invite-routes.js";
 import { registerAutomationRoutes } from "./http/automation-routes.js";
 import { registerBillingRoutes } from "./http/billing-routes.js";
 import { registerOpenApiRoutes } from "./http/openapi-routes.js";
+import { registerContactRoutes } from "./http/contact-routes.js";
 import { resolveSession } from "./auth/auth.js";
 import { eq } from "drizzle-orm";
 import { threads } from "./db/schema.js";
@@ -111,6 +112,7 @@ export async function buildServer() {
   registerAutomationRoutes(app, { db, sql, temporal, sandboxUrl });
   registerBillingRoutes(app, { db });
   registerOpenApiRoutes(app); // #86: GET /openapi.json + /docs (public)
+  registerContactRoutes(app, { db }); // #69: POST /contact (public marketing lead capture)
 
   // Public liveness/health probe (in PUBLIC_PATHS so the auth preHandler won't 401 it).
   app.get("/healthz", async () => ({ ok: true }));

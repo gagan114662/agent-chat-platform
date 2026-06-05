@@ -39,6 +39,47 @@ func TestMcpAuthorized(t *testing.T) {
 	}
 }
 
+// TestMcpCatalogTiers verifies the curated catalog (#97) is large and correctly
+// tiered: it has ≥25 entries, stripe is a `money`-tier entry, no `money`-tier
+// entry is default-allowed (default-deny applies to funds-moving servers), and
+// at least one `safe`-tier entry is default-allowed.
+func TestMcpCatalogTiers(t *testing.T) {
+	if len(mcpCatalog) < 25 {
+		t.Fatalf("curated MCP catalog must have >=25 entries, got %d", len(mcpCatalog))
+	}
+	// stripe must be money tier.
+	if got := mcpCatalog["stripe"].tier; got != "money" {
+		t.Fatalf("stripe must be tier=money, got %q", got)
+	}
+	// every tier must be one of the three known values.
+	validTier := map[string]bool{"safe": true, "sensitive": true, "money": true}
+	sawMoney, sawSafeAllowed := false, false
+	for name, entry := range mcpCatalog {
+		if !validTier[entry.tier] {
+			t.Fatalf("server %q has invalid tier %q", name, entry.tier)
+		}
+		if entry.command == "" {
+			t.Fatalf("server %q must carry a launch command", name)
+		}
+		if entry.tier == "money" {
+			sawMoney = true
+			// money-tier servers must NEVER be default-allowed.
+			if mcpAuthorized(name) {
+				t.Fatalf("money-tier server %q must NOT be default-allowed", name)
+			}
+		}
+		if entry.tier == "safe" && mcpAuthorized(name) {
+			sawSafeAllowed = true
+		}
+	}
+	if !sawMoney {
+		t.Fatal("catalog must contain at least one money-tier server")
+	}
+	if !sawSafeAllowed {
+		t.Fatal("catalog must contain at least one default-allowed safe-tier server")
+	}
+}
+
 // TestProvisionMcpConfig verifies .mcp.json is written with ONLY authorized
 // servers (filesystem in, unauthorized github out) and that cleanup removes it.
 func TestProvisionMcpConfig(t *testing.T) {
