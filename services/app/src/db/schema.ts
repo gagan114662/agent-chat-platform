@@ -509,3 +509,16 @@ export const agentReputation = pgTable("agent_reputation", {
   success: integer("success").notNull().default(0),
   fail: integer("fail").notNull().default(0),
 }, (t) => ({ pk: primaryKey({ columns: [t.orgId, t.agentId] }) }));
+
+// #130 auditable delegation chain: one row per hand-off (who delegated which task
+// to whom). Lets any action be traced back to the accountable human (chain.ts).
+export const delegationLinks = pgTable("delegation_links", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  taskId: text("task_id").notNull(),
+  byKind: text("by_kind").notNull(),
+  byId: text("by_id").notNull(),
+  toKind: text("to_kind").notNull(),
+  toId: text("to_id").notNull(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ taskIx: index("delegation_links_task_ix").on(t.orgId, t.taskId, t.at) }));

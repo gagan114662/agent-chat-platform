@@ -1,7 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
-import { goals, tasks } from "../db/schema.js";
+import { goals, tasks, agents } from "../db/schema.js";
+import { listReputations } from "../delegation/reputation-store.js";
+import { recordLink } from "../delegation/chain-store.js";
+
+// #127 capability/reputation auto-assignment: with no explicit assignee, route the
+// goal's tasks to the most-trusted eligible agent (highest live reputation; new
+// agents sit at the 50% prior). Returns undefined when the org has no agents.
+async function bestAgentId(db: DB, orgId: string): Promise<string | undefined> {
+  const orgAgents = await db.select({ id: agents.id }).from(agents).where(eq(agents.orgId, orgId));
+  if (orgAgents.length === 0) return undefined;
+  const reps = await listReputations(db, orgId);
+  return orgAgents
+    .map((a) => ({ id: a.id, score: reps[a.id]?.scorePct ?? 50 }))
+    .sort((x, y) => y.score - x.score)[0].id;
+}
 
 export interface NewGoal { orgId: string; title: string; criteria?: string; byKind: string; byId: string; }
 export async function createGoal(db: DB, g: NewGoal) {
@@ -30,15 +44,26 @@ export async function decomposeGoal(
   const [g] = await db.select().from(goals).where(and(eq(goals.id, args.goalId), eq(goals.orgId, args.orgId)));
   if (!g || g.state !== "open") return [];
   const subs = (args.planner ?? defaultGoalPlanner)({ title: g.title, criteria: g.criteria });
+  // #127: explicit assignee wins; otherwise auto-route to the best agent by reputation.
+  const assigneeId = args.assigneeId ?? (await bestAgentId(db, args.orgId));
   const ids: string[] = [];
   for (const s of subs) {
     // reuse the task creator (a task needs a thread; the goal carries one)
     const [t] = await db.insert(tasks).values({
       id: randomUUID(), orgId: args.orgId, threadId: args.threadId, title: s.title,
       state: "open", createdByKind: "agent", createdById: "planner",
-      ...(args.assigneeId ? { assigneeKind: "agent", assigneeId: args.assigneeId } : {}),
+      ...(assigneeId ? { assigneeKind: "agent", assigneeId } : {}),
     }).returning({ id: tasks.id });
     ids.push(t.id);
+    // #130: record the hand-off (goal's human creator → the assignee agent) so the
+    // task's delegation chain traces back to the accountable human.
+    if (assigneeId) {
+      await recordLink(db, {
+        orgId: args.orgId, taskId: t.id,
+        byKind: g.createdByKind === "human" ? "human" : "agent", byId: g.createdById,
+        toKind: "agent", toId: assigneeId,
+      });
+    }
   }
   await db.update(goals).set({ state: "active" }).where(and(eq(goals.id, g.id), eq(goals.orgId, args.orgId)));
   return ids;

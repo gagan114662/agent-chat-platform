@@ -8,6 +8,7 @@ import {
 } from "../tasks/tasks.js";
 import { tasks } from "../db/schema.js";
 import { actor } from "./actor.js";
+import { chainForTask } from "../delegation/chain-store.js";
 
 export interface TaskDetailDeps { db: DB; }
 
@@ -21,6 +22,13 @@ function statusFor(err: Error): number {
 }
 
 export function registerTaskDetailRoutes(app: FastifyInstance, d: TaskDetailDeps) {
+  // #130: a task's auditable delegation chain + the accountable human. Org-scoped.
+  app.get("/tasks/:id/delegation", async (req, reply) => {
+    const { id: taskId } = req.params as { id: string };
+    const { orgId } = actor(req);
+    return reply.code(200).send(await chainForTask(d.db, orgId, taskId));
+  });
+
   // List all tasks for the actor's org (newest first) — powers the Tasks board
   // (#106). Org-scoped: only the caller's org's tasks are returned.
   app.get("/tasks", async (req, reply) => {
