@@ -13,7 +13,7 @@ const SLASH_TO_ID: Record<string, string> = {
 export interface Mentionable { kind: "human" | "agent"; name: string; }
 
 export function Composer({ onSend, commands = [], onSlashSearch, mentionables = [] }: {
-  onSend: (body: string) => void;
+  onSend: (body: string) => void | Promise<unknown>;
   // Shared command registry (#60) — drives the inline slash-command hint.
   commands?: Command[];
   // `/search <q>` passes its argument here (the registry's focusSearch ignores args).
@@ -23,6 +23,8 @@ export function Composer({ onSend, commands = [], onSlashSearch, mentionables = 
 }) {
   const [text, setText] = useState("");
   const [mention, setMention] = useState<{ q: string; at: number } | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   // Candidates for the @mention popup: prefix-match on the partial handle, agents first.
@@ -101,7 +103,7 @@ export function Composer({ onSend, commands = [], onSlashSearch, mentionables = 
     return cmd ? { cmd, arg } : null;
   };
 
-  const submit = () => {
+  const submit = async () => {
     // Slash command: run it instead of posting a message.
     const slash = resolveSlash();
     if (slash) {
@@ -111,9 +113,18 @@ export function Composer({ onSend, commands = [], onSlashSearch, mentionables = 
       return;
     }
     const body = text.trim();
-    if (!body) return;
-    onSend(body);
-    setText("");
+    if (!body || sending) return;
+    // #123: await the send. Only clear on success; on failure KEEP the text and
+    // surface the error instead of silently dropping the message.
+    setSending(true); setSendError(null);
+    try {
+      await onSend(body);
+      setText("");
+    } catch (e) {
+      setSendError((e as Error)?.message || "Couldn't send — check your connection or sign-in, then retry.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const empty = text.trim().length === 0;
@@ -146,6 +157,12 @@ export function Composer({ onSend, commands = [], onSlashSearch, mentionables = 
             </li>
           ))}
         </ul>
+      )}
+      {sendError && (
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger" role="alert">
+          <span>{sendError}</span>
+          <button type="button" onClick={submit} className="shrink-0 rounded border border-danger/40 px-2 py-0.5 font-medium hover:bg-danger/20">Retry</button>
+        </div>
       )}
       <div className="flex flex-col gap-2 rounded-2xl border border-line bg-elevated px-3 py-2 transition-colors focus-within:border-accent/70">
         <div className="flex items-center gap-0.5 border-b border-line-soft pb-1.5">
@@ -187,11 +204,11 @@ export function Composer({ onSend, commands = [], onSlashSearch, mentionables = 
           </span>
           <button
             onClick={submit}
-            disabled={empty}
+            disabled={empty || sending}
             aria-label="Send"
             className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-elevated-2 disabled:text-ink-3"
           >
-            <Icon name="send" size={14} /> Send
+            <Icon name="send" size={14} /> {sending ? "Sending…" : "Send"}
           </button>
         </div>
       </div>

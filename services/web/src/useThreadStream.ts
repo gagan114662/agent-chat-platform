@@ -41,9 +41,16 @@ export function useThreadStream(threadId: string, onLiveMessage?: () => void) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
 
-  const send = (body: string) => postMessage(threadId, body);
+  // Post then refetch so the message (and any system/pr_card it spawned) shows up
+  // even if the WS push is missed (#123). Rejects on a non-2xx so the composer can
+  // surface the error instead of silently clearing.
   // Re-pull history (e.g. after an approve/decline action) so any message the action
   // posted shows up even if the WS push was missed. append() dedupes by id.
   const refetch = () => listMessages(threadId).then((hist) => { for (const m of hist) append(m); }).catch(() => {});
+  const send = async (body: string) => {
+    const r = await postMessage(threadId, body);
+    refetch();
+    return r;
+  };
   return { messages, send, refetch };
 }

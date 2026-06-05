@@ -1,17 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { Composer } from "./Composer.js";
 import type { Command } from "../lib/commands.js";
 
 describe("Composer", () => {
-  it("calls onSend with the typed text and clears the field", () => {
-    const onSend = vi.fn();
+  it("calls onSend with the typed text and clears the field (on success)", async () => {
+    const onSend = vi.fn(async () => {});
     render(<Composer onSend={onSend} />);
     const input = screen.getByPlaceholderText(/message/i) as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: "@coder fix it" } });
     fireEvent.click(screen.getByRole("button", { name: /send/i }));
     expect(onSend).toHaveBeenCalledWith("@coder fix it");
-    expect(input.value).toBe("");
+    // Clears only after the send resolves (#123 — async, no longer synchronous).
+    await waitFor(() => expect(input.value).toBe(""));
   });
 
   it("does not send empty/whitespace messages", () => {
@@ -69,15 +70,15 @@ describe("Composer", () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it("still sends a normal message with an @mention", () => {
-    const onSend = vi.fn();
+  it("still sends a normal message with an @mention", async () => {
+    const onSend = vi.fn(async () => {});
     const { commands } = slashCommands();
     render(<Composer onSend={onSend} commands={commands} />);
     const input = screen.getByPlaceholderText(/message/i) as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: "hello @coder" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onSend).toHaveBeenCalledWith("hello @coder");
-    expect(input.value).toBe("");
+    await waitFor(() => expect(input.value).toBe(""));
   });
 
   it("offers @mention autocomplete and inserts the picked handle (#108)", () => {
@@ -89,6 +90,26 @@ describe("Composer", () => {
     expect(opt).toBeInTheDocument();
     fireEvent.click(opt);
     expect(input.value).toBe("@coder ");
+  });
+
+
+  it("keeps the text and surfaces an error when send fails, clears on success (#123)", async () => {
+    const fail = vi.fn(async () => { throw new Error("network down"); });
+    render(<Composer onSend={fail} />);
+    const input = screen.getByPlaceholderText(/message/i) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "hello world" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/network down/i);
+    expect(input.value).toBe("hello world"); // NOT cleared on failure
+
+    const ok = vi.fn(async () => {});
+    cleanup();
+    render(<Composer onSend={ok} />);
+    const input2 = screen.getByPlaceholderText(/message/i) as HTMLTextAreaElement;
+    fireEvent.change(input2, { target: { value: "second" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await waitFor(() => expect(ok).toHaveBeenCalledWith("second"));
+    await waitFor(() => expect(input2.value).toBe("")); // cleared on success
   });
 
 });
