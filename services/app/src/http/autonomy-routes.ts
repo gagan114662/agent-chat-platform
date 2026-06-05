@@ -10,7 +10,8 @@ import { runBusinessGoal } from "../business/actions.js";
 import { progressGoal } from "../autonomy/progress.js";
 import { orgSpendCents, budgetTier } from "../autonomy/budget.js";
 import { detectAlerts, recordAlerts } from "../autonomy/alerts.js";
-import { incidents } from "../db/schema.js";
+import { incidents, goals } from "../db/schema.js";
+import { defaultRoleGraph, makeFusionExec, runRoleGraph } from "../orchestration/role-graph.js";
 import { actor } from "./actor.js";
 
 // `start` is the injectable fusion starter (see tick.ts) — routes pass it through so the
@@ -39,6 +40,24 @@ export function registerAutonomyRoutes(app: FastifyInstance, d: AutonomyDeps) {
     if (!title) return reply.code(400).send({ error: "title required" });
     const goal = await createGoal(d.db, { orgId, title, criteria, byKind: "human", byId: userId, businessId });
     return reply.code(201).send(goal);
+  });
+
+  // #150.2 runtime: run a goal as a coordinated ROLE TEAM — Planner → Coder →
+  // Reviewer, each a real agent run, executed in order with prior outputs as
+  // context. Fired in the background; the runs stream into the thread live. Needs a
+  // repo-bound threadId.
+  app.post("/goals/:id/run-team", async (req, reply) => {
+    const { id: goalId } = req.params as { id: string };
+    const { threadId } = (req.body ?? {}) as { threadId?: string };
+    const { orgId } = actor(req);
+    if (!threadId) return reply.code(400).send({ error: "threadId (repo-bound) required" });
+    const [g] = await d.db.select().from(goals).where(and(eq(goals.id, goalId), eq(goals.orgId, orgId)));
+    if (!g) return reply.code(404).send({ error: "goal not found" });
+    const graph = defaultRoleGraph(g.title);
+    const exec = makeFusionExec({ db: d.db, sql: d.sql, temporal: d.temporal, sandboxUrl: d.sandboxUrl }, { orgId, threadId });
+    // fire-and-forget: the team runs in dependency order; watch the thread.
+    runRoleGraph(graph, exec).catch((e) => console.warn("[acp] role-graph run failed:", String(e)));
+    return reply.code(202).send({ dispatched: true, graph: graph.map((n) => ({ id: n.id, role: n.role, agent: n.agentHandle, deps: n.deps ?? [] })) });
   });
 
   // #146: advance a business goal now (manual trigger, like "Run now" for code
