@@ -148,7 +148,16 @@ export async function buildServer() {
     const { existsSync } = await import("node:fs");
     if (existsSync(webDist)) {
       const fastifyStatic = (await import("@fastify/static")).default;
-      await app.register(fastifyStatic, { root: webDist, wildcard: false });
+      // Hashed assets (index-<hash>.js/css) are immutable → cache hard. index.html
+      // must NOT be cached, or a browser keeps loading an old bundle that points at
+      // assets the server no longer has → stale/flaky UI after a deploy (#143).
+      await app.register(fastifyStatic, {
+        root: webDist, wildcard: false,
+        setHeaders: (res, path) => {
+          if (path.endsWith(".html")) res.setHeader("cache-control", "no-cache, must-revalidate");
+          else if (/\/assets\//.test(path)) res.setHeader("cache-control", "public, max-age=31536000, immutable");
+        },
+      });
       app.setNotFoundHandler((req, reply) => {
         // SPA fallback for non-API GETs; API 404s still return JSON.
         if (
@@ -178,6 +187,7 @@ export async function buildServer() {
           !req.url.startsWith("/ws-ticket") &&
           !req.url.startsWith("/healthz")
         ) {
+          reply.header("cache-control", "no-cache, must-revalidate");
           return reply.sendFile("index.html");
         }
         return reply.code(404).send({ error: "not found" });
