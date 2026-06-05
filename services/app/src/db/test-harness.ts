@@ -2,7 +2,7 @@ import postgres from "postgres";
 import { makeDb } from "./client.js";
 
 const TABLES = [
-  "agent_reputation", "delegation_links",
+  "agent_reputation", "delegation_links", "skill_documents",
   "payment_decisions",
   "treasury_ledger", "invoices",
   "tools",

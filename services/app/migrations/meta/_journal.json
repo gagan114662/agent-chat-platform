@@ -288,6 +288,13 @@
       "when": 1783264000000,
       "tag": "0040_delegation_links",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1783350400000,
+      "tag": "0041_skill_documents",
+      "breakpoints": true
     }
   ]
 }

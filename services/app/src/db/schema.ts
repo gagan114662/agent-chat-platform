@@ -522,3 +522,14 @@ export const delegationLinks = pgTable("delegation_links", {
   toId: text("to_id").notNull(),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ taskIx: index("delegation_links_task_ix").on(t.orgId, t.taskId, t.at) }));
+
+// #131 versioned, optimizable agent skill documents (external trainable state).
+// Each save is a new version; the run injects the latest into the agent's intent.
+export const skillDocuments = pgTable("skill_documents", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  agentId: text("agent_id").notNull(),
+  version: integer("version").notNull(),
+  content: text("content").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ ix: index("skill_documents_agent_ix").on(t.orgId, t.agentId, t.version) }));

@@ -8,7 +8,7 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, listAgents, listActiveAgents, setAgentProfile, createAgent, listTasks, getTask, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, listTasks, getTask, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes } from "./api.js";
 import { GoalsPanel } from "./components/GoalsPanel.js";
 import { AgentsPanel } from "./components/AgentsPanel.js";
 import { TasksPanel } from "./components/TasksPanel.js";
@@ -249,11 +249,11 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
             : view === "goals"
               ? <GoalsPanel orgId={orgId} createGoal={createGoal} decomposeGoal={decomposeGoal} runTick={runTick} listGoals={listGoals} threads={threads.filter((t) => t.repoId).map((t) => ({ id: t.id, title: t.title }))} agents={principals.filter((p) => p.kind === "agent").map((p) => ({ id: p.id, handle: p.name }))} />
               : view === "agents"
-                ? <AgentsPanel listAgents={listAgents} setAgentProfile={setAgentProfile} createAgent={createAgent} />
+                ? <AgentsPanel listAgents={listAgents} setAgentProfile={setAgentProfile} createAgent={createAgent} getAgentSkill={getAgentSkill} saveAgentSkill={saveAgentSkill} />
                 : view === "tasks"
                   ? <TasksPanel listTasks={listTasks} getTask={getTask} updateTask={updateTask} addTaskComment={addTaskComment} />
                   : view === "billing"
-                    ? <BillingPanel getBilling={getBilling} listPlans={listPlans} billingCheckout={billingCheckout} />
+                    ? <BillingPanel getBilling={getBilling} listPlans={listPlans} billingCheckout={billingCheckout} getTreasury={getTreasury} />
                     : view === "automations"
                       ? <AutomationsPanel listAutomations={listAutomations} createAutomation={createAutomation} setAutomationEnabled={setAutomationEnabled} deleteAutomation={deleteAutomation} threads={[...threads, ...dms].map((t) => ({ id: t.id, title: t.title }))} agents={principals.filter((p) => p.kind === "agent").map((p) => ({ id: p.id, handle: p.name }))} />
                       : view === "memory"

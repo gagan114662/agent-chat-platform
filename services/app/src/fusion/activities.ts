@@ -13,6 +13,7 @@ import { reportRunUsage } from "../billing/report.js";
 import { captureDecision } from "../memory/capture.js";
 import { recallForIntent, formatRecall } from "../memory/memory.js";
 import { agentPrefs } from "../agents/agents.js";
+import { latestSkill } from "../agents/skills.js";
 import { agents, runs, tasks } from "../db/schema.js";
 import { recordOutcome } from "../delegation/reputation-store.js";
 import { and, eq } from "drizzle-orm";
@@ -29,15 +30,19 @@ import type { DB } from "../db/client.js";
 // prefs nor matching memory. Org-scoped; agentId optional (omit = no prefs).
 export async function buildAgentIntent(db: DB, orgId: string, intent: string, agentId?: string): Promise<string> {
   let prefs: ReturnType<typeof agentPrefs> = {};
+  let skill: string | null = null;
   if (agentId) {
     const [agent] = await db.select().from(agents).where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
     prefs = agentPrefs(agent);
+    // #131: inject the agent's latest skill document (external trainable state).
+    skill = (await latestSkill(db, orgId, agentId))?.content ?? null;
   }
   const recalled = await recallForIntent(db, orgId, intent);
   const preamble = formatRecall(recalled);
 
   const parts: string[] = [];
   if (prefs.systemPrompt) parts.push(`## Instructions\n${prefs.systemPrompt}`);
+  if (skill && skill.trim()) parts.push(`## Skill\n${skill}`);
   parts.push(intent);
   if (prefs.contextDirs && prefs.contextDirs.length > 0) {
     parts.push(`## Focus directories: ${prefs.contextDirs.join(", ")}`);

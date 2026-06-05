@@ -309,6 +309,22 @@ export async function listAgents(): Promise<Agent[]> {
   return res.json();
 }
 
+export interface SkillDoc { id: string; agentId: string; version: number; content: string; createdAt: string; }
+export async function getAgentSkill(agentId: string): Promise<{ latest: SkillDoc | null; versions: SkillDoc[] }> {
+  const res = await fetch(`/agents/${agentId}/skill`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getAgentSkill ${res.status}`);
+  return res.json();
+}
+export async function saveAgentSkill(agentId: string, content: string): Promise<SkillDoc> {
+  const res = await fetch(`/agents/${agentId}/skill`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(`saveAgentSkill ${res.status}`);
+  return res.json();
+}
+
 export async function setAgentProfile(agentId: string, patch: { avatarUrl?: string | null; visibility?: AgentVisibility }): Promise<Agent> {
   const res = await fetch(`/agents/${agentId}/profile`, {
     method: "PATCH",
@@ -447,6 +463,20 @@ export interface Billing { plan: Plan; usage: Usage; quotas: Record<QuotaKind, Q
 export async function getBilling(): Promise<Billing> {
   const res = await fetch(`/billing`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`getBilling ${res.status}`);
+  return res.json();
+}
+
+// #118/#119/#114 treasury + P&L + recent gated-payment decisions.
+export interface Treasury {
+  balanceCents: number;
+  pnl: { revenueCents: number; costCents: number; profitCents: number; marginPct: number; revenueBySource: Record<string, number>; costBySource: Record<string, number>; };
+  profitGoal: string;
+  invoices: { id: string; customer: string; amountCents: number; status: string }[];
+  decisions: { id: string; tool: string; amountCents: number; recipient: string | null; decision: string; reason: string; createdAt: string }[];
+}
+export async function getTreasury(): Promise<Treasury> {
+  const res = await fetch(`/treasury`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getTreasury ${res.status}`);
   return res.json();
 }
 

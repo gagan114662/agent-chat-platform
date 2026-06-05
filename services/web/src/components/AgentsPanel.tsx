@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Agent, AgentVisibility } from "../api.js";
+import type { Agent, AgentVisibility, SkillDoc } from "../api.js";
 
 // #58/#91 agents panel: list the org's agents and edit each one's profile
 // (visibility public|private + optional avatar URL) via PATCH /agents/:id/profile.
@@ -8,16 +8,38 @@ export function AgentsPanel({
   listAgents,
   setAgentProfile,
   createAgent,
+  getAgentSkill,
+  saveAgentSkill,
 }: {
   listAgents: () => Promise<Agent[]>;
   setAgentProfile: (agentId: string, patch: { avatarUrl?: string | null; visibility?: AgentVisibility }) => Promise<Agent>;
   createAgent?: (input: { handle: string; displayName: string; adapter?: string }) => Promise<Agent>;
+  getAgentSkill?: (agentId: string) => Promise<{ latest: SkillDoc | null; versions: SkillDoc[] }>;
+  saveAgentSkill?: (agentId: string, content: string) => Promise<SkillDoc>;
 }) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [draft, setDraft] = useState<Record<string, { visibility: AgentVisibility; avatarUrl: string }>>({});
   const [error, setError] = useState<string | null>(null);
   const [nh, setNh] = useState(""); const [nn, setNn] = useState(""); const [na, setNa] = useState("claude-code");
   const [adding, setAdding] = useState(false);
+  // #131 per-agent skill editor (open agent id → its draft content + version).
+  const [skillOpen, setSkillOpen] = useState<string | null>(null);
+  const [skillText, setSkillText] = useState("");
+  const [skillVer, setSkillVer] = useState(0);
+
+  const openSkill = async (agentId: string) => {
+    if (skillOpen === agentId) { setSkillOpen(null); return; }
+    setSkillOpen(agentId); setSkillText(""); setSkillVer(0);
+    if (getAgentSkill) {
+      try { const s = await getAgentSkill(agentId); setSkillText(s.latest?.content ?? ""); setSkillVer(s.latest?.version ?? 0); }
+      catch (e) { setError((e as Error).message); }
+    }
+  };
+  const saveSkill = async (agentId: string) => {
+    if (!saveAgentSkill) return;
+    try { const v = await saveAgentSkill(agentId, skillText); setSkillVer(v.version); }
+    catch (e) { setError((e as Error).message); }
+  };
 
   const addAgent = async () => {
     if (!createAgent || !nh.trim() || !nn.trim() || adding) return;
@@ -105,6 +127,9 @@ export function AgentsPanel({
                     <option value="public">public</option>
                     <option value="private">private</option>
                   </select>
+                  {getAgentSkill && (
+                    <button onClick={() => openSkill(a.id)} aria-label={`skill for ${a.handle}`} className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 hover:bg-elevated-2 hover:text-ink">Skill</button>
+                  )}
                   <button
                     onClick={() => save(a)}
                     aria-label={`save ${a.handle}`}
@@ -121,6 +146,22 @@ export function AgentsPanel({
                 aria-label={`avatar url for ${a.handle}`}
                 className="mt-2 w-full rounded-lg border border-line px-2 py-1 text-xs focus:border-accent focus:outline-none"
               />
+              {skillOpen === a.id && (
+                <div className="mt-2 rounded-lg border border-line bg-elevated p-2">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">Skill document {skillVer > 0 ? `· v${skillVer}` : "· new"}</span>
+                    <button onClick={() => saveSkill(a.id)} className="rounded bg-accent px-2 py-0.5 text-[11px] font-medium text-white hover:bg-accent-hover">Save new version</button>
+                  </div>
+                  <textarea
+                    value={skillText}
+                    onChange={(e) => setSkillText(e.target.value)}
+                    placeholder="The agent's skill / playbook — injected into every run. Each save is a new version."
+                    aria-label={`skill document for ${a.handle}`}
+                    rows={4}
+                    className="w-full rounded border border-line bg-surface px-2 py-1 text-xs text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none"
+                  />
+                </div>
+              )}
             </li>
           );
         })}

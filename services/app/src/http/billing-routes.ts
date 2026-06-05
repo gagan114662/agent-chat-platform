@@ -6,6 +6,9 @@ import { roleOf, can } from "../rbac/rbac.js";
 import { currentPlan, usage, checkQuota, listPlans, type QuotaKind } from "../billing/plans.js";
 import { defaultStripe, type MakeStripe } from "../billing/billing.js";
 import { plans, subscriptions } from "../db/schema.js";
+import { treasuryBalanceCents, listInvoices } from "../payments/treasury.js";
+import { profitAndLoss, suggestProfitGoal } from "../payments/pnl.js";
+import { listDecisions } from "../payments/decisions.js";
 
 const QUOTA_KINDS: QuotaKind[] = ["seats", "agents", "messages", "tasks"];
 
@@ -30,6 +33,20 @@ export function registerBillingRoutes(app: FastifyInstance, d: { db: DB; makeStr
   // The available pricing tiers (reference data).
   app.get("/billing/plans", async () => {
     return listPlans(d.db);
+  });
+
+  // #118/#119/#114 treasury + P&L + recent payment decisions for the org — the
+  // money surface behind the gate. Read-only; live numbers fill as revenue/costs
+  // are recorded (invoices paid, agent payouts) and decisions are logged.
+  app.get("/treasury", async (req) => {
+    const { orgId } = actor(req);
+    const [balanceCents, pnl, invoices, decisions] = await Promise.all([
+      treasuryBalanceCents(d.db, orgId),
+      profitAndLoss(d.db, orgId),
+      listInvoices(d.db, orgId),
+      listDecisions(d.db, orgId, 20),
+    ]);
+    return { balanceCents, pnl, profitGoal: suggestProfitGoal(pnl), invoices, decisions };
   });
 
   // Build a Stripe Checkout Session for the chosen plan's stripePriceId (admin).

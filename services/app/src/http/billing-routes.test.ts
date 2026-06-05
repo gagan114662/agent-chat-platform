@@ -50,7 +50,7 @@ describe("billing routes (#85)", () => {
     expect(body.usage.seats).toBe(2);
     expect(body.usage.agents).toBe(1);
     // quotas: each resource has {used, limit, ok}
-    expect(body.quotas.agents).toEqual({ used: 1, limit: 1, ok: false });
+    expect(body.quotas.agents).toEqual({ used: 1, limit: 3, ok: true }); // Starter = 3 agents (#107.5, migration 0036)
     expect(body.quotas.seats.used).toBe(2);
     expect(body.quotas).toHaveProperty("messages");
     expect(body.quotas).toHaveProperty("tasks");

@@ -6,6 +6,7 @@ import { actor } from "./actor.js";
 import { setAgentShared, setAgentProfile, setAgentConfig, isAgentVisibility, createAgent, QuotaError } from "../agents/agents.js";
 import { roleOf, can } from "../rbac/rbac.js";
 import { listReputations } from "../delegation/reputation-store.js";
+import { latestSkill, listSkillVersions, saveSkillVersion } from "../agents/skills.js";
 
 export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
   // #91: list the org's agents, exposing the profile fields (avatarUrl,
@@ -15,6 +16,29 @@ export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
     const rows = await d.db.select().from(agents).where(eq(agents.orgId, orgId));
     const reps = await listReputations(d.db, orgId); // #128: live track record
     return reply.code(200).send(rows.map((a) => ({ ...a, reputation: reps[a.id] ?? { scorePct: 50, runs: 0, success: 0, fail: 0 } })));
+  });
+
+  // #131: read an agent's latest skill document + version history (org-scoped).
+  app.get("/agents/:id/skill", async (req, reply) => {
+    const { id: agentId } = req.params as { id: string };
+    const { orgId } = actor(req);
+    const [latest, versions] = await Promise.all([
+      latestSkill(d.db, orgId, agentId),
+      listSkillVersions(d.db, orgId, agentId),
+    ]);
+    return reply.code(200).send({ latest, versions });
+  });
+
+  // #131: save a new skill-document version (admin-gated, like other agent edits).
+  app.put("/agents/:id/skill", async (req, reply) => {
+    const { id: agentId } = req.params as { id: string };
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "agent:share")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
+    const { content } = (req.body ?? {}) as { content?: string };
+    const row = await saveSkillVersion(d.db, orgId, agentId, content ?? "");
+    return reply.code(201).send(row);
   });
 
   // #122: which agents are actively working right now — agents whose assigned
