@@ -457,3 +457,21 @@ export const tools = pgTable("tools", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ wsIx: index("tools_org_ws_ix").on(t.orgId, t.workspaceId) }));
+
+// #114 RLHF capture: every human decision on a gated payment (approve/decline/
+// modify) is high-value labeled data — used to tune auto-approve thresholds and,
+// later, fine-tune on the org's real risk tolerance. Append-only audit log (#115).
+export const paymentDecisions = pgTable("payment_decisions", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  agentId: text("agent_id"),
+  tool: text("tool").notNull(),
+  amountCents: integer("amount_cents").notNull().default(0),
+  recipient: text("recipient"),
+  justification: text("justification").notNull().default(""),
+  // 'approve' | 'decline' | 'modify'
+  decision: text("decision").notNull(),
+  modifiedAmountCents: integer("modified_amount_cents"),
+  reason: text("reason").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ orgIx: index("payment_decisions_org_ix").on(t.orgId, t.createdAt) }));
