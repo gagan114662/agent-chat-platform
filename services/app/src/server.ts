@@ -34,6 +34,7 @@ import { registerAuth } from "./http/auth-routes.js";
 import { registerApiKeyRoutes } from "./http/apikey-routes.js";
 import { registerInviteRoutes } from "./http/invite-routes.js";
 import { registerAutomationRoutes } from "./http/automation-routes.js";
+import { registerBillingRoutes } from "./http/billing-routes.js";
 import { resolveSession } from "./auth/auth.js";
 import { eq } from "drizzle-orm";
 import { threads } from "./db/schema.js";
@@ -105,6 +106,7 @@ export async function buildServer() {
   registerApiKeyRoutes(app, { db });
   registerInviteRoutes(app, { db });
   registerAutomationRoutes(app, { db, sql, temporal, sandboxUrl });
+  registerBillingRoutes(app, { db });
 
   // Public liveness/health probe (in PUBLIC_PATHS so the auth preHandler won't 401 it).
   app.get("/healthz", async () => ({ ok: true }));
@@ -131,6 +133,7 @@ export async function buildServer() {
           !req.url.startsWith("/goals") &&
           !req.url.startsWith("/orgs") &&
           !req.url.startsWith("/agents") &&
+          !req.url.startsWith("/billing") &&
           !req.url.startsWith("/memory") &&
           !req.url.startsWith("/dms") &&
           !req.url.startsWith("/repos") &&

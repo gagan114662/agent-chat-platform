@@ -313,6 +313,34 @@ export const memoryEdges = pgTable("memory_edges", {
 // sink. The `action` (jsonb) either posts a message (`{type:"message", threadId,
 // body}`) or starts an agent run (`{type:"run", threadId, agentId, intent}`).
 // Org-scoped; `enabled` gates firing; `lastFiredAt` records the last schedule fire.
+// #85 plans: the seeded pricing tiers. Reference data — rows are inserted by the
+// 0027_billing migration (INSERT … ON CONFLICT DO NOTHING) and read by the
+// billing module. Limits are integers; `-1` means unlimited. `stripePriceId` is
+// the Stripe Price the Checkout Session is built from (nullable — e.g. the free
+// Starter tier or a Custom/contact-sales tier has no self-serve price).
+export const plans = pgTable("plans", {
+  id: text("id").primaryKey(),                       // 'starter' | 'individual' | 'pro' | 'growth' | 'custom'
+  name: text("name").notNull(),
+  seatLimit: integer("seat_limit").notNull(),
+  agentLimit: integer("agent_limit").notNull(),
+  messageQuota: integer("message_quota").notNull(),
+  taskQuota: integer("task_quota").notNull(),
+  stripePriceId: text("stripe_price_id"),
+});
+
+// #85 subscriptions: an org's current plan + Stripe linkage. One row per org
+// (orgId is the PK). No row → the org is treated as the Starter (free) tier, so
+// existing orgs keep working without a backfill. `status` walks active/…;
+// Stripe ids are set once Checkout completes (webhook is a #103 follow-up).
+export const subscriptions = pgTable("subscriptions", {
+  orgId: text("org_id").primaryKey(),
+  planId: text("plan_id").notNull(),
+  status: text("status").notNull().default("active"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubId: text("stripe_sub_id"),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+});
+
 export const automations = pgTable("automations", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
