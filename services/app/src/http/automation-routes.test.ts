@@ -65,6 +65,16 @@ describe("automation routes (#98)", () => {
     await app.close();
   });
 
+  it("POST /automations with a valid slack action → 201 (#100)", async () => {
+    const app = makeApp();
+    const res = await app.inject({
+      method: "POST", url: "/automations", headers: admin,
+      payload: { ...validBody, action: { type: "slack", channel: "#general", text: "deploy done" } },
+    });
+    expect(res.statusCode).toBe(201);
+    await app.close();
+  });
+
   it("PATCH /automations/:id toggles enabled (admin)", async () => {
     const app = makeApp();
     const created = await app.inject({ method: "POST", url: "/automations", headers: admin, payload: validBody });
