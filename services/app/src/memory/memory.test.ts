@@ -1,6 +1,8 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { createNode, createEdge, listNodes, neighbors, searchNodes, counts, graph, recallForIntent, formatRecall } from "./memory.js";
+import { createNode, createEdge, listNodes, neighbors, searchNodes, counts, graph, recallForIntent, formatRecall, supersedeNode, invalidateNode, revalidateNode, addContradiction } from "./memory.js";
+import { memoryEdges } from "../db/schema.js";
+import { and, eq } from "drizzle-orm";
 import { orgs } from "../db/schema.js";
 
 const h = testDb();
@@ -77,6 +79,72 @@ describe("memory", () => {
     await createNode(h.db, { orgId: "o1", kind: "decision", label: "Use Postgres" });
     expect(await recallForIntent(h.db, "o1", "")).toEqual([]);
     expect(await recallForIntent(h.db, "o1", "a to is of")).toEqual([]); // all terms <4 chars
+  });
+
+  it("createNode with derivedFrom creates a derived_from edge from new node to each source", async () => {
+    const a = await createNode(h.db, { orgId: "o1", kind: "fact", label: "source a" });
+    const b = await createNode(h.db, { orgId: "o1", kind: "fact", label: "source b" });
+    const c = await createNode(h.db, { orgId: "o1", kind: "decision", label: "derived", derivedFrom: [a.id, b.id] });
+    const edges = await h.db.select().from(memoryEdges).where(and(eq(memoryEdges.orgId, "o1"), eq(memoryEdges.relation, "derived_from")));
+    expect(edges.map((e) => `${e.fromId}->${e.toId}`).sort()).toEqual([`${c.id}->${a.id}`, `${c.id}->${b.id}`].sort());
+    expect(c.version).toBe(1);
+    expect(c.status).toBe("active");
+  });
+
+  it("supersedeNode optimistic-locks: right version supersedes old + bumps version; wrong version throws", async () => {
+    const old = await createNode(h.db, { orgId: "o1", kind: "fact", label: "v1 fact", body: "old" });
+    expect(old.version).toBe(1);
+    const fresh = await supersedeNode(h.db, { orgId: "o1", oldId: old.id, expectedVersion: 1, newNode: { kind: "fact", label: "v2 fact", body: "new" } });
+    expect(fresh.version).toBe(2);
+    expect(fresh.status).toBe("active");
+    // old is superseded
+    const all = await listNodes(h.db, "o1", {}, { includeInactive: true });
+    const oldRow = all.find((n) => n.id === old.id)!;
+    expect(oldRow.status).toBe("superseded");
+    // supersedes edge new->old
+    const edges = await h.db.select().from(memoryEdges).where(and(eq(memoryEdges.orgId, "o1"), eq(memoryEdges.relation, "supersedes")));
+    expect(edges.map((e) => `${e.fromId}->${e.toId}`)).toEqual([`${fresh.id}->${old.id}`]);
+    // stale expectedVersion throws (fresh is at version 2, not 1)
+    await expect(supersedeNode(h.db, { orgId: "o1", oldId: fresh.id, expectedVersion: 1, newNode: { kind: "fact", label: "v3" } })).rejects.toThrow("version conflict");
+    // cross-org throws (not found)
+    await expect(supersedeNode(h.db, { orgId: "o2", oldId: fresh.id, expectedVersion: 2, newNode: { kind: "fact", label: "x" } })).rejects.toThrow();
+  });
+
+  it("invalidateNode hides node from recall/list/search/graph/neighbors; includeInactive shows it; revalidateNode restores", async () => {
+    const dec = await createNode(h.db, { orgId: "o1", kind: "decision", label: "Use Postgres LISTEN NOTIFY realtime" });
+    const other = await createNode(h.db, { orgId: "o1", kind: "fact", label: "neighbor fact" });
+    await createEdge(h.db, { orgId: "o1", fromId: dec.id, toId: other.id, relation: "relates_to" });
+    // active: present
+    expect((await recallForIntent(h.db, "o1", "realtime notify postgres")).map((n) => n.id)).toContain(dec.id);
+    expect((await listNodes(h.db, "o1")).map((n) => n.id)).toContain(dec.id);
+    expect((await searchNodes(h.db, "o1", "realtime")).map((n) => n.id)).toContain(dec.id);
+
+    await invalidateNode(h.db, "o1", dec.id);
+    // hidden from recall/list/search by default
+    expect((await recallForIntent(h.db, "o1", "realtime notify postgres")).map((n) => n.id)).not.toContain(dec.id);
+    expect((await listNodes(h.db, "o1")).map((n) => n.id)).not.toContain(dec.id);
+    expect((await searchNodes(h.db, "o1", "realtime")).map((n) => n.id)).not.toContain(dec.id);
+    // graph drops it; neighbors of other no longer include it
+    expect((await graph(h.db, "o1")).nodes.map((n) => n.id)).not.toContain(dec.id);
+    expect((await neighbors(h.db, other.id, "o1")).map((n) => n.id)).not.toContain(dec.id);
+    // includeInactive surfaces it
+    expect((await listNodes(h.db, "o1", {}, { includeInactive: true })).map((n) => n.id)).toContain(dec.id);
+
+    // revalidate restores
+    await revalidateNode(h.db, "o1", dec.id);
+    expect((await listNodes(h.db, "o1")).map((n) => n.id)).toContain(dec.id);
+
+    // cross-org invalidate is a no-op (does not touch o1's node)
+    await invalidateNode(h.db, "o2", dec.id);
+    expect((await listNodes(h.db, "o1")).map((n) => n.id)).toContain(dec.id);
+  });
+
+  it("addContradiction creates a contradicts edge, org-scoped", async () => {
+    const a = await createNode(h.db, { orgId: "o1", kind: "fact", label: "earth is round" });
+    const b = await createNode(h.db, { orgId: "o1", kind: "fact", label: "earth is flat" });
+    await addContradiction(h.db, { orgId: "o1", fromId: a.id, toId: b.id });
+    const edges = await h.db.select().from(memoryEdges).where(and(eq(memoryEdges.orgId, "o1"), eq(memoryEdges.relation, "contradicts")));
+    expect(edges.map((e) => `${e.fromId}->${e.toId}`)).toEqual([`${a.id}->${b.id}`]);
   });
 
   it("formatRecall builds a preamble block (or empty string)", async () => {

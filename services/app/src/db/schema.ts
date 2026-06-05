@@ -272,6 +272,8 @@ export const memoryNodes = pgTable("memory_nodes", {
   label: text("label").notNull(),
   body: text("body").notNull().default(""),
   metadata: jsonb("metadata").notNull().default({}),
+  version: integer("version").notNull().default(1),
+  status: text("status").notNull().default("active"), // 'active'|'invalidated'|'superseded'
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
