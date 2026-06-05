@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { resolveMention, isPermittedOnRepo, agentModelConfig, agentMcp } from "./agents.js";
+import { resolveMention, isPermittedOnRepo, agentModelConfig, agentMcp, setAgentProfile, isAgentVisibility } from "./agents.js";
 import { orgs, workspaces, agents, repos } from "../db/schema.js";
 
 const h = testDb();
@@ -62,6 +62,57 @@ describe("agents", () => {
     await h.db.insert(repos).values({ id: "rOther", orgId: "o2", workspaceId: "w9", githubOwner: "o", githubName: "y", defaultBranch: "main", tokenEnvVar: "E2E_GITHUB_TOKEN" });
     await h.db.update(agents).set({ shared: true }).where(eq(agents.id, "a1"));
     expect(await isPermittedOnRepo(h.db, "a1", "rOther")).toBe(false);
+  });
+});
+
+describe("agent avatar + visibility (#91)", () => {
+  it("a new agent defaults to public visibility and null avatar", async () => {
+    const a = await resolveMention(h.db, "o1", "coder");
+    expect(a?.visibility).toBe("public");
+    expect(a?.avatarUrl).toBeNull();
+  });
+
+  it("setAgentProfile sets avatar + visibility (org-scoped)", async () => {
+    const updated = await setAgentProfile(h.db, { orgId: "o1", agentId: "a1", avatarUrl: "https://x/a.png", visibility: "private" });
+    expect(updated?.avatarUrl).toBe("https://x/a.png");
+    expect(updated?.visibility).toBe("private");
+  });
+
+  it("setAgentProfile updates only the provided field (avatar only)", async () => {
+    await setAgentProfile(h.db, { orgId: "o1", agentId: "a1", visibility: "private" });
+    const updated = await setAgentProfile(h.db, { orgId: "o1", agentId: "a1", avatarUrl: "https://x/b.png" });
+    expect(updated?.avatarUrl).toBe("https://x/b.png");
+    expect(updated?.visibility).toBe("private"); // unchanged
+  });
+
+  it("setAgentProfile is cross-org safe (other org → undefined, no mutation)", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "Org2" });
+    const res = await setAgentProfile(h.db, { orgId: "o2", agentId: "a1", visibility: "private" });
+    expect(res).toBeUndefined();
+    const a = await resolveMention(h.db, "o1", "coder");
+    expect(a?.visibility).toBe("public");
+  });
+
+  it("isAgentVisibility validates the allowed values", () => {
+    expect(isAgentVisibility("public")).toBe(true);
+    expect(isAgentVisibility("private")).toBe(true);
+    expect(isAgentVisibility("secret")).toBe(false);
+    expect(isAgentVisibility(123)).toBe(false);
+  });
+
+  it("resolveMention finds a PUBLIC agent org-wide regardless of caller workspace", async () => {
+    const a = await resolveMention(h.db, "o1", "coder", { fromWorkspaceId: "w-other" });
+    expect(a?.id).toBe("a1"); // public → visible everywhere
+  });
+
+  it("resolveMention scopes a PRIVATE agent to its own workspace", async () => {
+    await setAgentProfile(h.db, { orgId: "o1", agentId: "a1", visibility: "private" });
+    // From its home workspace → resolvable.
+    expect((await resolveMention(h.db, "o1", "coder", { fromWorkspaceId: "w1" }))?.id).toBe("a1");
+    // From another workspace → hidden.
+    expect(await resolveMention(h.db, "o1", "coder", { fromWorkspaceId: "w2" })).toBeUndefined();
+    // No workspace scope passed → unchanged prior behavior (still resolvable).
+    expect((await resolveMention(h.db, "o1", "coder"))?.id).toBe("a1");
   });
 });
 

@@ -38,9 +38,19 @@ export function agentMcp(agent: { config?: unknown } | null | undefined): string
   return names.length > 0 ? names : undefined;
 }
 
-export async function resolveMention(db: DB, orgId: string, handle: string) {
+// resolveMention finds an agent by org + handle. #91: an optional
+// `fromWorkspaceId` scopes PRIVATE agents (visibility = "private") to their own
+// workspace — a private agent is resolvable only from within its workspace.
+// PUBLIC agents (the default) always resolve org-wide. Omitting the option
+// preserves the prior behavior exactly (no visibility filtering), so existing
+// callers are untouched until they opt in by passing the caller's workspace.
+export async function resolveMention(db: DB, orgId: string, handle: string, opts?: { fromWorkspaceId?: string }) {
   const [a] = await db.select().from(agents)
     .where(and(eq(agents.orgId, orgId), eq(agents.handle, handle.toLowerCase())));
+  if (!a) return a;
+  if (opts?.fromWorkspaceId !== undefined && a.visibility === "private" && a.workspaceId !== opts.fromWorkspaceId) {
+    return undefined; // private agent is not visible outside its workspace
+  }
   return a;
 }
 
@@ -56,6 +66,38 @@ export async function isPermittedOnRepo(db: DB, agentId: string, repoId: string)
 // or undefined if no agent with that id exists in the org.
 export async function setAgentShared(db: DB, { orgId, agentId, shared }: { orgId: string; agentId: string; shared: boolean }) {
   const [a] = await db.update(agents).set({ shared })
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
+    .returning();
+  return a;
+}
+
+// #91: the allowed agent visibility values. "public" = resolvable org-wide
+// (today's behavior); "private" = resolvable only within its workspace.
+export const AGENT_VISIBILITIES = ["public", "private"] as const;
+export type AgentVisibility = (typeof AGENT_VISIBILITIES)[number];
+
+export function isAgentVisibility(v: unknown): v is AgentVisibility {
+  return typeof v === "string" && (AGENT_VISIBILITIES as readonly string[]).includes(v);
+}
+
+// #91: set an agent's profile fields — avatarUrl and/or visibility (org-scoped).
+// Only the provided fields are updated; visibility (when provided) is validated
+// by the caller via isAgentVisibility. Returns the updated agent, or undefined
+// if no agent with that id exists in the org (cross-org → undefined).
+export async function setAgentProfile(
+  db: DB,
+  { orgId, agentId, avatarUrl, visibility }: { orgId: string; agentId: string; avatarUrl?: string | null; visibility?: AgentVisibility },
+) {
+  const patch: { avatarUrl?: string | null; visibility?: AgentVisibility } = {};
+  if (avatarUrl !== undefined) patch.avatarUrl = avatarUrl;
+  if (visibility !== undefined) patch.visibility = visibility;
+  if (Object.keys(patch).length === 0) {
+    // Nothing to change: return the agent as-is (still org-scoped) so callers
+    // get a 404 vs 200 distinction without mutating.
+    const [a] = await db.select().from(agents).where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+    return a;
+  }
+  const [a] = await db.update(agents).set(patch)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
     .returning();
   return a;

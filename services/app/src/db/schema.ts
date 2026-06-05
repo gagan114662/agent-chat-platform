@@ -42,6 +42,8 @@ export const agents = pgTable("agents", {
   adapter: text("adapter").notNull().default("fake"),
   config: jsonb("config").notNull().default({}),
   shared: boolean("shared").notNull().default(false), // #28: shared agents run on any repo in their org
+  avatarUrl: text("avatar_url"), // #91: optional avatar image URL (nullable)
+  visibility: text("visibility").notNull().default("public"), // #91: public | private
 }, (t) => ({ handleUx: uniqueIndex("agents_org_handle_ux").on(t.orgId, t.handle) }));
 
 export const channels = pgTable("channels", {
