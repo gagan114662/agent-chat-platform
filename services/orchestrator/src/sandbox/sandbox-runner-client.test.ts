@@ -48,6 +48,20 @@ describe("SandboxRunnerClient", () => {
     expect(res).toEqual({ plan: "1. step one\n2. step two" });
   });
 
+  it("posts /exec and returns ExecResult", async () => {
+    nock("http://runner:8090")
+      .post("/exec", { repoUrl: "https://github.com/o/r.git", baseBranch: "main", command: "ls" })
+      .reply(200, { output: "a.ts\nb.ts\n", exitCode: 0 });
+
+    const client = new SandboxRunnerClient("http://runner:8090");
+    const res = await client.exec({
+      repoUrl: "https://github.com/o/r.git",
+      baseBranch: "main",
+      command: "ls",
+    });
+    expect(res).toEqual({ output: "a.ts\nb.ts\n", exitCode: 0 });
+  });
+
   it("rejects with status and body on a non-200 response", async () => {
     nock("http://runner:8090").post("/run").reply(500, "boom");
 

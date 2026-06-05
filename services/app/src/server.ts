@@ -19,6 +19,7 @@ import { registerAgentRoutes } from "./http/agent-routes.js";
 import { registerApprovalRoutes } from "./http/approval-routes.js";
 import { registerPlanRoutes } from "./http/plan-routes.js";
 import { registerDiffRoutes } from "./http/diff-routes.js";
+import { registerExecRoutes } from "./http/exec-routes.js";
 import { registerChecksRoutes } from "./http/checks-routes.js";
 import { registerNotesRoutes } from "./http/notes-routes.js";
 import { registerRootCauseRoutes } from "./http/rootcause-routes.js";
@@ -98,6 +99,7 @@ export async function buildServer() {
   registerApprovalRoutes(app, { db });
   registerPlanRoutes(app, { db, sql, temporal, sandboxUrl });
   registerDiffRoutes(app, { db });
+  registerExecRoutes(app, { db, sandboxUrl }); // #72 admin exec route → sandbox /exec
   registerChecksRoutes(app, { db });
   registerNotesRoutes(app, { db });
   registerRootCauseRoutes(app, { db });

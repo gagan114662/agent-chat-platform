@@ -122,6 +122,53 @@ func NewHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(res)
 	})
+	mux.HandleFunc("POST /exec", func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // cap request body at 1 MiB
+		// Default-deny: /exec is arbitrary code execution, so it is OFF unless the
+		// operator explicitly enables it on this runner (gated like adapters #38).
+		if os.Getenv("ACP_ALLOW_EXEC") != "1" {
+			http.Error(w, "exec not allowed (set ACP_ALLOW_EXEC=1)", http.StatusForbidden)
+			return
+		}
+		if !sem.tryAcquire() {
+			http.Error(w, "too many concurrent runs", http.StatusServiceUnavailable)
+			return
+		}
+		defer sem.release()
+		ctx, cancel := context.WithTimeout(r.Context(), limits.Timeout)
+		defer cancel()
+		var req ExecRequest
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			// MaxBytesReader signals an oversize body — surface it as 413.
+			if _, ok := err.(*http.MaxBytesError); ok {
+				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			http.Error(w, redactCreds(err.Error()), http.StatusBadRequest)
+			return
+		}
+		if err := req.Validate(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		work, err := os.MkdirTemp("", "sbx-exec-*")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer os.RemoveAll(work)
+		req.WorkDir = filepath.Join(work, "repo")
+
+		res, err := Exec(ctx, req, limits)
+		if err != nil {
+			http.Error(w, redactCreds(err.Error()), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(res)
+	})
 	mux.HandleFunc("POST /feedback", func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // cap request body at 1 MiB
 		if !sem.tryAcquire() {

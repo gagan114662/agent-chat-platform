@@ -53,6 +53,17 @@ export interface PlanResult {
   plan: string;
 }
 
+export interface SandboxExecRequest {
+  repoUrl: string;
+  baseBranch: string;
+  command: string;
+}
+
+export interface ExecResult {
+  output: string;
+  exitCode: number;
+}
+
 export type ChecksStatus = "pending" | "success" | "failure";
 
 export interface PullRequest {

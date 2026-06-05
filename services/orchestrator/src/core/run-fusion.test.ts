@@ -9,6 +9,7 @@ function deps(checks: ChecksStatus[]) {
     run: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "sha1" }),
     feedback: vi.fn().mockResolvedValue({ branch: "feature/x", commitSha: "fixsha" }),
     plan: vi.fn().mockResolvedValue({ plan: "PLAN" }),
+    exec: vi.fn().mockResolvedValue({ output: "", exitCode: 0 }),
   };
   let i = 0;
   const github: GitHubService = {

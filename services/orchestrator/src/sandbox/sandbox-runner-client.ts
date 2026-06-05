@@ -1,4 +1,4 @@
-import type { RunResult, SandboxRunRequest, SandboxFeedbackRequest, SandboxPlanRequest, PlanResult } from "../types.js";
+import type { RunResult, SandboxRunRequest, SandboxFeedbackRequest, SandboxPlanRequest, PlanResult, SandboxExecRequest, ExecResult } from "../types.js";
 import { nodeFetch } from "../http/node-fetch.js";
 import { redactCreds } from "../util/redact.js";
 
@@ -9,6 +9,10 @@ export interface SandboxRunner {
   feedback(req: SandboxFeedbackRequest): Promise<RunResult>;
   // Produce a read-only plan for the intent (no edits, no push). Backs plan mode.
   plan(req: SandboxPlanRequest): Promise<PlanResult>;
+  // Run an arbitrary command in a fresh clone and return its combined output +
+  // exit code (#72). Arbitrary code execution: default-denied on the sandbox
+  // (ACP_ALLOW_EXEC) and admin-gated on the app route. Never commits/pushes.
+  exec(req: SandboxExecRequest): Promise<ExecResult>;
 }
 
 export class SandboxRunnerClient implements SandboxRunner {
@@ -53,6 +57,25 @@ export class SandboxRunnerClient implements SandboxRunner {
     }
     try {
       return (await res.json()) as PlanResult;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(redactCreds(`sandbox-runner ${url}: invalid JSON response: ${message}`));
+    }
+  }
+
+  async exec(req: SandboxExecRequest): Promise<ExecResult> {
+    const url = `${this.baseUrl}/exec`;
+    const res = await nodeFetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (res.status !== 200) {
+      const text = await res.text();
+      throw new Error(redactCreds(`sandbox-runner ${res.status}: ${text}`));
+    }
+    try {
+      return (await res.json()) as ExecResult;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(redactCreds(`sandbox-runner ${url}: invalid JSON response: ${message}`));
