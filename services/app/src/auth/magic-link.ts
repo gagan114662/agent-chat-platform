@@ -42,6 +42,19 @@ export async function requestMagicLink(
   return { token };
 }
 
+// peekMagicLinkMember resolves the member behind a magic-link token WITHOUT
+// consuming it (used by the #84 MFA gate so a failed MFA attempt doesn't burn the
+// single-use token). Returns the member id only for an unused, unexpired token.
+export async function peekMagicLinkMember(
+  db: DB,
+  v: { token: string; now?: number },
+): Promise<string | undefined> {
+  const now = v.now ?? Date.now();
+  const [link] = await db.select().from(magicLinks).where(eq(magicLinks.tokenHash, hash(v.token)));
+  if (!link || link.usedAt || link.expiresAt.getTime() < now) return undefined;
+  return link.memberId;
+}
+
 // verifyMagicLink looks up a magic-link by its token hash. It succeeds ONLY for a
 // token that is unused (`usedAt` null) and unexpired (`expiresAt` > now); anything
 // else throws "invalid or expired". On success it marks the link used (single-use)

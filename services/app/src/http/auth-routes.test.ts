@@ -132,6 +132,92 @@ describe("auth routes", () => {
     }
   });
 
+  it("MFA is off by default: login needs no code (#84)", async () => {
+    const app = makeApp();
+    const login = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "m1" } });
+    expect(login.statusCode).toBe(201);
+    await app.close();
+  });
+
+  it("enroll → confirm → login requires a valid code; wrong/absent code → 401 (#84)", async () => {
+    const { totpCode } = await import("../auth/totp.js");
+    const app = makeApp();
+
+    // authenticate (dev mode: no password) to call the authed MFA routes
+    const login0 = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "m1" } });
+    const token0 = login0.json().token as string;
+
+    // enroll → returns a secret (MFA not yet enabled)
+    const enroll = await app.inject({ method: "POST", url: "/auth/mfa/enroll", headers: { authorization: `Bearer ${token0}` } });
+    expect(enroll.statusCode).toBe(200);
+    const secret = enroll.json().secret as string;
+    expect(secret).toMatch(/^[A-Z2-7]+$/);
+    expect(enroll.json().uri).toContain("otpauth://");
+
+    // confirm enables MFA
+    const confirm = await app.inject({ method: "POST", url: "/auth/mfa/confirm", headers: { authorization: `Bearer ${token0}`, "content-type": "application/json" }, payload: { code: totpCode(secret) } });
+    expect(confirm.statusCode).toBe(200);
+
+    // now login WITHOUT a code → 401
+    const noCode = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "m1" } });
+    expect(noCode.statusCode).toBe(401);
+    expect(noCode.json().error).toMatch(/mfa/i);
+
+    // login with a WRONG code → 401
+    const badCode = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "m1", code: "000000" } });
+    expect(badCode.statusCode).toBe(401);
+
+    // login WITH a valid code → 201 session
+    const ok = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "m1", code: totpCode(secret) } });
+    expect(ok.statusCode).toBe(201);
+    expect(ok.json().token).toBeTruthy();
+    await app.close();
+  });
+
+  it("magic-link verify also requires a valid code when MFA is enabled (#84)", async () => {
+    const { enrollMfa, confirmMfa } = await import("../auth/mfa.js");
+    const { totpCode } = await import("../auth/totp.js");
+    const { requestMagicLink } = await import("../auth/magic-link.js");
+    // enable MFA directly for m1
+    const { secret } = await enrollMfa(h.db, { orgId: "o1", memberId: "m1" });
+    await confirmMfa(h.db, { orgId: "o1", memberId: "m1", code: totpCode(secret) });
+
+    const app = makeApp();
+    const { token } = await requestMagicLink(h.db, { email: "you@x.io" });
+    // verify without a code → 401
+    const noCode = await app.inject({ method: "POST", url: "/auth/magic-link/verify", headers: { "content-type": "application/json" }, payload: { token } });
+    expect(noCode.statusCode).toBe(401);
+    expect(noCode.json().error).toMatch(/mfa/i);
+    // verify with a valid code → 200 (token is still unused since the gate runs first)
+    const ok = await app.inject({ method: "POST", url: "/auth/magic-link/verify", headers: { "content-type": "application/json" }, payload: { token, code: totpCode(secret) } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().member.id).toBe("m1");
+    await app.close();
+  });
+
+  it("GET /auth/google → 302 when configured, 400 when not (#84)", async () => {
+    const prevId = process.env.GOOGLE_CLIENT_ID;
+    const prevRedirect = process.env.GOOGLE_REDIRECT_URI;
+    delete process.env.GOOGLE_CLIENT_ID;
+    try {
+      const app = makeApp();
+      // unconfigured → 400 (still a PUBLIC path, not 401)
+      const unconf = await app.inject({ method: "GET", url: "/auth/google" });
+      expect(unconf.statusCode).toBe(400);
+
+      process.env.GOOGLE_CLIENT_ID = "cid-123";
+      process.env.GOOGLE_REDIRECT_URI = "https://app.example.com/auth/google/callback";
+      const redir = await app.inject({ method: "GET", url: "/auth/google" });
+      expect(redir.statusCode).toBe(302);
+      expect(redir.headers.location).toContain("accounts.google.com");
+      expect(redir.headers.location).toContain("client_id=cid-123");
+      await app.close();
+    } finally {
+      if (prevId === undefined) delete process.env.GOOGLE_CLIENT_ID; else process.env.GOOGLE_CLIENT_ID = prevId;
+      if (prevRedirect === undefined) delete process.env.GOOGLE_REDIRECT_URI; else process.env.GOOGLE_REDIRECT_URI = prevRedirect;
+    }
+  });
+
   it("strict mode rejects unauthenticated requests and hides /auth/members", async () => {
     delete process.env.ACP_ALLOW_DEV_HEADERS;
     try {
