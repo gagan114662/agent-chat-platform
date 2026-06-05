@@ -17,7 +17,7 @@ describe("plans + subscriptions + usage/quota (#85)", () => {
     const p = await currentPlan(h.db, "o1");
     expect(p.id).toBe(STARTER_PLAN_ID);
     expect(p.name).toBe("Starter");
-    expect(p.agentLimit).toBe(1);
+    expect(p.agentLimit).toBe(3);
     expect(p.seatLimit).toBe(1);
   });
 
@@ -42,13 +42,17 @@ describe("plans + subscriptions + usage/quota (#85)", () => {
     expect(u).toEqual({ seats: 2, agents: 1, messages: 2, tasks: 1 });
   });
 
-  it("checkQuota('agents') ok under limit, not-ok at limit (Starter agentLimit=1)", async () => {
+  it("checkQuota('agents') ok under limit, not-ok at limit (Starter agentLimit=3)", async () => {
     let q = await checkQuota(h.db, "o1", "agents");
-    expect(q).toEqual({ used: 0, limit: 1, ok: true });
+    expect(q).toEqual({ used: 0, limit: 3, ok: true });
 
-    await h.db.insert(agents).values({ id: "a1", orgId: "o1", workspaceId: "w1", handle: "c1", displayName: "C1" });
+    await h.db.insert(agents).values([
+      { id: "a1", orgId: "o1", workspaceId: "w1", handle: "c1", displayName: "C1" },
+      { id: "a2", orgId: "o1", workspaceId: "w1", handle: "c2", displayName: "C2" },
+      { id: "a3", orgId: "o1", workspaceId: "w1", handle: "c3", displayName: "C3" },
+    ]);
     q = await checkQuota(h.db, "o1", "agents");
-    expect(q).toEqual({ used: 1, limit: 1, ok: false });
+    expect(q).toEqual({ used: 3, limit: 3, ok: false });
   });
 
   it("checkQuota('seats') reflects member count vs the plan seat limit", async () => {

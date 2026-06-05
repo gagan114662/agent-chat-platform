@@ -118,12 +118,15 @@ describe("agent avatar + visibility (#91)", () => {
 });
 
 describe("createAgent quota enforcement (#85)", () => {
-  it("blocks creating an agent at the plan limit (Starter agentLimit=1, already 1 agent)", async () => {
-    // o1 already has agent a1 (seeded) and defaults to Starter (agentLimit=1).
-    await expect(createAgent(h.db, { orgId: "o1", workspaceId: "w1", handle: "c2", displayName: "C2" }))
+  it("blocks creating an agent at the plan limit (Starter agentLimit=3)", async () => {
+    // o1 already has agent a1 (seeded) and defaults to Starter (agentLimit=3).
+    // Fill to the limit (a1 + c2 + c3 = 3), then the next create must be blocked.
+    await createAgent(h.db, { orgId: "o1", workspaceId: "w1", handle: "c2", displayName: "C2" });
+    await createAgent(h.db, { orgId: "o1", workspaceId: "w1", handle: "c3", displayName: "C3" });
+    await expect(createAgent(h.db, { orgId: "o1", workspaceId: "w1", handle: "c4", displayName: "C4" }))
       .rejects.toBeInstanceOf(QuotaError);
-    // No new agent was inserted.
-    expect(await resolveMention(h.db, "o1", "c2")).toBeUndefined();
+    // No new agent was inserted past the limit.
+    expect(await resolveMention(h.db, "o1", "c4")).toBeUndefined();
   });
 
   it("allows creating an agent under the plan limit (Pro agentLimit=25)", async () => {
