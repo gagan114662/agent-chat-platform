@@ -13,7 +13,8 @@ beforeEach(async () => { await h.reset(); await h.db.insert(orgs).values({ id: "
 describe("audit log (#150.3) — hash chain", () => {
   it("links entries and verifies intact", async () => {
     await append(h.db, { orgId: "o1", actorKind: "agent", actorId: "a1", action: "run.merged", resource: "r1" });
-    await append(h.db, { orgId: "o1", actorKind: "human", actorId: "m1", action: "payment.approved", resource: "b1", payload: { amountCents: 4900 } });
+    // a MULTI-key payload (jsonb may reorder keys → the canonical hash must be key-stable)
+    await append(h.db, { orgId: "o1", actorKind: "human", actorId: "m1", action: "payment.approved", resource: "b1", payload: { amountCents: 4900, customer: "alice@x.com", note: "x" } });
     const v = await verifyChain(h.db, "o1");
     expect(v).toMatchObject({ ok: true, entries: 2 });
     const entries = await listAudit(h.db, "o1");

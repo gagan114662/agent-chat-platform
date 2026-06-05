@@ -18,9 +18,18 @@ export interface AuditInput {
   payload?: Record<string, unknown>;
 }
 
-// canonical: a stable serialization of the fields that are hashed (order-independent).
+// stable, key-sorted JSON so the hash is identical regardless of object key order.
+// (Postgres jsonb does NOT preserve key order, so a naive JSON.stringify would hash
+// differently at append vs. verify and falsely flag tampering.)
+function stable(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(stable);
+  if (v && typeof v === "object") {
+    return Object.keys(v as Record<string, unknown>).sort().reduce<Record<string, unknown>>((o, k) => { o[k] = stable((v as Record<string, unknown>)[k]); return o; }, {});
+  }
+  return v;
+}
 function canonical(seq: number, prevHash: string, i: AuditInput): string {
-  return JSON.stringify({ seq, prevHash, orgId: i.orgId, actorKind: i.actorKind, actorId: i.actorId, action: i.action, resource: i.resource ?? "", payload: i.payload ?? {} });
+  return JSON.stringify(stable({ seq, prevHash, orgId: i.orgId, actorKind: i.actorKind, actorId: i.actorId, action: i.action, resource: i.resource ?? "", payload: i.payload ?? {} }));
 }
 export function hashEntry(seq: number, prevHash: string, i: AuditInput): string {
   return createHash("sha256").update(canonical(seq, prevHash, i)).digest("hex");
