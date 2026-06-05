@@ -60,11 +60,31 @@ export class OctokitGitHubService implements GitHubService {
   }
 
   async getChecksStatus(owner: string, repo: string, ref: string): Promise<ChecksStatus> {
-    const res = await this.octokit.repos.getCombinedStatusForRef({ owner, repo, ref });
-    const state = res.data.state; // "success" | "pending" | "failure" | "error"
-    if (state === "success") return "success";
-    if (state === "failure" || state === "error") return "failure";
-    return "pending";
+    // Two distinct GitHub signals must both be honored: the legacy commit
+    // statuses API (CircleCI/Travis-style contexts) AND the Checks API
+    // (GitHub Actions report here, never as legacy statuses). Reading only the
+    // combined status makes an Actions-only repo look "pending" forever, so the
+    // merge gate polls until timeout (#103). Combine both into one verdict.
+    const [statusRes, checkRes] = await Promise.all([
+      this.octokit.repos.getCombinedStatusForRef({ owner, repo, ref }),
+      this.octokit.checks.listForRef({ owner, repo, ref, per_page: 100 }),
+    ]);
+    const verdicts: ChecksStatus[] = [];
+    for (const s of statusRes.data.statuses ?? []) {
+      if (s.state === "failure" || s.state === "error") verdicts.push("failure");
+      else if (s.state === "success") verdicts.push("success");
+      else verdicts.push("pending");
+    }
+    for (const c of checkRes.data.check_runs ?? []) {
+      if (c.status !== "completed") { verdicts.push("pending"); continue; }
+      const ok = c.conclusion === "success" || c.conclusion === "neutral" || c.conclusion === "skipped";
+      verdicts.push(ok ? "success" : "failure");
+    }
+    if (verdicts.includes("failure")) return "failure";
+    // No signals yet (CI not registered) stays pending so we never merge ahead
+    // of checks; the gate's own timeout bounds the wait.
+    if (verdicts.length === 0 || verdicts.includes("pending")) return "pending";
+    return "success";
   }
 
   async merge(owner: string, repo: string, prNumber: number): Promise<void> {

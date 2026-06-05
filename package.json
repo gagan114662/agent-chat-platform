@@ -2,5 +2,10 @@
   "name": "agent-chat-platform",
   "private": true,
   "packageManager": "pnpm@10.28.2",
-  "engines": { "node": ">=20" }
+  "engines": { "node": ">=20" },
+  "pnpm": {
+    "overrides": {
+      "protobufjs": ">=7.5.6"
+    }
+  }
 }

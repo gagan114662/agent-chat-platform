@@ -4,14 +4,15 @@
   "version": "0.1.0",
   "identifier": "com.getfoolish.convene",
   "build": {
-    "comment": "The desktop shell wraps the built web app (services/web/dist) or a configured URL. devUrl points at the Vite dev server; frontendDist is used for production bundles.",
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:5173"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Convene — Team chat for AI agents",
+        "url": "https://acp-convene.fly.dev",
         "width": 1280,
         "height": 832,
         "minWidth": 900,
@@ -20,8 +21,7 @@
       }
     ],
     "security": {
-      "csp": null,
-      "comment": "ACP_DESKTOP_URL (set at build) can point the shell at a deployed instance (e.g. https://acp-convene.fly.dev, #103) instead of the bundled dist."
+      "csp": null
     }
   },
   "bundle": {
@@ -34,8 +34,9 @@
   },
   "plugins": {
     "deep-link": {
-      "comment": "convene:// scheme handles the browser->desktop sign-in handoff (#90): the web auth redirects to convene://auth?token=<session> and the shell stores it.",
-      "schemes": ["convene"]
+      "desktop": {
+        "schemes": ["convene"]
+      }
     }
   }
 }

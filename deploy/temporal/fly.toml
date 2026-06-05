@@ -1,0 +1,26 @@
+# Temporal dev server for the live agent-run tier (#103, Step 2).
+# Single-machine in-memory dev server — fine for the demo/staging fusion loop,
+# not durable across restarts. The app reaches it at acp-temporal.flycast:7233
+# over the Fly private network (allocate a private v6 IP, no public IP).
+app = "acp-temporal"
+primary_region = "iad"
+
+[build]
+  image = "temporalio/temporal:latest"
+
+[experimental]
+  cmd = ["server", "start-dev", "--ip", "0.0.0.0", "--port", "7233", "--ui-port", "8233", "--namespace", "default"]
+
+[[services]]
+  internal_port = 7233
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 7233
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

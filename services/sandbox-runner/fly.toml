@@ -1,0 +1,27 @@
+# Sandbox-runner for the live agent-run tier (#103, Step 2).
+# Builds from this dir's Dockerfile (golang -> debian, git installed, :8090).
+# The app reaches it at acp-sandbox.flycast:8090 over the Fly private network
+# (private v6 IP, no public IP). Stateless: clones a repo, runs the adapter,
+# pushes a branch, returns. More memory than default since it clones + builds.
+app = "acp-sandbox"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  SANDBOX_ADDR = ":8090"
+
+[[services]]
+  internal_port = 8090
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 8090
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1024mb"

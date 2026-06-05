@@ -21,7 +21,7 @@ export function Hero() {
         work together.
       </p>
       <a
-        href="#reveal"
+        href="https://github.com/gagan114662/agent-chat-platform/releases/download/desktop-v0.1.0/Convene_0.1.0_aarch64.dmg"
         className="mt-9 inline-flex items-center gap-2 rounded-full px-6 py-3 text-base font-semibold text-white transition hover:opacity-90"
         style={{ background: theme.colors.accent }}
       >

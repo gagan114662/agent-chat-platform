@@ -40,9 +40,53 @@ describe("OctokitGitHubService", () => {
   });
 
   it("maps combined status to ChecksStatus", async () => {
-    nock(api).get("/repos/o/r/commits/abc/status").reply(200, { state: "success" });
+    nock(api).get("/repos/o/r/commits/abc/status").reply(200, { state: "success", statuses: [{ context: "ci", state: "success" }] });
+    nock(api).get("/repos/o/r/commits/abc/check-runs").query(true).reply(200, { check_runs: [] });
     const svc = new OctokitGitHubService("tok");
     expect(await svc.getChecksStatus("o", "r", "abc")).toBe("success");
+  });
+
+  it("treats green Actions check-runs as success even when the legacy combined status is empty", async () => {
+    // GitHub Actions report as check-runs, NOT legacy commit statuses. An
+    // Actions-only repo's combined status is "pending" with zero statuses, so
+    // ignoring check-runs would make the merge gate poll until timeout (#103).
+    nock(api).get("/repos/o/r/commits/abc/status").reply(200, { state: "pending", statuses: [] });
+    nock(api).get("/repos/o/r/commits/abc/check-runs").query(true).reply(200, {
+      check_runs: [
+        { status: "completed", conclusion: "success", name: "check" },
+        { status: "completed", conclusion: "skipped", name: "optional" },
+      ],
+    });
+    const svc = new OctokitGitHubService("tok");
+    expect(await svc.getChecksStatus("o", "r", "abc")).toBe("success");
+  });
+
+  it("reports pending while an Actions check-run is still in progress", async () => {
+    nock(api).get("/repos/o/r/commits/abc/status").reply(200, { state: "pending", statuses: [] });
+    nock(api).get("/repos/o/r/commits/abc/check-runs").query(true).reply(200, {
+      check_runs: [{ status: "in_progress", conclusion: null, name: "check" }],
+    });
+    const svc = new OctokitGitHubService("tok");
+    expect(await svc.getChecksStatus("o", "r", "abc")).toBe("pending");
+  });
+
+  it("reports failure when an Actions check-run concluded failure", async () => {
+    nock(api).get("/repos/o/r/commits/abc/status").reply(200, { state: "pending", statuses: [] });
+    nock(api).get("/repos/o/r/commits/abc/check-runs").query(true).reply(200, {
+      check_runs: [
+        { status: "completed", conclusion: "success", name: "lint" },
+        { status: "completed", conclusion: "failure", name: "test" },
+      ],
+    });
+    const svc = new OctokitGitHubService("tok");
+    expect(await svc.getChecksStatus("o", "r", "abc")).toBe("failure");
+  });
+
+  it("stays pending when neither legacy statuses nor check-runs exist yet (don't merge before CI registers)", async () => {
+    nock(api).get("/repos/o/r/commits/abc/status").reply(200, { state: "pending", statuses: [] });
+    nock(api).get("/repos/o/r/commits/abc/check-runs").query(true).reply(200, { check_runs: [] });
+    const svc = new OctokitGitHubService("tok");
+    expect(await svc.getChecksStatus("o", "r", "abc")).toBe("pending");
   });
 
   it("merges a PR", async () => {

@@ -79,41 +79,97 @@ curl -s https://acp-web.fly.dev/healthz    # -> {"ok":true}
 
 ---
 
-## Step 2 — live agent runs (Temporal + sandbox-runner)
+## Step 2 — live agent runs (Temporal + sandbox-runner) — AS BUILT
 
-Agent runs are driven through Temporal and executed in the sandbox-runner. Add
-these so the "run" surfaces work:
+Agent runs are driven through Temporal and executed in the sandbox-runner. This
+is deployed and proven live: an `@coder` mention in a repo-bound thread drives a
+real branch → PR → merge on a GitHub repo. Two extra Fly apps in org `personal`
+(region `iad`) sit on the private network; the app reaches them over **flycast**
+(each has a private v6 IP and a `[[services.ports]]` entry so app→app TCP works).
 
-### Temporal
+### Temporal (`acp-temporal`)
 
-Use **Temporal Cloud** or deploy a `temporal` Fly app, then point the app at it:
-
-```sh
-fly secrets set TEMPORAL_ADDRESS=<host:7233> --app acp-web
-# For Temporal Cloud, also configure namespace/mTLS per Temporal's docs.
-```
-
-### sandbox-runner
-
-The sandbox-runner has its own Dockerfile at `services/sandbox-runner/Dockerfile`
-(Go service, listens on `:8090`). Deploy it as a separate Fly app, then tell the
-app where to reach it:
+A single-machine Temporal **dev server** (in-memory; fine for staging, not
+durable). Config: `deploy/temporal/fly.toml` (image `temporalio/temporal`,
+`server start-dev --ip 0.0.0.0 --port 7233`).
 
 ```sh
-# From services/sandbox-runner, with its own fly.toml:
-fly launch --no-deploy --name acp-sandbox
-fly deploy --app acp-sandbox
-
-# Point the main app at the runner (internal Fly DNS shown):
-fly secrets set SANDBOX_URL=http://acp-sandbox.internal:8090 --app acp-web
+fly apps create acp-temporal --org personal
+fly ips allocate-v6 --private -a acp-temporal
+fly deploy -c deploy/temporal/fly.toml -a acp-temporal --ha=false
 ```
 
-Redeploy `acp-web` after setting `TEMPORAL_ADDRESS` / `SANDBOX_URL` so the new
-secrets take effect:
+For production durability use **Temporal Cloud** instead (set `TEMPORAL_ADDRESS`
+to its host + configure namespace/mTLS per Temporal's docs).
+
+### sandbox-runner (`acp-sandbox`)
+
+Go service at `services/sandbox-runner` (listens `:8090`). Its image is
+`node:20-bookworm-slim` + git + the `claude` and `codex` CLIs, so the `fake`
+adapter and the live `claude-code` / `codex` adapters all have what they need.
 
 ```sh
-fly deploy --app acp-web
+fly apps create acp-sandbox --org personal
+fly ips allocate-v6 --private -a acp-sandbox
+fly deploy -c services/sandbox-runner/fly.toml -a acp-sandbox --remote-only --ha=false
 ```
+
+### Wire the app (`acp-convene`)
+
+```sh
+fly secrets set \
+  TEMPORAL_ADDRESS="acp-temporal.flycast:7233" \
+  SANDBOX_URL="http://acp-sandbox.flycast:8090" \
+  E2E_GITHUB_TOKEN="$(gh auth token)" \
+  E2E_REPO_OWNER="<owner>" \
+  E2E_REPO_NAME="<repo>" \
+  --app acp-convene
+```
+
+Setting secrets restarts the app; the in-process Temporal worker reconnects on
+boot (look for `Worker state changed { taskQueue: 'chat-fusion', state: 'RUNNING' }`).
+Re-seed so the demo repo `r1` binds to your repo: `fly ssh console -a acp-convene
+-C "node --import tsx src/db/seed.ts"`. The target repo should have a CI workflow
+(GitHub Actions check-runs are honored by the merge gate) and the repo's autonomy
+must be `autopilot-merge` for auto-merge.
+
+Smoke test: log in (`POST /auth/login {memberId, password}`), then
+`POST /threads/t1/messages {"body":"@coder ..."}` and poll `runs.state` for
+`merged`.
+
+### Live Claude / Codex runs (subscription auth — NOT API keys)
+
+The `fake` adapter needs nothing more. Real `claude-code` / `codex` agents author
+PRs using your **subscription** credentials (Claude Pro/Max, ChatGPT) — no
+metered API keys. Both run inside `acp-sandbox`, so the secrets go there.
+
+**Claude Code** — generate a long-lived OAuth token on a machine signed into your
+Claude subscription, then set it as a secret. The `claude` CLI reads it from the
+env (the sandbox env scrub preserves the `CLAUDE_` prefix even though it contains
+"TOKEN"):
+
+```sh
+claude setup-token            # prints a CLAUDE_CODE_OAUTH_TOKEN (subscription)
+fly secrets set \
+  ACP_ALLOWED_ADAPTERS="fake,claude-code" \
+  CLAUDE_CODE_OAUTH_TOKEN="<token from setup-token>" \
+  --app acp-sandbox
+```
+
+**Codex** — Codex's ChatGPT-subscription auth lives in `~/.codex/auth.json` after
+a `codex login`. Pass that file's contents as a secret; `docker-entrypoint.sh`
+writes it to `$CODEX_HOME/auth.json` at boot:
+
+```sh
+codex login                   # ChatGPT subscription; writes ~/.codex/auth.json
+fly secrets set \
+  ACP_ALLOWED_ADAPTERS="fake,claude-code,codex" \
+  CODEX_AUTH_JSON="$(cat ~/.codex/auth.json)" \
+  --app acp-sandbox
+```
+
+Then create an agent with adapter `claude-code` (or `codex`) and mention it.
+Without credentials the adapter fails closed at `Prepare` — default-deny (#38).
 
 ---
 

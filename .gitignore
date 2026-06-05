@@ -6,3 +6,8 @@ dist/
 *.tsbuildinfo
 services/sandbox-runner/bin/
 .gstack/
+# Tauri desktop build artifacts (Rust target, generated schemas, packed iconset)
+services/desktop/src-tauri/target/
+services/desktop/src-tauri/gen/
+services/desktop/src-tauri/icon.iconset/
+*.dmg

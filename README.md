@@ -26,20 +26,36 @@ reload.chat (comms only) nor conductor.build (execution only) closes that loop.
 | Output / VCS | **GitHub PRs** (deepest single-provider integration) |
 | Build strategy | **C — full-control Kubernetes platform** (own everything incl. realtime + isolation) |
 
-## ⚠️ Documented risk
+## Status — deployed vertical slice, live
 
-Approach C (full-control K8s) is the steepest path — realistically **months, not weeks** to
-first usable product, and it requires standing up platform-grade infra (cluster ops,
-isolation runtime, self-hosted realtime, authz) **before demand is validated**. Mitigation:
-sequence the build as a thin vertical slice first (one tenant, one repo, one agent,
-mention→sandbox→PR) before scaling out.
+The thin vertical slice is **built and running in production**, and the fusion loop is
+**proven end-to-end**.
+
+- **Live:** https://acp-convene.fly.dev (Fly.io — single-origin app + web + Postgres;
+  `/healthz` → `{ok:true}`). See [`DEPLOY.md`](DEPLOY.md).
+- **Fusion loop proven:** `@mention an agent in a repo-bound thread → ephemeral sandbox
+  clones the repo → adapter runs → pushes a branch → opens a GitHub PR → checks → auto-merge`,
+  driven by a **Temporal** workflow (`acp-temporal`) executing in the **sandbox-runner**
+  (`acp-sandbox`). A real run went from mention to a merged PR in ~16s.
+- **Adapters:** `fake` (proven loop), plus `claude-code` and `codex` using **subscription
+  auth** (Claude Pro/Max, ChatGPT — not metered API keys); default-deny via
+  `ACP_ALLOWED_ADAPTERS` (#38).
+- **Built:** auth (sessions/MFA/SSO/API keys), orgs/workspaces/RBAC, channels/threads/DMs,
+  tasks, memory, GitHub App integration (issues → Tasks), Cloudflare log ingestion, a web UI
+  (chat + Billing/Automations/Memory/Goals/Agents panels), a Tauri macOS desktop shell, and
+  observability. Backlog: **1 open issue** (GTM, parked) of ~75.
+
+### Tiers (`DEPLOY.md`)
+
+1. **Chat/auth/memory/tasks/UI + ingestion** — `acp-convene` (single-origin Fly app).
+2. **Live agent runs** — `acp-temporal` (Temporal) + `acp-sandbox` (sandbox-runner) on the
+   Fly private network (flycast).
+
+> Production-hardening still open: durable Temporal (the live one is a dev server),
+> managed Postgres, and the full-control K8s path in [`deploy/k8s/`](deploy/k8s/) for later.
 
 ## Docs
 
+- [`DEPLOY.md`](DEPLOY.md) — as-built deploy runbook (both tiers, subscription auth)
 - [`docs/specs/2026-06-03-agent-chat-fusion-design.md`](docs/specs/2026-06-03-agent-chat-fusion-design.md) — living design spec
 - [`docs/oss-build-accelerators.md`](docs/oss-build-accelerators.md) — open-source components that cut build time
-
-## Status
-
-✅ **Design complete.** All 6 spec sections approved & committed. Next: implementation plan
-(`docs/plans/`), then build the thin vertical slice. No application code scaffolded yet.
