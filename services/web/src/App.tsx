@@ -8,13 +8,14 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, setDeployCommand, deployRepo, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, setDeployCommand, deployRepo, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listBusinesses, createBusiness, getBusiness, createPaymentIntent, decidePaymentIntent, createCampaign, decideCampaign, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes } from "./api.js";
 import { GoalsPanel } from "./components/GoalsPanel.js";
 import { AgentsPanel } from "./components/AgentsPanel.js";
 import { TasksPanel } from "./components/TasksPanel.js";
 import { BillingPanel } from "./components/BillingPanel.js";
 import { AutomationsPanel } from "./components/AutomationsPanel.js";
 import { MemoryPanel } from "./components/MemoryPanel.js";
+import { BusinessesPanel } from "./components/BusinessesPanel.js";
 import type { Channel, Thread, Repo, Principal, InboxItem } from "./types.js";
 import { useAuth } from "./useAuth.js";
 import { useTheme } from "./useTheme.js";
@@ -38,7 +39,7 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
   const [dms, setDms] = useState<Thread[]>([]);
   const [principals, setPrincipals] = useState<Principal[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [view, setView] = useState<"thread" | "context" | "inbox" | "goals" | "agents" | "tasks" | "billing" | "automations" | "memory">("thread");
+  const [view, setView] = useState<"thread" | "context" | "inbox" | "goals" | "agents" | "tasks" | "billing" | "automations" | "memory" | "businesses">("thread");
   const [unreads, setUnreads] = useState<Record<string, number>>({});
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -164,6 +165,7 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
           tasks: () => setView("tasks"),
           automations: () => setView("automations"),
           billing: () => setView("billing"),
+          businesses: () => setView("businesses"),
         }}
         theme={theme}
         onToggleTheme={onToggleTheme}
@@ -213,6 +215,8 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
                             ? "Automations"
                             : view === "memory"
                               ? "Memory"
+                              : view === "businesses"
+                                ? "Businesses"
                               : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
             </h1>
             <p className="text-[11px] text-ink-3">{{
@@ -224,6 +228,7 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
               billing: "Plan, usage & quotas",
               automations: "Scheduled & event-driven agent runs",
               memory: "Search & consolidate workspace memory",
+              businesses: "Businesses you run — P&L, customers & money (human-gated)",
               thread: "chat → sandboxed agent → PR → back to chat",
             }[view] ?? "chat → sandboxed agent → PR → back to chat"}</p>
           </div>
@@ -258,6 +263,8 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
                       ? <AutomationsPanel listAutomations={listAutomations} createAutomation={createAutomation} setAutomationEnabled={setAutomationEnabled} deleteAutomation={deleteAutomation} threads={[...threads, ...dms].map((t) => ({ id: t.id, title: t.title }))} agents={principals.filter((p) => p.kind === "agent").map((p) => ({ id: p.id, handle: p.name }))} />
                       : view === "memory"
                         ? <MemoryPanel memoryRecall={memoryRecall} memoryConsolidate={memoryConsolidate} listMemoryNodes={listMemoryNodes} />
+                        : view === "businesses"
+                        ? <BusinessesPanel listBusinesses={listBusinesses} createBusiness={createBusiness} getBusiness={getBusiness} createPaymentIntent={createPaymentIntent} decidePaymentIntent={decidePaymentIntent} createCampaign={createCampaign} decideCampaign={decideCampaign} />
                         : activeThreadId
                     ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} commands={commands} onSlashSearch={focusSearch} mentionables={principals.map((p) => ({ kind: p.kind, name: p.name }))} />
                     : <div className="flex-1" />}

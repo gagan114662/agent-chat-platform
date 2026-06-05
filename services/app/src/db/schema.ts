@@ -167,6 +167,67 @@ export const taskRelations = pgTable("task_relations", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ ux: uniqueIndex("task_relations_ux").on(t.orgId, t.fromTaskId, t.toTaskId, t.relation) }));
 
+// #141/#142 a first-class business: bundles a repo (#139) + live URL (#140) + P&L
+// + CRM + gated revenue/outreach. A workspace can hold many, each isolated.
+export const businesses = pgTable("businesses", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  name: text("name").notNull(),
+  repoId: text("repo_id"),
+  liveUrl: text("live_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Per-business revenue/cost lines → P&L.
+export const businessLedger = pgTable("business_ledger", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  businessId: text("business_id").notNull(),
+  kind: text("kind").notNull(),            // 'revenue' | 'cost'
+  amountCents: integer("amount_cents").notNull(),
+  source: text("source").notNull(),        // 'payment' | 'agent_spend' | 'infra' | 'api' | 'manual'
+  memo: text("memo").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// A request to charge a customer — PENDING until a human approves (#110/#125).
+export const paymentIntents = pgTable("payment_intents", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  businessId: text("business_id").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  customer: text("customer").notNull().default(""),
+  memo: text("memo").notNull().default(""),
+  state: text("state").notNull().default("pending"), // 'pending'|'approved'|'declined'
+  approvedBy: text("approved_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// CRM: a lead/customer in a business's funnel.
+export const leads = pgTable("leads", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  businessId: text("business_id").notNull(),
+  identifier: text("identifier").notNull(),
+  stage: text("stage").notNull().default("visitor"), // 'visitor'|'signup'|'customer'
+  source: text("source").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// A customer-acquisition campaign — PENDING until a human approves (high-stakes, #125).
+export const outreachCampaigns = pgTable("outreach_campaigns", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  businessId: text("business_id").notNull(),
+  channel: text("channel").notNull(), // 'email'|'social'|'ads'
+  audience: text("audience").notNull().default(""),
+  body: text("body").notNull().default(""),
+  state: text("state").notNull().default("pending"), // 'pending'|'approved'|'sent'|'declined'
+  approvedBy: text("approved_by"),
+  sentCount: integer("sent_count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const goals = pgTable("goals", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),

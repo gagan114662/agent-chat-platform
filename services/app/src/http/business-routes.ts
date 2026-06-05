@@ -1,0 +1,97 @@
+import type { FastifyInstance } from "fastify";
+import type { DB } from "../db/client.js";
+import { actor } from "./actor.js";
+import { roleOf, can } from "../rbac/rbac.js";
+import {
+  createBusiness, listBusinesses, getBusiness, businessPnl, addLedgerEntry,
+  createPaymentIntent, listPaymentIntents, decidePaymentIntent,
+  addLead, funnel, createCampaign, listCampaigns, decideCampaign,
+} from "../business/businesses.js";
+
+// #141/#142 business routes. Drafts (create business / payment intent / campaign /
+// lead / cost) are member-allowed; APPROVING a payment or a campaign is admin-gated
+// (team:manage) — that approval is the human money/outreach gate (#110/#125).
+export function registerBusinessRoutes(app: FastifyInstance, d: { db: DB }) {
+  const isAdmin = async (userId: string, orgId: string) => can(await roleOf(d.db, userId, orgId), "team:manage");
+
+  app.get("/businesses", async (req, reply) => {
+    const { orgId } = actor(req);
+    return reply.code(200).send({ businesses: await listBusinesses(d.db, orgId) });
+  });
+  app.post("/businesses", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { name, repoId } = (req.body ?? {}) as { name?: string; repoId?: string };
+    if (!name?.trim()) return reply.code(400).send({ error: "name required" });
+    return reply.code(201).send(await createBusiness(d.db, { orgId, name: name.trim(), repoId }));
+  });
+
+  // P&L + funnel + payment intents + campaigns for one business (the dashboard).
+  app.get("/businesses/:id", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const b = await getBusiness(d.db, orgId, id);
+    if (!b) return reply.code(404).send({ error: "business not found" });
+    const [pnl, fun, intents, campaigns] = await Promise.all([
+      businessPnl(d.db, orgId, id), funnel(d.db, orgId, id),
+      listPaymentIntents(d.db, orgId, id), listCampaigns(d.db, orgId, id),
+    ]);
+    return reply.code(200).send({ business: b, pnl, funnel: fun, paymentIntents: intents, campaigns });
+  });
+
+  // Cost attribution (#141): record a cost line (agent/model spend, infra, api).
+  app.post("/businesses/:id/ledger", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { kind, amountCents, source, memo } = (req.body ?? {}) as { kind?: string; amountCents?: number; source?: string; memo?: string };
+    if (kind !== "revenue" && kind !== "cost") return reply.code(400).send({ error: "kind must be revenue|cost" });
+    if (typeof amountCents !== "number") return reply.code(400).send({ error: "amountCents required" });
+    return reply.code(201).send(await addLedgerEntry(d.db, { orgId, businessId: id, kind, amountCents, source: source ?? "manual", memo }));
+  });
+
+  // ---- human-gated revenue rails (#141) ----
+  app.post("/businesses/:id/payment-intents", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { amountCents, customer, memo } = (req.body ?? {}) as { amountCents?: number; customer?: string; memo?: string };
+    if (typeof amountCents !== "number" || amountCents <= 0) return reply.code(400).send({ error: "amountCents > 0 required" });
+    return reply.code(201).send(await createPaymentIntent(d.db, { orgId, businessId: id, amountCents, customer, memo }));
+  });
+  app.post("/payment-intents/:id/decide", async (req, reply) => {
+    const { orgId, userId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { approve } = (req.body ?? {}) as { approve?: boolean };
+    if (typeof approve !== "boolean") return reply.code(400).send({ error: "approve (boolean) required" });
+    if (!(await isAdmin(userId, orgId))) return reply.code(403).send({ error: "forbidden — approving a charge is the human money gate (admin only)" });
+    const row = await decidePaymentIntent(d.db, { orgId, intentId: id, approve, byUserId: userId });
+    if (!row) return reply.code(404).send({ error: "payment intent not found" });
+    return reply.code(200).send(row);
+  });
+
+  // ---- CRM / funnel (#142) ----
+  app.post("/businesses/:id/leads", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { identifier, stage, source } = (req.body ?? {}) as { identifier?: string; stage?: "visitor" | "signup" | "customer"; source?: string };
+    if (!identifier?.trim()) return reply.code(400).send({ error: "identifier required" });
+    return reply.code(201).send(await addLead(d.db, { orgId, businessId: id, identifier: identifier.trim(), stage, source }));
+  });
+
+  // ---- human-gated acquisition (#142) ----
+  app.post("/businesses/:id/campaigns", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { channel, audience, body } = (req.body ?? {}) as { channel?: string; audience?: string; body?: string };
+    if (channel !== "email" && channel !== "social" && channel !== "ads") return reply.code(400).send({ error: "channel must be email|social|ads" });
+    return reply.code(201).send(await createCampaign(d.db, { orgId, businessId: id, channel, audience, body }));
+  });
+  app.post("/campaigns/:id/decide", async (req, reply) => {
+    const { orgId, userId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { approve, costCents } = (req.body ?? {}) as { approve?: boolean; costCents?: number };
+    if (typeof approve !== "boolean") return reply.code(400).send({ error: "approve (boolean) required" });
+    if (!(await isAdmin(userId, orgId))) return reply.code(403).send({ error: "forbidden — approving outreach to real people is the human gate (admin only)" });
+    const row = await decideCampaign(d.db, { orgId, campaignId: id, approve, byUserId: userId, costCents });
+    if (!row) return reply.code(404).send({ error: "campaign not found" });
+    return reply.code(200).send(row);
+  });
+}

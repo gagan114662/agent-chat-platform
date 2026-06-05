@@ -657,3 +657,52 @@ export async function listMemoryNodes(q?: string): Promise<MemoryNode[]> {
   if (!res.ok) throw new Error(`listMemoryNodes ${res.status}`);
   return res.json();
 }
+
+// ---- #141/#142 businesses ----
+export interface Business { id: string; orgId: string; name: string; repoId?: string | null; liveUrl?: string | null; }
+export interface Pnl { revenueCents: number; costCents: number; netCents: number; profitable: boolean; }
+export interface Funnel { visitor: number; signup: number; customer: number; }
+export interface PaymentIntent { id: string; businessId: string; amountCents: number; customer: string; memo: string; state: string; }
+export interface Campaign { id: string; businessId: string; channel: string; audience: string; body: string; state: string; sentCount: number; }
+export interface BusinessDetail { business: Business; pnl: Pnl; funnel: Funnel; paymentIntents: PaymentIntent[]; campaigns: Campaign[]; }
+
+export async function listBusinesses(): Promise<Business[]> {
+  const res = await fetch(`/businesses`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listBusinesses ${res.status}`);
+  return (await res.json()).businesses;
+}
+export async function createBusiness(name: string, repoId?: string): Promise<Business> {
+  const res = await fetch(`/businesses`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify(repoId ? { name, repoId } : { name }) });
+  if (!res.ok) throw new Error(`createBusiness ${res.status}`);
+  return res.json();
+}
+export async function getBusiness(id: string): Promise<BusinessDetail> {
+  const res = await fetch(`/businesses/${id}`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getBusiness ${res.status}`);
+  return res.json();
+}
+export async function addBusinessCost(id: string, amountCents: number, source: string, memo?: string) {
+  const res = await fetch(`/businesses/${id}/ledger`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify({ kind: "cost", amountCents, source, memo }) });
+  if (!res.ok) throw new Error(`addBusinessCost ${res.status}`);
+  return res.json();
+}
+export async function createPaymentIntent(id: string, amountCents: number, customer: string) {
+  const res = await fetch(`/businesses/${id}/payment-intents`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify({ amountCents, customer }) });
+  if (!res.ok) throw new Error(`createPaymentIntent ${res.status}`);
+  return res.json();
+}
+export async function decidePaymentIntent(intentId: string, approve: boolean) {
+  const res = await fetch(`/payment-intents/${intentId}/decide`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify({ approve }) });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `decidePaymentIntent ${res.status}`);
+  return res.json();
+}
+export async function createCampaign(id: string, channel: string, audience: string, body: string) {
+  const res = await fetch(`/businesses/${id}/campaigns`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify({ channel, audience, body }) });
+  if (!res.ok) throw new Error(`createCampaign ${res.status}`);
+  return res.json();
+}
+export async function decideCampaign(campaignId: string, approve: boolean, costCents?: number) {
+  const res = await fetch(`/campaigns/${campaignId}/decide`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify(costCents ? { approve, costCents } : { approve }) });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `decideCampaign ${res.status}`);
+  return res.json();
+}

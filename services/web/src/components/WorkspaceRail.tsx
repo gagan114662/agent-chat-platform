@@ -1,6 +1,6 @@
 import { Icon, type IconName } from "./Icon.js";
 
-export type RailView = "activity" | "context" | "memory" | "goals" | "agents" | "tasks" | "automations" | "billing";
+export type RailView = "activity" | "context" | "memory" | "goals" | "agents" | "tasks" | "automations" | "billing" | "businesses";
 
 // Slack-style far-left workspace rail: the logo plus icon-only navigation into the
 // app's section views. The channel/thread list lives in the adjacent Sidebar.
@@ -19,6 +19,7 @@ export function WorkspaceRail({ active, inboxCount = 0, onSelect, theme = "dark"
     { view: "agents", icon: "agents", label: "Agents" },
     { view: "tasks", icon: "tasks", label: "Tasks" },
     { view: "automations", icon: "automations", label: "Automations" },
+    { view: "businesses", icon: "businesses", label: "Businesses" },
     { view: "billing", icon: "billing", label: "Billing" },
   ];
   return (
