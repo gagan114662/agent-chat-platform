@@ -10,7 +10,7 @@ export function Sidebar({
   channels, threads, dms, principals, repos, activeThreadId,
   unreads = {}, inbox = [], onOpenInbox, identity,
   onSelectThread, onCreateThread, onCreateChannel, onStartDm, onOpenContext, canCreateChannel,
-  onOpenGoals, onOpenAgents, onOpenTasks,
+  onOpenGoals, onOpenAgents, onOpenTasks, onOpenBilling, onOpenAutomations,
   newThreadRef,
 }: {
   channels: Channel[];
@@ -32,6 +32,8 @@ export function Sidebar({
   onOpenGoals?: () => void;
   onOpenAgents?: () => void;
   onOpenTasks?: () => void;
+  onOpenBilling?: () => void;
+  onOpenAutomations?: () => void;
   newThreadRef?: RefObject<HTMLInputElement>;
 }) {
   const [channelName, setChannelName] = useState("");
@@ -102,9 +104,25 @@ export function Sidebar({
         {onOpenTasks && (
           <button
             onClick={onOpenTasks}
-            className="mb-2 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+            className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
           >
             ✅ Tasks
+          </button>
+        )}
+        {onOpenAutomations && (
+          <button
+            onClick={onOpenAutomations}
+            className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          >
+            ⚡ Automations
+          </button>
+        )}
+        {onOpenBilling && (
+          <button
+            onClick={onOpenBilling}
+            className="mb-2 block w-full rounded-lg px-2 py-1.5 text-left text-neutral-600 hover:bg-neutral-100"
+          >
+            💳 Billing
           </button>
         )}
         {channels.map((c) => (

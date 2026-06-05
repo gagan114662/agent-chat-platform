@@ -8,10 +8,12 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listAgents, setAgentProfile, getTask, updateTask, addTaskComment } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listAgents, setAgentProfile, getTask, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation } from "./api.js";
 import { GoalsPanel } from "./components/GoalsPanel.js";
 import { AgentsPanel } from "./components/AgentsPanel.js";
 import { TasksPanel } from "./components/TasksPanel.js";
+import { BillingPanel } from "./components/BillingPanel.js";
+import { AutomationsPanel } from "./components/AutomationsPanel.js";
 import type { Channel, Thread, Repo, Principal, InboxItem } from "./types.js";
 import { useAuth } from "./useAuth.js";
 import { LoginScreen } from "./components/LoginScreen.js";
@@ -30,7 +32,7 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
   const [dms, setDms] = useState<Thread[]>([]);
   const [principals, setPrincipals] = useState<Principal[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [view, setView] = useState<"thread" | "context" | "inbox" | "goals" | "agents" | "tasks">("thread");
+  const [view, setView] = useState<"thread" | "context" | "inbox" | "goals" | "agents" | "tasks" | "billing" | "automations">("thread");
   const [unreads, setUnreads] = useState<Record<string, number>>({});
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -131,6 +133,8 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
         openGoals: () => setView("goals"),
         openAgents: () => setView("agents"),
         openTasks: () => setView("tasks"),
+        openBilling: () => setView("billing"),
+        openAutomations: () => setView("automations"),
         focusSearch,
       },
     }),
@@ -161,6 +165,8 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
         onOpenGoals={() => setView("goals")}
         onOpenAgents={() => setView("agents")}
         onOpenTasks={() => setView("tasks")}
+        onOpenBilling={() => setView("billing")}
+        onOpenAutomations={() => setView("automations")}
         newThreadRef={newThreadRef}
       />
       <main className="flex flex-1 flex-col">
@@ -177,7 +183,11 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
                       ? "Agents"
                       : view === "tasks"
                         ? "Tasks"
-                        : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
+                        : view === "billing"
+                          ? "Billing"
+                          : view === "automations"
+                            ? "Automations"
+                            : ([...threads, ...dms].find((t) => t.id === activeThreadId)?.title ?? "No thread selected")}
             </h1>
             <p className="text-xs text-neutral-400">chat → sandboxed agent → PR → back to chat</p>
           </div>
@@ -204,7 +214,11 @@ function Workspace({ onLogout, userId, orgId, role }: { onLogout: () => void; us
                 ? <AgentsPanel listAgents={listAgents} setAgentProfile={setAgentProfile} />
                 : view === "tasks"
                   ? <TasksPanel getTask={getTask} updateTask={updateTask} addTaskComment={addTaskComment} />
-                  : activeThreadId
+                  : view === "billing"
+                    ? <BillingPanel getBilling={getBilling} listPlans={listPlans} billingCheckout={billingCheckout} />
+                    : view === "automations"
+                      ? <AutomationsPanel listAutomations={listAutomations} createAutomation={createAutomation} setAutomationEnabled={setAutomationEnabled} deleteAutomation={deleteAutomation} />
+                      : activeThreadId
                     ? <ThreadConversation threadId={activeThreadId} onActivity={refreshNotifications} commands={commands} onSlashSearch={focusSearch} />
                     : <div className="flex-1" />}
       </main>
