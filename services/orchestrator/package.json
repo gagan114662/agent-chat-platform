@@ -9,6 +9,7 @@
     "./policy/risk.js": "./src/policy/risk.ts",
     "./policy/policy.js": "./src/policy/policy.ts",
     "./policy/qa.js": "./src/policy/qa.ts",
+    "./policy/browser-qa.js": "./src/policy/browser-qa.ts",
     "./temporal/workflow.js": "./src/temporal/workflow.ts",
     "./temporal/activities.js": "./src/temporal/activities.ts",
     "./telemetry/traced-fusion.js": "./src/telemetry/traced-fusion.ts"
@@ -26,6 +27,7 @@
     "@temporalio/testing": "^1.11.0",
     "@temporalio/worker": "^1.11.0",
     "@temporalio/workflow": "^1.11.0",
+    "playwright-core": "^1.48.0",
     "undici": "^6.0.0"
   },
   "devDependencies": {
