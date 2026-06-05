@@ -13,6 +13,7 @@ import { runs, runEvents, incidents } from "../db/schema.js";
 import { createMessage } from "../chat/messages.js";
 import { notify } from "../db/client.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
+import { makeSlackClient, type MakeSlack } from "../integrations/slack.js";
 
 // A detected alert, pre-persistence. `key` is the deterministic dedup key:
 // combined with the orgId it forms the incident id (`${orgId}:${key}`) so a
@@ -111,6 +112,12 @@ export interface RecordAlertsCtx {
   // When set (arg or env ALERT_THREAD_ID), each NEW alert is posted as a system
   // message into the thread + a realtime notify fires.
   threadId?: string;
+  // #100 optional Slack routing. When a Slack channel is configured (arg or env
+  // SLACK_ALERT_CHANNEL) and Slack is available, each NEW alert is ALSO posted to
+  // Slack (best-effort/guarded — a failing or unconfigured post never breaks
+  // recording). `makeSlack` is injectable so tests pass a fake (no live Slack).
+  slackChannel?: string;
+  makeSlack?: MakeSlack;
 }
 
 // recordAlerts persists the alerts as idempotent `incidents` (source "alert") and
@@ -123,6 +130,7 @@ export async function recordAlerts(
   alerts: Alert[],
 ): Promise<number> {
   const threadId = ctx.threadId ?? process.env.ALERT_THREAD_ID;
+  const slackChannel = ctx.slackChannel ?? process.env.SLACK_ALERT_CHANNEL;
   let created = 0;
   for (const a of alerts) {
     const [row] = await db.insert(incidents).values({
@@ -146,6 +154,17 @@ export async function recordAlerts(
         body: `[${a.severity.toUpperCase()}] ${a.title}\n\n${a.body}`,
       });
       await notify(sql, THREAD_CHANNEL, { threadId, message: msg });
+    }
+    // Optional Slack route — best-effort/guarded. An unconfigured Slack
+    // (makeSlackClient throws "slack not configured") or a failing post is
+    // swallowed so it never breaks alert recording. Keeps the in-thread post above.
+    if (slackChannel) {
+      try {
+        const slack = (ctx.makeSlack ?? makeSlackClient)();
+        await slack.postMessage(slackChannel, `[${a.severity.toUpperCase()}] ${a.title}\n\n${a.body}`);
+      } catch {
+        // unconfigured or failed Slack post — ignore (best-effort)
+      }
     }
   }
   return created;

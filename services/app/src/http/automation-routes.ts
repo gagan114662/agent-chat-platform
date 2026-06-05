@@ -35,6 +35,7 @@ function validAction(a: unknown): a is Action {
   const o = a as Record<string, unknown>;
   if (o.type === "message") return typeof o.threadId === "string" && typeof o.body === "string";
   if (o.type === "run") return typeof o.threadId === "string" && typeof o.agentId === "string" && typeof o.intent === "string";
+  if (o.type === "slack") return typeof o.channel === "string" && o.channel.length > 0 && typeof o.text === "string";
   return false;
 }
 
@@ -49,7 +50,7 @@ export function registerAutomationRoutes(app: FastifyInstance, d: AutomationRout
     const { name, trigger, action } = (req.body ?? {}) as { name?: string; trigger?: unknown; action?: unknown };
     if (!name?.trim()) return reply.code(400).send({ error: "name required" });
     if (!validTrigger(trigger)) return reply.code(400).send({ error: "trigger must be {type:'schedule',everyMinutes} or {type:'event',event}" });
-    if (!validAction(action)) return reply.code(400).send({ error: "action must be {type:'message',threadId,body} or {type:'run',threadId,agentId,intent}" });
+    if (!validAction(action)) return reply.code(400).send({ error: "action must be {type:'message',threadId,body}, {type:'run',threadId,agentId,intent} or {type:'slack',channel,text}" });
     const created = await createAutomation(d.db, { orgId, name: name.trim(), trigger, action, createdById: userId });
     return reply.code(201).send(created);
   });

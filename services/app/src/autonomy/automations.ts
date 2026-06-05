@@ -17,6 +17,7 @@ import { agentModelConfig, agentMcp } from "../agents/agents.js";
 import { createMessage } from "../chat/messages.js";
 import { notify } from "../db/client.js";
 import { THREAD_CHANNEL } from "../fusion/events.js";
+import { makeSlackClient, type SlackClient, type MakeSlack } from "../integrations/slack.js";
 import type { StartRun } from "./tick.js";
 
 // A schedule trigger fires when `lastFiredAt` is older than `everyMinutes` (or null).
@@ -31,7 +32,10 @@ export interface MessageAction { type: "message"; threadId: string; body: string
 // A run action starts an agent fusion run on the thread's repo (guarded: skipped
 // when the thread has no repo or the repo token is unset).
 export interface RunAction { type: "run"; threadId: string; agentId: string; intent: string; }
-export type Action = MessageAction | RunAction;
+// A slack action posts an outbound Slack message (#100). Best-effort/guarded: if
+// Slack is unconfigured or the post fails, the action is skipped (never throws).
+export interface SlackAction { type: "slack"; channel: string; text: string; }
+export type Action = MessageAction | RunAction | SlackAction;
 
 // Injectable deps mirror TickDeps: `start` defaults to the real startFusionRun so
 // tests inject a FAKE starter and need no live Temporal.
@@ -41,6 +45,9 @@ export interface AutomationDeps {
   temporal: Client;
   sandboxUrl: string;
   start?: StartRun;
+  // Injectable Slack client factory (#100). Defaults to makeSlackClient; tests
+  // pass a fake. Used only by the `slack` action, guarded.
+  makeSlack?: MakeSlack;
 }
 
 // Bound how many schedule automations fire per tick so the loop stays bounded.
@@ -101,6 +108,19 @@ export async function executeAction(db: DB, deps: AutomationDeps, orgId: string,
     });
     await notify(deps.sql, THREAD_CHANNEL, { threadId: action.threadId, message: msg });
     return true;
+  }
+
+  if (action.type === "slack") {
+    // #100 outbound Slack — best-effort/guarded. If Slack is unconfigured
+    // (makeSlackClient throws "slack not configured") or the post fails, we
+    // swallow the error and skip (return false) so the automation run never breaks.
+    try {
+      const slack: SlackClient = (deps.makeSlack ?? makeSlackClient)();
+      await slack.postMessage(action.channel, action.text);
+      return true;
+    } catch {
+      return false; // unconfigured or failed → guarded skip
+    }
   }
 
   // run action — resolve thread → repo + token, then start a fusion run (guarded).

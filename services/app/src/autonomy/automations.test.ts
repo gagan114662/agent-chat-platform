@@ -3,9 +3,10 @@ import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
 import {
   createAutomation, listAutomations, setEnabled, deleteAutomation,
-  runDueScheduleAutomations, fireEventAutomations, type AutomationDeps,
+  runDueScheduleAutomations, fireEventAutomations, executeAction, type AutomationDeps,
 } from "./automations.js";
 import { type StartRun } from "./tick.js";
+import type { SlackClient } from "../integrations/slack.js";
 import { orgs, workspaces, channels, threads, repos, agents, runs, tasks, automations } from "../db/schema.js";
 import { listMessages } from "../chat/messages.js";
 
@@ -38,6 +39,11 @@ beforeEach(async () => {
 
 function makeDeps(start: StartRun): AutomationDeps {
   return { db: h.db, sql: h.sql, temporal: temporalStub, sandboxUrl: "http://runner:8090", start };
+}
+
+// Fake Slack client that records every post — no live Slack.
+function fakeSlack(calls: { channel: string; text: string }[]): SlackClient {
+  return { postMessage: async (channel, text) => { calls.push({ channel, text }); } };
 }
 
 describe("automations — CRUD (org-scoped)", () => {
@@ -147,6 +153,33 @@ describe("fireEventAutomations", () => {
     expect(fired).toBe(0); // guarded — no repo to resolve
     expect(start).not.toHaveBeenCalled();
     expect(await h.db.select().from(runs)).toEqual([]);
+  });
+
+  it("a slack action posts via the injected Slack client (configured channel/text)", async () => {
+    const calls: { channel: string; text: string }[] = [];
+    const deps: AutomationDeps = { ...makeDeps(vi.fn(async () => {})), makeSlack: () => fakeSlack(calls) };
+    const ran = await executeAction(h.db, deps, "o1", { type: "slack", channel: "#general", text: "deploy done" });
+    expect(ran).toBe(true);
+    expect(calls).toEqual([{ channel: "#general", text: "deploy done" }]);
+  });
+
+  it("a slack action is guarded — unconfigured Slack → skipped, no throw", async () => {
+    // No makeSlack injected and no Slack env → makeSlackClient throws "slack not
+    // configured"; executeAction must catch and skip (return false) rather than break.
+    delete process.env.SLACK_BOT_TOKEN;
+    delete process.env.SLACK_WEBHOOK_URL;
+    const deps = makeDeps(vi.fn(async () => {}));
+    const ran = await executeAction(h.db, deps, "o1", { type: "slack", channel: "#general", text: "x" });
+    expect(ran).toBe(false);
+  });
+
+  it("a slack action that throws at post time is guarded — skipped, no throw", async () => {
+    const deps: AutomationDeps = {
+      ...makeDeps(vi.fn(async () => {})),
+      makeSlack: () => ({ postMessage: async () => { throw new Error("slack 500"); } }),
+    };
+    const ran = await executeAction(h.db, deps, "o1", { type: "slack", channel: "#general", text: "x" });
+    expect(ran).toBe(false);
   });
 
   it("disabled event automation never fires", async () => {
