@@ -15,19 +15,51 @@ type mcpCatalogEntry struct {
 	tier    string // "safe" | "sensitive" | "money"
 }
 
-// mcpCatalog is the built-in MCP server catalog (name → launch + tier).
-// Commands are best-effort `npx -y @modelcontextprotocol/server-<x>`-style and
-// refined later (#97). `safe`-tier servers are allowed by default; everything
-// else (incl. `money`) requires the name in ACP_ALLOWED_MCP. A `money`-tier
-// entry is included to prove default-deny applies to it too.
+// mcpCatalog is the built-in, curated MCP server catalog (name → launch + tier),
+// drawn from the 50-essential-MCP-servers list (#97). Commands are best-effort
+// `npx -y @modelcontextprotocol/server-<x>` / vendor packages and refined when
+// wired live. Tiers gate default authorization:
+//   - safe       — read-only / local; allowed by default.
+//   - sensitive  — writes / external state; default-deny, needs ACP_ALLOWED_MCP.
+//   - money      — irreversible / moves funds; default-deny, needs ACP_ALLOWED_MCP
+//     AND the per-org approval gate (#16/#21). NEVER default-allowed.
 var mcpCatalog = map[string]mcpCatalogEntry{
+	// safe — read-only / local.
 	"filesystem":          {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-filesystem"}, tier: "safe"},
 	"git":                 {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-git"}, tier: "safe"},
 	"fetch":               {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-fetch"}, tier: "safe"},
+	"time":                {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-time"}, tier: "safe"},
 	"sequential-thinking": {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-sequential-thinking"}, tier: "safe"},
 	"memory":              {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-memory"}, tier: "safe"},
-	"github":              {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-github"}, tier: "sensitive"},
-	"stripe":              {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-stripe"}, tier: "money"},
+	"context7":            {command: "npx", args: []string{"-y", "@upstash/context7-mcp"}, tier: "safe"},
+	"sqlite":              {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-sqlite"}, tier: "safe"},
+	"brave-search":        {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-brave-search"}, tier: "safe"},
+
+	// sensitive — writes / external state.
+	"github":     {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-github"}, tier: "sensitive"},
+	"gitlab":     {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-gitlab"}, tier: "sensitive"},
+	"slack":      {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-slack"}, tier: "sensitive"},
+	"notion":     {command: "npx", args: []string{"-y", "@notionhq/notion-mcp-server"}, tier: "sensitive"},
+	"linear":     {command: "npx", args: []string{"-y", "@linear/mcp-server"}, tier: "sensitive"},
+	"postgres":   {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-postgres"}, tier: "sensitive"},
+	"redis":      {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-redis"}, tier: "sensitive"},
+	"supabase":   {command: "npx", args: []string{"-y", "@supabase/mcp-server-supabase"}, tier: "sensitive"},
+	"sentry":     {command: "npx", args: []string{"-y", "@sentry/mcp-server"}, tier: "sensitive"},
+	"gdrive":     {command: "npx", args: []string{"-y", "@modelcontextprotocol/server-gdrive"}, tier: "sensitive"},
+	"cloudflare": {command: "npx", args: []string{"-y", "@cloudflare/mcp-server-cloudflare"}, tier: "sensitive"},
+	"vercel":     {command: "npx", args: []string{"-y", "@vercel/mcp-server"}, tier: "sensitive"},
+	"kubernetes": {command: "npx", args: []string{"-y", "mcp-server-kubernetes"}, tier: "sensitive"},
+	"docker":     {command: "npx", args: []string{"-y", "mcp-server-docker"}, tier: "sensitive"},
+
+	// money — irreversible / moves funds. NEVER default-allowed.
+	"stripe":     {command: "npx", args: []string{"-y", "@stripe/mcp"}, tier: "money"},
+	"paypal":     {command: "npx", args: []string{"-y", "@paypal/mcp"}, tier: "money"},
+	"plaid":      {command: "npx", args: []string{"-y", "@plaid/mcp-server"}, tier: "money"},
+	"quickbooks": {command: "npx", args: []string{"-y", "@intuit/quickbooks-mcp"}, tier: "money"},
+	"alpaca":     {command: "npx", args: []string{"-y", "@alpacahq/mcp-server"}, tier: "money"},
+	"ccxt":       {command: "npx", args: []string{"-y", "ccxt-mcp"}, tier: "money"},
+	"etherscan":  {command: "npx", args: []string{"-y", "etherscan-mcp"}, tier: "money"},
+	"coingecko":  {command: "npx", args: []string{"-y", "@coingecko/coingecko-mcp"}, tier: "money"},
 }
 
 // mcpAuthorized reports whether the named MCP server may be provisioned into a
