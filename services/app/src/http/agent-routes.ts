@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import { agents, members } from "../db/schema.js";
 import { actor } from "./actor.js";
-import { setAgentShared, setAgentProfile, isAgentVisibility, createAgent, QuotaError } from "../agents/agents.js";
+import { setAgentShared, setAgentProfile, setAgentConfig, isAgentVisibility, createAgent, QuotaError } from "../agents/agents.js";
 import { roleOf, can } from "../rbac/rbac.js";
 
 export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
@@ -59,6 +59,41 @@ export function registerAgentRoutes(app: FastifyInstance, d: { db: DB }) {
       return reply.code(400).send({ error: "avatarUrl must be a string or null" });
     }
     const agent = await setAgentProfile(d.db, { orgId, agentId: id, avatarUrl, visibility });
+    if (!agent) return reply.code(404).send({ error: "agent not found" });
+    return reply.code(200).send(agent);
+  });
+
+  // #74: set an agent's preferences — systemPrompt / contextDirs / preferences —
+  // on its jsonb `config`. Reuses the agent-management gate (#28 agent:share),
+  // org-scoped (404). Merges into the existing config so model/provider (#58) and
+  // mcpServers (#57) are preserved. contextDirs must be a string[] (else 400).
+  app.patch("/agents/:id/config", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { systemPrompt, contextDirs, preferences } =
+      (req.body ?? {}) as { systemPrompt?: unknown; contextDirs?: unknown; preferences?: unknown };
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "agent:share")) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
+    if (systemPrompt !== undefined && typeof systemPrompt !== "string") {
+      return reply.code(400).send({ error: "systemPrompt must be a string" });
+    }
+    if (contextDirs !== undefined &&
+      (!Array.isArray(contextDirs) || !contextDirs.every((dir) => typeof dir === "string"))) {
+      return reply.code(400).send({ error: "contextDirs must be an array of strings" });
+    }
+    if (preferences !== undefined &&
+      (preferences === null || typeof preferences !== "object" || Array.isArray(preferences))) {
+      return reply.code(400).send({ error: "preferences must be an object" });
+    }
+    const agent = await setAgentConfig(d.db, {
+      orgId, agentId: id,
+      prefs: {
+        systemPrompt: systemPrompt as string | undefined,
+        contextDirs: contextDirs as string[] | undefined,
+        preferences: preferences as Record<string, unknown> | undefined,
+      },
+    });
     if (!agent) return reply.code(404).send({ error: "agent not found" });
     return reply.code(200).send(agent);
   });

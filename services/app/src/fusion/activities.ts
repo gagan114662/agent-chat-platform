@@ -12,16 +12,37 @@ import { reporterFromEnv } from "../billing/billing.js";
 import { reportRunUsage } from "../billing/report.js";
 import { captureDecision } from "../memory/capture.js";
 import { recallForIntent, formatRecall } from "../memory/memory.js";
+import { agentPrefs } from "../agents/agents.js";
+import { agents } from "../db/schema.js";
+import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 
-// Augments the intent the AGENT sees with a recalled-context preamble so prior
-// org decisions/facts inform a new run. The FIRST line stays the original task
-// (so the orchestrator PR title — first line only — remains clean). Returns the
-// original intent unchanged when there's no matching memory. Org-scoped.
-export async function buildAgentIntent(db: DB, orgId: string, intent: string): Promise<string> {
+// Augments the intent the AGENT sees with: the agent's configured persona
+// (#74 systemPrompt as a leading "## Instructions" block), the original task,
+// the agent's context-directory focus (#74 contextDirs hint), and a recalled
+// org-memory preamble (#26). Order: systemPrompt → task intent → focus dirs →
+// recalled memory. The TASK line stays the FIRST task line when there's no
+// systemPrompt (so the orchestrator PR title — first line only — remains clean);
+// when a systemPrompt is configured it leads, with the task preserved verbatim
+// just below it. Returns the original intent unchanged when there's neither
+// prefs nor matching memory. Org-scoped; agentId optional (omit = no prefs).
+export async function buildAgentIntent(db: DB, orgId: string, intent: string, agentId?: string): Promise<string> {
+  let prefs: ReturnType<typeof agentPrefs> = {};
+  if (agentId) {
+    const [agent] = await db.select().from(agents).where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+    prefs = agentPrefs(agent);
+  }
   const recalled = await recallForIntent(db, orgId, intent);
   const preamble = formatRecall(recalled);
-  return preamble ? `${intent}\n\n${preamble}` : intent;
+
+  const parts: string[] = [];
+  if (prefs.systemPrompt) parts.push(`## Instructions\n${prefs.systemPrompt}`);
+  parts.push(intent);
+  if (prefs.contextDirs && prefs.contextDirs.length > 0) {
+    parts.push(`## Focus directories: ${prefs.contextDirs.join(", ")}`);
+  }
+  if (preamble) parts.push(preamble);
+  return parts.join("\n\n");
 }
 
 export interface RunFusionActivityInput {
@@ -89,10 +110,11 @@ export async function runChatFusionActivity(
       }, { orgId: input.sink.orgId, event }).then(() => undefined),
     });
     const mergeGate = buildMergeGate(github, { owner: input.owner, repo: input.repo, autonomy: input.autonomy });
-    // #26: feed recalled org memory into the intent the agent sees (first line
-    // stays the original task → PR title stays clean). captureDecision below still
+    // #26/#74: feed the agent's configured persona/scope (#74 systemPrompt +
+    // contextDirs) and recalled org memory (#26) into the intent the agent sees
+    // (the task line stays clean → PR title clean). captureDecision below still
     // records against the original input.intent.
-    const agentIntent = await buildAgentIntent(db, input.sink.orgId, input.intent);
+    const agentIntent = await buildAgentIntent(db, input.sink.orgId, input.intent, input.sink.agentId);
     const fusionInput = {
       owner: input.owner, repo: input.repo, repoUrl,
       baseBranch: input.baseBranch, intent: agentIntent, branch: input.branch,

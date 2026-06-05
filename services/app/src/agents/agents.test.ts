@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
-import { resolveMention, isPermittedOnRepo, agentModelConfig, agentMcp, setAgentProfile, isAgentVisibility, createAgent, QuotaError } from "./agents.js";
+import { resolveMention, isPermittedOnRepo, agentModelConfig, agentMcp, agentPrefs, setAgentProfile, setAgentConfig, isAgentVisibility, createAgent, QuotaError } from "./agents.js";
 import { setSubscription } from "../billing/plans.js";
 import { orgs, workspaces, agents, repos } from "../db/schema.js";
 
@@ -157,6 +157,47 @@ describe("agentModelConfig (#58)", () => {
     expect(agentModelConfig({ config: { model: 123, provider: ["x"] } })).toEqual({});
     expect(agentModelConfig({ config: { model: "", provider: "" } })).toEqual({});
     expect(agentModelConfig({ config: "not-an-object" })).toEqual({});
+  });
+});
+
+describe("agentPrefs (#74)", () => {
+  it("returns {} for null/absent/empty/non-object config", () => {
+    expect(agentPrefs(null)).toEqual({});
+    expect(agentPrefs(undefined)).toEqual({});
+    expect(agentPrefs({})).toEqual({});
+    expect(agentPrefs({ config: {} })).toEqual({});
+    expect(agentPrefs({ config: "not-an-object" })).toEqual({});
+  });
+  it("surfaces well-typed systemPrompt / contextDirs / preferences", () => {
+    expect(agentPrefs({ config: { systemPrompt: "be careful", contextDirs: ["src/a"], preferences: { tone: "x" } } }))
+      .toEqual({ systemPrompt: "be careful", contextDirs: ["src/a"], preferences: { tone: "x" } });
+  });
+  it("ignores malformed values (empty string, non-string dirs, array preferences)", () => {
+    expect(agentPrefs({ config: { systemPrompt: "" } })).toEqual({});
+    expect(agentPrefs({ config: { systemPrompt: 123 } })).toEqual({});
+    expect(agentPrefs({ config: { contextDirs: ["src/a", 1, ""] } })).toEqual({ contextDirs: ["src/a"] });
+    expect(agentPrefs({ config: { contextDirs: [] } })).toEqual({});
+    expect(agentPrefs({ config: { contextDirs: "src/a" } })).toEqual({});
+    expect(agentPrefs({ config: { preferences: ["x"] } })).toEqual({});
+  });
+});
+
+describe("setAgentConfig (#74)", () => {
+  it("merges prefs into config without clobbering existing model/provider/mcpServers", async () => {
+    await h.db.insert(agents).values({
+      id: "a-cfg", orgId: "o1", workspaceId: "w1", handle: "opus2", displayName: "Opus2", adapter: "claude-code",
+      config: { model: "m", provider: "bedrock", mcpServers: ["filesystem"] },
+    });
+    const updated = await setAgentConfig(h.db, { orgId: "o1", agentId: "a-cfg", prefs: { systemPrompt: "be careful", contextDirs: ["src/auth"] } });
+    expect(agentModelConfig(updated)).toEqual({ model: "m", provider: "bedrock" });
+    expect(agentMcp(updated)).toEqual(["filesystem"]);
+    expect(agentPrefs(updated)).toEqual({ systemPrompt: "be careful", contextDirs: ["src/auth"] });
+  });
+  it("is cross-org safe (other org → undefined, no mutation)", async () => {
+    await h.db.insert(orgs).values({ id: "o2", name: "Org2" });
+    const res = await setAgentConfig(h.db, { orgId: "o2", agentId: "a1", prefs: { systemPrompt: "x" } });
+    expect(res).toBeUndefined();
+    expect(agentPrefs(await resolveMention(h.db, "o1", "coder"))).toEqual({});
   });
 });
 

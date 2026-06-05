@@ -71,6 +71,36 @@ export function agentMcp(agent: { config?: unknown } | null | undefined): string
   return names.length > 0 ? names : undefined;
 }
 
+// AgentPrefs is the optional per-agent preferences (#74) stored on the agent's
+// jsonb `config`: a custom `systemPrompt` (persona), `contextDirs` (focus dirs),
+// and a free-form `preferences` bag. All optional; absent = today's behavior.
+export interface AgentPrefs {
+  systemPrompt?: string;
+  contextDirs?: string[];
+  preferences?: Record<string, unknown>;
+}
+
+// agentPrefs reads the per-agent preferences (#74) off an agent's jsonb config.
+// Tolerant of an absent/loosely-typed config (jsonb): only well-typed values are
+// surfaced — `systemPrompt` only when a non-empty string, `contextDirs` only as a
+// non-empty array of non-empty strings, `preferences` only as a plain object.
+// Anything malformed is ignored so a bad config never injects prompt/scope.
+export function agentPrefs(agent: { config?: unknown } | null | undefined): AgentPrefs {
+  const cfg = agent?.config;
+  if (!cfg || typeof cfg !== "object") return {};
+  const c = cfg as Record<string, unknown>;
+  const out: AgentPrefs = {};
+  if (typeof c.systemPrompt === "string" && c.systemPrompt !== "") out.systemPrompt = c.systemPrompt;
+  if (Array.isArray(c.contextDirs)) {
+    const dirs = c.contextDirs.filter((d): d is string => typeof d === "string" && d !== "");
+    if (dirs.length > 0) out.contextDirs = dirs;
+  }
+  if (c.preferences && typeof c.preferences === "object" && !Array.isArray(c.preferences)) {
+    out.preferences = c.preferences as Record<string, unknown>;
+  }
+  return out;
+}
+
 // resolveMention finds an agent by org + handle. #91: an optional
 // `fromWorkspaceId` scopes PRIVATE agents (visibility = "private") to their own
 // workspace — a private agent is resolvable only from within its workspace.
@@ -99,6 +129,29 @@ export async function isPermittedOnRepo(db: DB, agentId: string, repoId: string)
 // or undefined if no agent with that id exists in the org.
 export async function setAgentShared(db: DB, { orgId, agentId, shared }: { orgId: string; agentId: string; shared: boolean }) {
   const [a] = await db.update(agents).set({ shared })
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
+    .returning();
+  return a;
+}
+
+// #74: set an agent's preferences on its jsonb `config` (org-scoped). MERGES the
+// provided prefs into the existing config so other config keys — model/provider
+// (#58), mcpServers (#57) — are preserved (never clobbered). Only the provided
+// pref keys (systemPrompt/contextDirs/preferences) are overwritten. Returns the
+// updated agent, or undefined if no agent with that id exists in the org
+// (cross-org → undefined, no mutation). Validation of contextDirs is the caller's.
+export async function setAgentConfig(
+  db: DB,
+  { orgId, agentId, prefs }: { orgId: string; agentId: string; prefs: { systemPrompt?: string; contextDirs?: string[]; preferences?: Record<string, unknown> } },
+) {
+  const [existing] = await db.select().from(agents).where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+  if (!existing) return undefined; // cross-org or missing → no mutation
+  const base = (existing.config && typeof existing.config === "object" ? existing.config : {}) as Record<string, unknown>;
+  const merged: Record<string, unknown> = { ...base };
+  if (prefs.systemPrompt !== undefined) merged.systemPrompt = prefs.systemPrompt;
+  if (prefs.contextDirs !== undefined) merged.contextDirs = prefs.contextDirs;
+  if (prefs.preferences !== undefined) merged.preferences = prefs.preferences;
+  const [a] = await db.update(agents).set({ config: merged })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
     .returning();
   return a;
