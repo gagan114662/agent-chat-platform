@@ -14,7 +14,7 @@ import (
 func TestRunSetupScriptWritesMarker(t *testing.T) {
 	dir := t.TempDir()
 	var lines []string
-	err := runSetupScript(context.Background(), dir, "echo hi > marker.txt", func(l string) {
+	err := runSetupScript(context.Background(), dir, "echo hi > marker.txt", nil, func(l string) {
 		lines = append(lines, l)
 	})
 	if err != nil {
@@ -28,7 +28,7 @@ func TestRunSetupScriptWritesMarker(t *testing.T) {
 func TestRunSetupScriptStreamsOutput(t *testing.T) {
 	dir := t.TempDir()
 	var lines []string
-	err := runSetupScript(context.Background(), dir, "echo first; echo second", func(l string) {
+	err := runSetupScript(context.Background(), dir, "echo first; echo second", nil, func(l string) {
 		lines = append(lines, l)
 	})
 	if err != nil {
@@ -41,7 +41,7 @@ func TestRunSetupScriptStreamsOutput(t *testing.T) {
 
 func TestRunSetupScriptNonZeroExitFails(t *testing.T) {
 	dir := t.TempDir()
-	err := runSetupScript(context.Background(), dir, "exit 3", func(string) {})
+	err := runSetupScript(context.Background(), dir, "exit 3", nil, func(string) {})
 	if err == nil {
 		t.Fatal("expected error for non-zero exit")
 	}
@@ -50,12 +50,28 @@ func TestRunSetupScriptNonZeroExitFails(t *testing.T) {
 func TestRunSetupScriptEmptyIsNoop(t *testing.T) {
 	dir := t.TempDir()
 	called := false
-	err := runSetupScript(context.Background(), dir, "", func(string) { called = true })
+	err := runSetupScript(context.Background(), dir, "", nil, func(string) { called = true })
 	if err != nil {
 		t.Fatalf("empty script should be no-op, got: %v", err)
 	}
 	if called {
 		t.Fatal("onLine should not be called for empty script")
+	}
+}
+
+// TestRunSetupScriptSeesEnv verifies the per-repo, admin-configured env vars
+// (#73) reach the setup script: the script echoes $FOO and we capture the value.
+func TestRunSetupScriptSeesEnv(t *testing.T) {
+	dir := t.TempDir()
+	var lines []string
+	err := runSetupScript(context.Background(), dir, "echo \"$FOO\"", map[string]string{"FOO": "bar"}, func(l string) {
+		lines = append(lines, l)
+	})
+	if err != nil {
+		t.Fatalf("runSetupScript: %v", err)
+	}
+	if len(lines) != 1 || lines[0] != "bar" {
+		t.Fatalf("expected setup script to see FOO=bar, got %v", lines)
 	}
 }
 

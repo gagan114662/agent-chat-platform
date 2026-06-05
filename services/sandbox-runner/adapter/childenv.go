@@ -2,6 +2,17 @@ package adapter
 
 import "strings"
 
+// applyRepoEnv appends the per-repo, admin-configured env vars to a child env
+// AFTER the #49 scrub (filterChildEnv). These are intentional repo config — an
+// admin override — so a configured *_TOKEN is allowed by design (that is the
+// point). nil/empty repoEnv leaves the env unchanged (today's behavior).
+func applyRepoEnv(env []string, repoEnv map[string]string) []string {
+	for k, v := range repoEnv {
+		env = append(env, k+"="+v)
+	}
+	return env
+}
+
 // sensitiveEnvSubstrings name env keys we must NOT expose to the agent process.
 var sensitiveEnvSubstrings = []string{"TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL"}
 

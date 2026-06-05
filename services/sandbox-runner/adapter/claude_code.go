@@ -29,12 +29,13 @@ func maxPromptBytes() int {
 // streaming its output as typed log events. exec/lookPath are injectable for tests.
 type ClaudeCodeAdapter struct {
 	lookPath   func(string) (string, error)
-	exec       func(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error
-	planExec   func(ctx context.Context, dir, intent, model, provider, mcpConfig string) (string, error)
-	repoDir    string   // captured from Prepare so ApplyFeedback (no dir param) knows where to run
-	model      string   // captured from Prepare; "" = the CLI default (no --model flag)
-	provider   string   // captured from Prepare; "" = default Anthropic (no provider env)
-	mcpServers []string // captured from Prepare; nil/empty = no .mcp.json, no --mcp-config
+	exec       func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error
+	planExec   func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string) (string, error)
+	repoDir    string            // captured from Prepare so ApplyFeedback (no dir param) knows where to run
+	model      string            // captured from Prepare; "" = the CLI default (no --model flag)
+	provider   string            // captured from Prepare; "" = default Anthropic (no provider env)
+	mcpServers []string          // captured from Prepare; nil/empty = no .mcp.json, no --mcp-config
+	env        map[string]string // captured from Prepare; per-repo admin env applied after the #49 scrub
 }
 
 func NewClaudeCodeAdapter() *ClaudeCodeAdapter {
@@ -53,6 +54,7 @@ func (a *ClaudeCodeAdapter) Prepare(_ context.Context, p PrepareContext) error {
 	a.model = p.Model     // optional --model selection (validated upstream in Validate())
 	a.provider = p.Provider
 	a.mcpServers = p.McpServers // optional MCP servers (authz applied at provisioning)
+	a.env = p.Env               // optional per-repo env applied after the scrub
 	return nil
 }
 
@@ -64,26 +66,26 @@ func (a *ClaudeCodeAdapter) Run(ctx context.Context, repoDir, intent string, emi
 // injected exec seam and captured model/provider. Kept as a thin method so
 // existing claude tests and ApplyFeedback keep their call shape.
 func (a *ClaudeCodeAdapter) runAgent(ctx context.Context, repoDir, prompt, startMsg, doneMsg, failMsg string, emit Emit) error {
-	return runAgentShared(ctx, a.exec, a.model, a.provider, a.mcpServers, repoDir, prompt, startMsg, doneMsg, failMsg, emit)
+	return runAgentShared(ctx, a.exec, a.model, a.provider, a.mcpServers, a.env, repoDir, prompt, startMsg, doneMsg, failMsg, emit)
 }
 
 // Plan runs `claude -p <intent> --permission-mode plan` (read-only) in repoDir
 // and returns the captured stdout. Reuses the Plan-24 hardening via the shared
 // planShared helper: prompt-bound, quarantine, built-in skills, filterChildEnv.
 func (a *ClaudeCodeAdapter) Plan(ctx context.Context, repoDir, intent string) (string, error) {
-	return planShared(ctx, a.planExec, a.model, a.provider, a.mcpServers, repoDir, intent, "claude-code plan failed")
+	return planShared(ctx, a.planExec, a.model, a.provider, a.mcpServers, a.env, repoDir, intent, "claude-code plan failed")
 }
 
 // execFunc is the injectable agent-exec seam shared by every first-party
 // adapter (claude-code, codex): run the CLI in dir with the given prompt and
 // stream each output line to onLine. mcpConfig is the path to a provisioned
 // .mcp.json (empty = none → no --mcp-config flag).
-type execFunc func(ctx context.Context, dir, prompt, model, provider, mcpConfig string, onLine func(string)) error
+type execFunc func(ctx context.Context, dir, prompt, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error
 
 // planExecFunc is the injectable read-only plan seam shared by adapters: run
 // the CLI's plan mode in dir and return the captured plan text. mcpConfig is
 // the path to a provisioned .mcp.json (empty = none → no --mcp-config flag).
-type planExecFunc func(ctx context.Context, dir, intent, model, provider, mcpConfig string) (string, error)
+type planExecFunc func(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string) (string, error)
 
 // runAgentShared is the package-level shared body for Run and ApplyFeedback
 // across adapters: it bounds the prompt, quarantines repo-resident agent
@@ -91,7 +93,7 @@ type planExecFunc func(ctx context.Context, dir, intent, model, provider, mcpCon
 // the injected exec seam (env-scrubbed inside the seam) streaming each line as
 // an EventLog, and emits start/done events. Both first-party adapters reuse this
 // single hardening path (DRY); only the exec seam (CLI argv) differs.
-func runAgentShared(ctx context.Context, exec execFunc, model, provider string, mcpServers []string, repoDir, prompt, startMsg, doneMsg, failMsg string, emit Emit) error {
+func runAgentShared(ctx context.Context, exec execFunc, model, provider string, mcpServers []string, env map[string]string, repoDir, prompt, startMsg, doneMsg, failMsg string, emit Emit) error {
 	if len(prompt) > maxPromptBytes() {
 		return fmt.Errorf("prompt exceeds max prompt size")
 	}
@@ -107,7 +109,7 @@ func runAgentShared(ctx context.Context, exec execFunc, model, provider string, 
 	if err == nil {
 		defer cleanupMcp()
 	}
-	if err := exec(ctx, repoDir, prompt, model, provider, mcpConfig, func(line string) {
+	if err := exec(ctx, repoDir, prompt, model, provider, mcpConfig, env, func(line string) {
 		emit(Event{Type: EventLog, Message: line})
 	}); err != nil {
 		return fmt.Errorf("%s: %w", failMsg, err)
@@ -120,7 +122,7 @@ func runAgentShared(ctx context.Context, exec execFunc, model, provider string, 
 // bounds the intent, quarantines repo-resident agent instructions, provisions
 // built-in skills, and runs the injected read-only planExec seam, returning the
 // captured plan text. failMsg names the adapter for error wrapping.
-func planShared(ctx context.Context, planExec planExecFunc, model, provider string, mcpServers []string, repoDir, intent, failMsg string) (string, error) {
+func planShared(ctx context.Context, planExec planExecFunc, model, provider string, mcpServers []string, env map[string]string, repoDir, intent, failMsg string) (string, error) {
 	if len(intent) > maxPromptBytes() {
 		return "", fmt.Errorf("intent exceeds max prompt size")
 	}
@@ -134,7 +136,7 @@ func planShared(ctx context.Context, planExec planExecFunc, model, provider stri
 	if err == nil {
 		defer cleanupMcp()
 	}
-	text, err := planExec(ctx, repoDir, intent, model, provider, mcpConfig)
+	text, err := planExec(ctx, repoDir, intent, model, provider, mcpConfig, env)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", failMsg, err)
 	}
@@ -182,12 +184,12 @@ func providerEnv(provider string) []string {
 // runClaudeCLI invokes `claude -p <intent> --permission-mode acceptEdits` in dir,
 // streaming combined stdout+stderr line-by-line to onLine. When model is set it
 // appends `--model <model>`; provider selects the backend via provider env.
-func runClaudeCLI(ctx context.Context, dir, intent, model, provider, mcpConfig string, onLine func(string)) error {
+func runClaudeCLI(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string, onLine func(string)) error {
 	cmd := exec.CommandContext(ctx, "claude", claudeArgs(intent, model, "acceptEdits", mcpConfig)...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Env = append(filterChildEnv(os.Environ()), providerEnv(provider)...)
+	cmd.Env = applyRepoEnv(append(filterChildEnv(os.Environ()), providerEnv(provider)...), env)
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw
 	cmd.Stderr = pw
@@ -212,12 +214,12 @@ func runClaudeCLI(ctx context.Context, dir, intent, model, provider, mcpConfig s
 // runClaudePlanCLI invokes `claude -p <intent> --permission-mode plan` in dir,
 // capturing the full combined stdout+stderr as the returned plan string.
 // Read-only: --permission-mode plan instructs the agent not to edit files.
-func runClaudePlanCLI(ctx context.Context, dir, intent, model, provider, mcpConfig string) (string, error) {
+func runClaudePlanCLI(ctx context.Context, dir, intent, model, provider, mcpConfig string, env map[string]string) (string, error) {
 	cmd := exec.CommandContext(ctx, "claude", claudeArgs(intent, model, "plan", mcpConfig)...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Env = append(filterChildEnv(os.Environ()), providerEnv(provider)...)
+	cmd.Env = applyRepoEnv(append(filterChildEnv(os.Environ()), providerEnv(provider)...), env)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err

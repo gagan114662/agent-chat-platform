@@ -146,6 +146,7 @@ export async function executeAction(db: DB, deps: AutomationDeps, orgId: string,
     repo: {
       githubOwner: repo.githubOwner, githubName: repo.githubName,
       defaultBranch: repo.defaultBranch, tokenEnvVar: repo.tokenEnvVar, autonomy: repo.autonomy,
+      envVars: repo.envVars, githubApiUrl: repo.githubApiUrl, // #73
     },
     agentId: action.agentId, intent: action.intent, sandboxUrl: deps.sandboxUrl,
     ...agentModelConfig(agent),

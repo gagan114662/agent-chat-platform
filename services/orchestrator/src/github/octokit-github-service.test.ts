@@ -69,6 +69,33 @@ describe("OctokitGitHubService", () => {
     ]);
   });
 
+  it("routes requests at a GitHub Enterprise base URL", async () => {
+    const ghe = "https://ghe.example.com/api/v3";
+    nock(ghe)
+      .post("/repos/o/r/pulls")
+      .reply(201, { number: 9, html_url: "https://ghe.example.com/o/r/pull/9" });
+
+    const svc = new OctokitGitHubService("tok", ghe);
+    const pr = await svc.openPr({
+      owner: "o", repo: "r", head: "feature/x", base: "main",
+      title: "t", body: "b",
+    });
+    expect(pr).toEqual({ number: 9, url: "https://ghe.example.com/o/r/pull/9" });
+  });
+
+  it("defaults to github.com when no base URL is given", async () => {
+    nock(api)
+      .post("/repos/o/r/pulls")
+      .reply(201, { number: 11, html_url: "https://github.com/o/r/pull/11" });
+
+    const svc = new OctokitGitHubService("tok");
+    const pr = await svc.openPr({
+      owner: "o", repo: "r", head: "feature/x", base: "main",
+      title: "t", body: "b",
+    });
+    expect(pr.number).toBe(11);
+  });
+
   it("updates a PR with only the provided fields", async () => {
     let sentBody: unknown;
     nock(api)

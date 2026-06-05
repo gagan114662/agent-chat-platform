@@ -23,7 +23,11 @@ type RunRequest struct {
 	// only ever populated from trusted repo config (never cloned content), so it
 	// carries no charset validation — it is a shell script by design.
 	SetupScript string `json:"setupScript,omitempty"`
-	WorkDir     string `json:"-"`
+	// Env is the per-repo, admin-configured environment applied to the agent's
+	// child env (after the #49 scrub) AND to the setup script (#73). Optional;
+	// nil/empty = today's behavior. Only ever populated from trusted repo config.
+	Env     map[string]string `json:"env,omitempty"`
+	WorkDir string            `json:"-"`
 }
 
 type RunResult struct {
@@ -136,7 +140,7 @@ func Run(ctx context.Context, req RunRequest, agent Agent, limits Limits) (RunRe
 	// Per-repo setup (deps/build) runs after clone and BEFORE the agent, in the
 	// workdir, bounded by ctx (#50). A non-zero exit fails the run. Run takes a
 	// plain Agent with no emitter, so setup output is discarded here.
-	if err := runSetupScript(ctx, req.WorkDir, req.SetupScript, nil); err != nil {
+	if err := runSetupScript(ctx, req.WorkDir, req.SetupScript, req.Env, nil); err != nil {
 		return RunResult{}, fmt.Errorf("setup: %w", err)
 	}
 	if err := agent.Apply(ctx, req.WorkDir, req.Intent); err != nil {

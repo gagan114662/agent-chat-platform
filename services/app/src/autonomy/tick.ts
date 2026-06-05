@@ -57,6 +57,7 @@ export async function tick(d: TickDeps, args: { orgId: string; budgetMax?: numbe
       repo: {
         githubOwner: repo.githubOwner, githubName: repo.githubName,
         defaultBranch: repo.defaultBranch, tokenEnvVar: repo.tokenEnvVar, autonomy: repo.autonomy,
+        envVars: repo.envVars, githubApiUrl: repo.githubApiUrl, // #73
       },
       agentId: t.assigneeId, intent: t.title, sandboxUrl: d.sandboxUrl,
       ...agentModelConfig(agent), // #58: per-agent model/provider from agents.config

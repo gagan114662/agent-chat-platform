@@ -12,6 +12,13 @@ export interface StartRepo {
   // #71 per-repo setup script (repos.setupScript). Nullable in the DB; surfaced
   // into the run so the sandbox runs it after clone, before the agent.
   setupScript?: string | null;
+  // #73 per-repo environment variables (repos.envVars). Threaded into the run so
+  // the sandbox applies them to the agent's child env and the setup script.
+  // Optional; undefined/empty = none (today's behavior).
+  envVars?: Record<string, string> | null;
+  // #73 GitHub Enterprise base URL (repos.githubApiUrl). Nullable; surfaced so
+  // the activity builds the GitHub client against the GHE host. null = github.com.
+  githubApiUrl?: string | null;
 }
 
 export interface StartFusionRunInput {
@@ -60,6 +67,8 @@ export async function startFusionRun(temporal: Client, i: StartFusionRunInput) {
     ...(i.provider ? { provider: i.provider } : {}),
     ...(i.mcpServers ? { mcpServers: i.mcpServers } : {}),
     ...(i.repo.setupScript ? { setupScript: i.repo.setupScript } : {}), // #71
+    ...(i.repo.envVars && Object.keys(i.repo.envVars).length > 0 ? { env: i.repo.envVars } : {}), // #73
+    ...(i.repo.githubApiUrl ? { githubApiUrl: i.repo.githubApiUrl } : {}), // #73
     sink: { orgId: i.orgId, threadId: i.threadId, runId: i.run.id, agentId: i.agentId, mentionDepth: i.mentionDepth ?? 0, ...(i.parentRunId ? { parentRunId: i.parentRunId } : {}) },
   });
 }
