@@ -11,6 +11,13 @@ import type { FusionEvent } from "@acp/orchestrator/core/run-fusion.js";
 export interface SinkCtx { orgId: string; threadId: string; runId: string; agentId: string; mentionDepth?: number; parentRunId?: string; }
 export const THREAD_CHANNEL = "thread_messages";
 
+// #98 best-effort hook: on an `outcome` event the sink fires matching user event
+// automations (`outcome:<outcome>`). Injected so production wires the real
+// fireEventAutomations and tests inject a fake. The call is GUARDED inside the sink
+// (a thrown error is swallowed) so an automation failure can NEVER break message
+// delivery or the run-state transition.
+export interface SinkDeps { fireEvents?: (event: string) => Promise<void>; }
+
 function describe(e: FusionEvent): string {
   switch (e.type) {
     case "sandbox_started": return "🧪 sandbox started — cloning repo and running agent…";
@@ -37,7 +44,7 @@ function eventKey(e: FusionEvent): string {
   return e.type;
 }
 
-export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
+export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx, deps: SinkDeps = {}) {
   return async (e: FusionEvent) => {
     const key = eventKey(e);
 
@@ -118,6 +125,17 @@ export function makeFusionSink(db: DB, sql: postgres.Sql, ctx: SinkCtx) {
         await transitionRun(db, ctx.runId, e.outcome, {
           prNumber: e.prNumber, prUrl: e.prUrl, commitSha: e.commitSha,
         }, ctx.orgId);
+      }
+
+      // #98: fire matching user event automations for this outcome — BEST-EFFORT.
+      // Guarded so a failure can't break the delivery/transition above (which has
+      // already completed). The event key is `outcome:<outcome>`.
+      if (deps.fireEvents) {
+        try {
+          await deps.fireEvents(`outcome:${e.outcome}`);
+        } catch (err) {
+          console.warn(`[acp] event automation hook failed for ${ctx.runId} (best-effort):`, String(err));
+        }
       }
     }
   };

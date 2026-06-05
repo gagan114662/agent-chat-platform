@@ -98,6 +98,32 @@ describe("fusion sink", () => {
     expect(r.state).toBe("awaiting_plan_approval");
   });
 
+  it("#98: fires the event-automation hook on outcome with `outcome:<outcome>` (best-effort)", async () => {
+    const { run } = await seedRun();
+    const events: string[] = [];
+    const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" }, {
+      fireEvents: async (event) => { events.push(event); },
+    });
+    await sink({ type: "sandbox_started" });
+    await sink({ type: "outcome", outcome: "checks_failed", prNumber: 7, prUrl: "u" });
+    expect(events).toContain("outcome:checks_failed");
+  });
+
+  it("#98: a throwing event-automation hook does not break delivery/transition (guarded)", async () => {
+    const { run } = await seedRun();
+    const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" }, {
+      fireEvents: async () => { throw new Error("boom"); },
+    });
+    await sink({ type: "sandbox_started" });
+    // Must not throw even though the hook throws.
+    await sink({ type: "outcome", outcome: "merged", prNumber: 7, prUrl: "u", commitSha: "s" });
+    // The transition still happened and the message was still delivered.
+    const [r] = await h.db.select().from(runs).where(eq(runs.id, run.id));
+    expect(r.state).toBe("merged");
+    const msgs = await listMessages(h.db, "t1", "o1");
+    expect(msgs.at(-1)?.kind).toBe("pr_card");
+  });
+
   it("is idempotent on replay (same seq not double-written)", async () => {
     const { run } = await seedRun();
     const sink = makeFusionSink(h.db, h.sql, { orgId: "o1", threadId: "t1", runId: run.id, agentId: "a1" });

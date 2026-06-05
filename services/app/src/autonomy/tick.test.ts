@@ -2,7 +2,8 @@ import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { tick, type StartRun } from "./tick.js";
-import { orgs, workspaces, channels, threads, repos, agents, tasks, runs, incidents } from "../db/schema.js";
+import { orgs, workspaces, channels, threads, repos, agents, tasks, runs, incidents, automations } from "../db/schema.js";
+import { listMessages } from "../chat/messages.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
@@ -111,6 +112,22 @@ describe("tick — observe ready tasks, dispatch within budget", () => {
     expect(res.alerts).toBeGreaterThanOrEqual(1);
     const inc = await h.db.select().from(incidents).where(eq(incidents.orgId, "o1"));
     expect(inc.some((i) => i.source === "alert" && i.id === "o1:run-failed:r-cf")).toBe(true);
+  });
+
+  it("#98: fires a due schedule automation from the tick (and reports the count)", async () => {
+    await h.db.insert(automations).values({
+      id: "auto-1", orgId: "o1", name: "brief", createdById: "m1",
+      trigger: { type: "schedule", everyMinutes: 60 } as any,
+      action: { type: "message", threadId: "t1", body: "morning brief" } as any,
+    });
+    const start = vi.fn(async () => {});
+    const res = await tick(makeDeps(start), { orgId: "o1" });
+    expect(res.automations).toBe(1);
+    const msgs = await listMessages(h.db, "t1", "o1");
+    expect(msgs.some((m) => m.body === "morning brief")).toBe(true);
+    // lastFiredAt set → an immediate re-tick does not re-fire it
+    const again = await tick(makeDeps(start), { orgId: "o1" });
+    expect(again.automations).toBe(0);
   });
 
   it("does not touch another org's tasks (org-scoped)", async () => {

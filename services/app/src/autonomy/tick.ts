@@ -6,6 +6,7 @@ import { tasks, threads, repos, runs, agents } from "../db/schema.js";
 import { startFusionRun, type StartFusionRunInput } from "../fusion/start.js";
 import { agentModelConfig, agentMcp } from "../agents/agents.js";
 import { detectAlerts, recordAlerts } from "./alerts.js";
+import { runDueScheduleAutomations } from "./automations.js";
 
 // `start` is injectable so the tick can run with a FAKE temporal in tests (and so the
 // production path stays identical to the mention/hand-off starter). It defaults to the
@@ -19,7 +20,7 @@ export interface TickDeps {
   sandboxUrl: string;
   start?: StartRun;
 }
-export interface TickResult { dispatched: string[]; skipped: number; reason: string; alerts: number; }
+export interface TickResult { dispatched: string[]; skipped: number; reason: string; alerts: number; automations: number; }
 
 // One self-prompting iteration for an org: find OPEN tasks that are ready to run
 // (assigned to an agent, thread has a repo with a resolvable token, NOT monitor-only,
@@ -69,5 +70,10 @@ export async function tick(d: TickDeps, args: { orgId: string; budgetMax?: numbe
   // by what detectAlerts finds.
   const detected = await detectAlerts(d.db, args.orgId);
   const alerts = await recordAlerts(d.db, d.sql, { orgId: args.orgId }, detected);
-  return { dispatched, skipped, reason: `budget ${budget}, ${open.length} open tasks`, alerts };
+  // #98: fire user automations whose schedule is due this iteration (bounded
+  // per-tick inside runDueScheduleAutomations). The same injected `start` seam is
+  // threaded so run-actions dispatch through the fake starter in tests. The pass
+  // is org-scoped and uses the wall clock as `now`.
+  const automations = await runDueScheduleAutomations(d.db, { db: d.db, sql: d.sql, temporal: d.temporal, sandboxUrl: d.sandboxUrl, start }, { orgId: args.orgId, now: new Date() });
+  return { dispatched, skipped, reason: `budget ${budget}, ${open.length} open tasks`, alerts, automations };
 }
