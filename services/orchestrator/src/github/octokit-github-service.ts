@@ -22,9 +22,12 @@ function isBinaryPath(path: string): boolean {
 export class OctokitGitHubService implements GitHubService {
   private readonly octokit: Octokit;
 
-  constructor(token: string) {
+  // baseUrl optionally points the client at a GitHub Enterprise host's API root
+  // (e.g. "https://ghe.example.com/api/v3"). Undefined => api.github.com as today.
+  constructor(token: string, baseUrl?: string) {
     this.octokit = new Octokit({
       auth: token,
+      ...(baseUrl ? { baseUrl } : {}),
       request: { fetch: nodeFetch as typeof globalThis.fetch },
     });
   }
