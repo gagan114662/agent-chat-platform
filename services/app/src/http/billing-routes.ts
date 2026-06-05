@@ -9,6 +9,7 @@ import { plans, subscriptions } from "../db/schema.js";
 import { treasuryBalanceCents, listInvoices } from "../payments/treasury.js";
 import { profitAndLoss, suggestProfitGoal } from "../payments/pnl.js";
 import { listDecisions } from "../payments/decisions.js";
+import { balanceCents, topUp, recentLedger, meteringEnabled, centsPerRun } from "../billing/credits.js";
 
 const QUOTA_KINDS: QuotaKind[] = ["seats", "agents", "messages", "tasks"];
 
@@ -19,6 +20,21 @@ const QUOTA_KINDS: QuotaKind[] = ["seats", "agents", "messages", "tasks"];
 // unless STRIPE_API_KEY is set. Checkout/portal are admin-gated (team:manage)
 // and everything is org-scoped (actor(req).orgId).
 export function registerBillingRoutes(app: FastifyInstance, d: { db: DB; makeStripe?: MakeStripe }) {
+  // #148: prepaid credit balance + recent ledger + whether metering is active.
+  app.get("/credits", async (req) => {
+    const { orgId } = actor(req);
+    return { balanceCents: await balanceCents(d.db, orgId), metered: meteringEnabled(), centsPerRun: centsPerRun(), recent: await recentLedger(d.db, orgId, 20) };
+  });
+  // #148: top up credits (admin). Real money in is the operator's processor; this
+  // records the settled grant so agents can run. amountCents > 0.
+  app.post("/credits/topup", async (req, reply) => {
+    const { orgId, userId } = actor(req);
+    if (!can(await roleOf(d.db, userId, orgId), "team:manage")) return reply.code(403).send({ error: "forbidden" });
+    const { amountCents, reason } = (req.body ?? {}) as { amountCents?: number; reason?: string };
+    if (typeof amountCents !== "number" || amountCents <= 0) return reply.code(400).send({ error: "amountCents > 0 required" });
+    return reply.code(201).send({ balanceCents: await topUp(d.db, orgId, amountCents, reason ?? "top-up") });
+  });
+
   // The org's current plan + usage + per-resource quotas.
   app.get("/billing", async (req) => {
     const { orgId } = actor(req);

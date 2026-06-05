@@ -330,6 +330,13 @@
       "when": 1783782400000,
       "tag": "0046_goal_business",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1783868800000,
+      "tag": "0047_credits",
+      "breakpoints": true
     }
   ]
 }

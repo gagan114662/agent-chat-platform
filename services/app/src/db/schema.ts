@@ -230,6 +230,16 @@ export const outreachCampaigns = pgTable("outreach_campaigns", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// #148 prepaid credit ledger: append-only; balance = sum(deltaCents). Positive =
+// top-up/grant, negative = metered agent compute.
+export const creditLedger = pgTable("credit_ledger", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  deltaCents: integer("delta_cents").notNull(),
+  reason: text("reason").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const goals = pgTable("goals", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),

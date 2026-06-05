@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Billing, Plan, QuotaKind, Treasury } from "../api.js";
+import type { Billing, Plan, QuotaKind, Treasury, Credits } from "../api.js";
 
 const QUOTA_KINDS: QuotaKind[] = ["seats", "agents", "messages", "tasks"];
 
@@ -15,25 +15,42 @@ export function BillingPanel({
   listPlans,
   billingCheckout,
   getTreasury,
+  getCredits,
+  topUpCredits,
   redirect = (url: string) => { window.location.href = url; },
 }: {
   getBilling: () => Promise<Billing>;
   listPlans: () => Promise<Plan[]>;
   billingCheckout: (planId: string) => Promise<{ url: string }>;
   getTreasury?: () => Promise<Treasury>;
+  getCredits?: () => Promise<Credits>;
+  topUpCredits?: (amountCents: number) => Promise<{ balanceCents: number }>;
   redirect?: (url: string) => void;
 }) {
   const [billing, setBilling] = useState<Billing | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [treasury, setTreasury] = useState<Treasury | null>(null);
+  const [credits, setCredits] = useState<Credits | null>(null);
+  const [topup, setTopup] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const loadCredits = () => getCredits?.().then(setCredits).catch(() => {});
   useEffect(() => {
     getBilling().then(setBilling).catch((e) => setError((e as Error).message));
     listPlans().then(setPlans).catch((e) => setError((e as Error).message));
     getTreasury?.().then(setTreasury).catch(() => {});
-  }, [getBilling, listPlans, getTreasury]);
+    loadCredits();
+  }, [getBilling, listPlans, getTreasury, getCredits]);
+
+  const doTopUp = async () => {
+    if (!topUpCredits) return;
+    const dollars = parseFloat(topup);
+    if (!(dollars > 0)) return;
+    setError(null);
+    try { await topUpCredits(Math.round(dollars * 100)); setTopup(""); loadCredits(); }
+    catch (e) { setError((e as Error).message); }
+  };
 
   const upgrade = async (planId: string) => {
     if (busy) return;
@@ -52,6 +69,25 @@ export function BillingPanel({
     <div className="flex-1 overflow-y-auto p-4">
       <h2 className="mb-4 text-sm font-semibold text-ink">Billing</h2>
       {error && <p className="mb-3 text-xs text-danger">{error}</p>}
+
+      {credits && (
+        <div className="mb-4 rounded-lg border border-line bg-surface p-3">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">Prepaid credits</span>
+            <span className={`text-sm font-semibold ${credits.balanceCents > 0 ? "text-positive" : "text-danger"}`}>{usd(credits.balanceCents)}</span>
+          </div>
+          <div className="text-[11px] text-ink-3">
+            {credits.metered ? `Metered: ${usd(credits.centsPerRun)}/run — agents pause when the balance hits $0 (top up to resume).` : "Metering off (agents run on the workspace subscription). Top up to enable prepaid metering."}
+          </div>
+          {topUpCredits && (
+            <div className="mt-2 flex items-center gap-2">
+              <input value={topup} onChange={(e) => setTopup(e.target.value)} placeholder="amount ($)" className="w-28 rounded-lg border border-line bg-elevated px-2 py-1 text-xs text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none" />
+              <button onClick={doTopUp} disabled={!topup} className="rounded-lg bg-accent px-3 py-1 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50">Top up</button>
+              <span className="text-[10px] text-ink-3">Real payment is operator-connected (Stripe); this records the settled grant.</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {billing && (
         <>

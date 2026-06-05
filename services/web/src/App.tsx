@@ -8,7 +8,7 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, getRunPr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, runGoal, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, setDeployCommand, deployRepo, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listBusinesses, createBusiness, getBusiness, createPaymentIntent, decidePaymentIntent, createCampaign, decideCampaign, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes, listApprovals, deriveMemoryEdges } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, getRunPr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, runGoal, listGoals, setGoalAutonomy, getAutonomyStatus, connectRepo, ingestRepoIssues, setDeployCommand, deployRepo, listAgents, listActiveAgents, setAgentProfile, createAgent, getAgentSkill, saveAgentSkill, optimizeAgentSkill, listBusinesses, createBusiness, getBusiness, createPaymentIntent, decidePaymentIntent, createCampaign, decideCampaign, listTasks, getTask, getTaskDelegation, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, getTreasury, getCredits, topUpCredits, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes, listApprovals, deriveMemoryEdges } from "./api.js";
 import { GoalsPanel } from "./components/GoalsPanel.js";
 import { AgentsPanel } from "./components/AgentsPanel.js";
 import { TasksPanel } from "./components/TasksPanel.js";
@@ -271,7 +271,7 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
                 : view === "tasks"
                   ? <TasksPanel listTasks={listTasks} getTask={getTask} getTaskDelegation={getTaskDelegation} updateTask={updateTask} addTaskComment={addTaskComment} />
                   : view === "billing"
-                    ? <BillingPanel getBilling={getBilling} listPlans={listPlans} billingCheckout={billingCheckout} getTreasury={getTreasury} />
+                    ? <BillingPanel getBilling={getBilling} listPlans={listPlans} billingCheckout={billingCheckout} getTreasury={getTreasury} getCredits={getCredits} topUpCredits={topUpCredits} />
                     : view === "automations"
                       ? <AutomationsPanel listAutomations={listAutomations} createAutomation={createAutomation} setAutomationEnabled={setAutomationEnabled} deleteAutomation={deleteAutomation} threads={[...threads, ...dms].map((t) => ({ id: t.id, title: t.title }))} agents={principals.filter((p) => p.kind === "agent").map((p) => ({ id: p.id, handle: p.name }))} />
                       : view === "memory"

@@ -166,6 +166,7 @@ export async function buildServer() {
           !req.url.startsWith("/orgs") &&
           !req.url.startsWith("/agents") &&
           !req.url.startsWith("/billing") &&
+          !req.url.startsWith("/credits") &&
           !req.url.startsWith("/memory") &&
           !req.url.startsWith("/dms") &&
           !req.url.startsWith("/repos") &&

@@ -581,6 +581,19 @@ export async function getTreasury(): Promise<Treasury> {
   return res.json();
 }
 
+// #148 prepaid credits: balance + metering state + recent ledger; top up (admin).
+export interface Credits { balanceCents: number; metered: boolean; centsPerRun: number; recent: { id: string; deltaCents: number; reason: string; createdAt: string }[]; }
+export async function getCredits(): Promise<Credits> {
+  const res = await fetch(`/credits`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getCredits ${res.status}`);
+  return res.json();
+}
+export async function topUpCredits(amountCents: number): Promise<{ balanceCents: number }> {
+  const res = await fetch(`/credits/topup`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify({ amountCents }) });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `topUpCredits ${res.status}`);
+  return res.json();
+}
+
 export async function listPlans(): Promise<Plan[]> {
   const res = await fetch(`/billing/plans`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`listPlans ${res.status}`);
