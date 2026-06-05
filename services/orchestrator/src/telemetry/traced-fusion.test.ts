@@ -23,6 +23,7 @@ function deps(checks: ChecksStatus[]) {
   let i = 0;
   const github: GitHubService = {
     openPr: vi.fn().mockResolvedValue({ number: 7, url: "u" }),
+    findPrForBranch: vi.fn().mockResolvedValue(null),
     getChecksStatus: vi.fn().mockImplementation(async () => checks[Math.min(i++, checks.length - 1)]),
     merge: vi.fn().mockResolvedValue(undefined),
     getChangedFiles: vi.fn().mockResolvedValue([]),

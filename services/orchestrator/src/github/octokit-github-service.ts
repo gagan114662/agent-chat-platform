@@ -44,6 +44,21 @@ export class OctokitGitHubService implements GitHubService {
     return { number: res.data.number, url: res.data.html_url };
   }
 
+  async findPrForBranch(
+    owner: string,
+    repo: string,
+    head: string,
+  ): Promise<{ number: number; url: string } | null> {
+    const res = await this.octokit.pulls.list({
+      owner,
+      repo,
+      head: `${owner}:${head}`,
+      state: "open",
+    });
+    const first = res.data[0];
+    return first ? { number: first.number, url: first.html_url } : null;
+  }
+
   async getChecksStatus(owner: string, repo: string, ref: string): Promise<ChecksStatus> {
     const res = await this.octokit.repos.getCombinedStatusForRef({ owner, repo, ref });
     const state = res.data.state; // "success" | "pending" | "failure" | "error"

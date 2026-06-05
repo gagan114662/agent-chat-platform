@@ -73,6 +73,30 @@ export interface FusionResult {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// An already-merged PR is a no-op success for an idempotent retry (#70): GitHub
+// returns 405/422 with a message like "Pull Request is already merged". Match on
+// that signal so a retried activity treats it as merged rather than failing.
+function isAlreadyMerged(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /already merged/i.test(msg);
+}
+
+// Tolerant merge (#70): a clean merge behaves as today; an already-merged signal
+// is swallowed (idempotent). Any other error is rethrown.
+async function mergeIdempotent(
+  github: FusionDeps["github"],
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<void> {
+  try {
+    await github.merge(owner, repo, prNumber);
+  } catch (err) {
+    if (isAlreadyMerged(err)) return;
+    throw err;
+  }
+}
+
 // NOTE: In Plan 4 the CI-resolution loop (fix-on-red) and risk router replace
 // the simple failure/return below. The skeleton just gates on green/red/timeout.
 export async function runFusion(
@@ -118,7 +142,10 @@ export async function runFusion(
   });
   await emit({ type: "branch_pushed", branch: run.branch, commitSha: run.commitSha });
 
-  const pr = await deps.github.openPr({
+  // Find-or-create (#70): reuse an existing open PR for the head branch so a
+  // retried activity doesn't open a duplicate. No existing PR => open as today.
+  const existing = await deps.github.findPrForBranch(input.owner, input.repo, run.branch);
+  const pr = existing ?? await deps.github.openPr({
     owner: input.owner,
     repo: input.repo,
     head: run.branch,
@@ -142,7 +169,7 @@ export async function runFusion(
           return { outcome: "held_for_human", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha };
         }
       }
-      await deps.github.merge(input.owner, input.repo, pr.number);
+      await mergeIdempotent(deps.github, input.owner, input.repo, pr.number);
       await emit({ type: "outcome", outcome: "merged", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha });
       return { outcome: "merged", prNumber: pr.number, prUrl: pr.url, commitSha: run.commitSha };
     }

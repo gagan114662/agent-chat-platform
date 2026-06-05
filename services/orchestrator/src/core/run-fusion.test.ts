@@ -13,6 +13,7 @@ function deps(checks: ChecksStatus[]) {
   let i = 0;
   const github: GitHubService = {
     openPr: vi.fn().mockResolvedValue({ number: 7, url: "u" }),
+    findPrForBranch: vi.fn().mockResolvedValue(null),
     getChecksStatus: vi.fn().mockImplementation(async () => checks[Math.min(i++, checks.length - 1)]),
     merge: vi.fn().mockResolvedValue(undefined),
     getChangedFiles: vi.fn().mockResolvedValue([]),
@@ -36,6 +37,43 @@ describe("runFusion", () => {
     const out = await runFusion(d, input, { pollMs: 0, maxPolls: 5 });
     expect(out.outcome).toBe("merged");
     expect(d.github.merge).toHaveBeenCalledWith("o", "r", 7);
+  });
+
+  it("reuses an existing PR for the branch instead of opening a duplicate (#70)", async () => {
+    const d = deps(["success"]);
+    (d.github.findPrForBranch as ReturnType<typeof vi.fn>).mockResolvedValue({ number: 42, url: "u42" });
+    const out = await runFusion(d, input, { pollMs: 0, maxPolls: 5 });
+    expect(out.outcome).toBe("merged");
+    expect(d.github.findPrForBranch).toHaveBeenCalledWith("o", "r", "feature/x");
+    expect(d.github.openPr).not.toHaveBeenCalled();
+    expect(out.prNumber).toBe(42);
+    expect(d.github.merge).toHaveBeenCalledWith("o", "r", 42);
+  });
+
+  it("opens a PR when none exists for the branch (#70, happy path)", async () => {
+    const d = deps(["success"]);
+    const out = await runFusion(d, input, { pollMs: 0, maxPolls: 5 });
+    expect(out.outcome).toBe("merged");
+    expect(d.github.openPr).toHaveBeenCalledTimes(1);
+    expect(out.prNumber).toBe(7);
+  });
+
+  it("treats an already-merged PR as merged (idempotent retry, #70)", async () => {
+    const d = deps(["success"]);
+    (d.github.merge as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("Pull Request is already merged"),
+    );
+    const out = await runFusion(d, input, { pollMs: 0, maxPolls: 5 });
+    expect(out.outcome).toBe("merged");
+    expect(out.prNumber).toBe(7);
+  });
+
+  it("rethrows a merge error that is not an already-merged signal (#70)", async () => {
+    const d = deps(["success"]);
+    (d.github.merge as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("Pull Request is not mergeable"),
+    );
+    await expect(runFusion(d, input, { pollMs: 0, maxPolls: 5 })).rejects.toThrow(/not mergeable/);
   });
 
   it("does not merge and reports failure when checks fail", async () => {
