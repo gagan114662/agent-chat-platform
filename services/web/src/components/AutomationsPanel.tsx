@@ -25,11 +25,16 @@ export function AutomationsPanel({
   createAutomation,
   setAutomationEnabled,
   deleteAutomation,
+  threads = [],
+  agents = [],
 }: {
   listAutomations: () => Promise<Automation[]>;
   createAutomation: (name: string, trigger: AutomationTrigger, action: AutomationAction) => Promise<Automation>;
   setAutomationEnabled: (id: string, enabled: boolean) => Promise<void>;
   deleteAutomation: (id: string) => Promise<void>;
+  // #108: when provided, the raw thread-id / agent-id fields become dropdowns.
+  threads?: { id: string; title: string }[];
+  agents?: { id: string; handle: string }[];
 }) {
   const [rows, setRows] = useState<Automation[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +103,7 @@ export function AutomationsPanel({
     }
   };
 
-  const inputCls = "w-full rounded-lg border border-line px-2 py-1.5 text-sm focus:border-accent focus:outline-none";
+  const inputCls = "w-full rounded-lg border border-line bg-elevated px-2 py-1.5 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none";
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
@@ -114,7 +119,11 @@ export function AutomationsPanel({
             <option value="event">event</option>
           </select>
           {triggerType === "schedule" ? (
-            <input aria-label="every minutes" type="number" value={everyMinutes} onChange={(e) => setEveryMinutes(e.target.value)} placeholder="every minutes" className={inputCls} />
+            <div className="flex flex-1 items-center gap-2">
+              <span className="shrink-0 text-xs text-ink-3">every</span>
+              <input aria-label="every minutes" type="number" min={1} value={everyMinutes} onChange={(e) => setEveryMinutes(e.target.value)} placeholder="60" className={inputCls} />
+              <span className="shrink-0 text-xs text-ink-3">minutes</span>
+            </div>
           ) : (
             <input aria-label="event name" value={event} onChange={(e) => setEvent(e.target.value)} placeholder="event (e.g. outcome:checks_failed)" className={inputCls} />
           )}
@@ -128,14 +137,35 @@ export function AutomationsPanel({
           </select>
           {actionType === "message" && (
             <>
-              <input aria-label="message thread id" value={threadId} onChange={(e) => setThreadId(e.target.value)} placeholder="thread id" className={inputCls} />
+              {threads.length ? (
+                <select aria-label="message thread id" value={threadId} onChange={(e) => setThreadId(e.target.value)} className={inputCls}>
+                  <option value="">Select a thread…</option>
+                  {threads.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </select>
+              ) : (
+                <input aria-label="message thread id" value={threadId} onChange={(e) => setThreadId(e.target.value)} placeholder="thread id" className={inputCls} />
+              )}
               <input aria-label="message body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="body" className={inputCls} />
             </>
           )}
           {actionType === "run" && (
             <>
-              <input aria-label="run thread id" value={threadId} onChange={(e) => setThreadId(e.target.value)} placeholder="thread id" className={inputCls} />
-              <input aria-label="run agent id" value={agentId} onChange={(e) => setAgentId(e.target.value)} placeholder="agent id" className={inputCls} />
+              {threads.length ? (
+                <select aria-label="run thread id" value={threadId} onChange={(e) => setThreadId(e.target.value)} className={inputCls}>
+                  <option value="">Select a thread…</option>
+                  {threads.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </select>
+              ) : (
+                <input aria-label="run thread id" value={threadId} onChange={(e) => setThreadId(e.target.value)} placeholder="thread id" className={inputCls} />
+              )}
+              {agents.length ? (
+                <select aria-label="run agent id" value={agentId} onChange={(e) => setAgentId(e.target.value)} className={inputCls}>
+                  <option value="">Select an agent…</option>
+                  {agents.map((a) => <option key={a.id} value={a.id}>@{a.handle}</option>)}
+                </select>
+              ) : (
+                <input aria-label="run agent id" value={agentId} onChange={(e) => setAgentId(e.target.value)} placeholder="agent id" className={inputCls} />
+              )}
               <input aria-label="run intent" value={intent} onChange={(e) => setIntent(e.target.value)} placeholder="intent" className={inputCls} />
             </>
           )}
@@ -156,6 +186,16 @@ export function AutomationsPanel({
         </button>
       </div>
 
+      {rows.length === 0 && (
+        <div className="mb-2 rounded-lg border border-dashed border-line bg-surface px-3 py-3 text-xs text-ink-3">
+          No automations yet. Examples:
+          <ul className="mt-1.5 list-disc space-y-1 pl-4">
+            <li>Every <span className="text-ink-2">60 minutes</span>, post a standup prompt to <span className="text-ink-2">#general</span>.</li>
+            <li>On event <span className="text-ink-2">outcome:checks_failed</span>, message the thread so a human takes a look.</li>
+            <li>Every <span className="text-ink-2">1440 minutes</span> (daily), run <span className="text-ink-2">@coder</span> to update the changelog.</li>
+          </ul>
+        </div>
+      )}
       <ul className="space-y-2">
         {rows.map((a) => (
           <li key={a.id} className="rounded-lg border border-line bg-surface px-3 py-2">

@@ -64,7 +64,7 @@ export interface SearchResult {
 
 // #61 notifications
 export interface UnreadCount { threadId: string; unread: number; }
-export interface InboxItem { threadId: string; title: string; latestAt: string; }
+export interface InboxItem { threadId: string; title: string; latestAt: string; reason?: string }
 
 export type MemoryKind = "decision" | "fact" | "preference" | "identity" | "artifact";
 export type MemoryScope = "personal" | "project" | "team" | "org";

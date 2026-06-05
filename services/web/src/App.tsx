@@ -8,7 +8,7 @@ import { SearchBar } from "./components/SearchBar.js";
 import { ContextExplorer } from "./components/ContextExplorer.js";
 import { useThreadStream } from "./useThreadStream.js";
 import { useMemory } from "./useMemory.js";
-import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listAgents, setAgentProfile, getTask, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes } from "./api.js";
+import { listChannels, listThreads, listRepos, createThread, createChannel, searchMessages, listPrincipals, listDms, startDm, approveRun, declineRun, runDiff, runFile, syncPrComments, updatePr, listCheckpoints, restoreCheckpoint, approvePlan, rejectPlan, getUnreads, markThreadRead, getInbox, createGoal, decomposeGoal, runTick, listAgents, setAgentProfile, createAgent, listTasks, getTask, updateTask, addTaskComment, getBilling, listPlans, billingCheckout, listAutomations, createAutomation, setAutomationEnabled, deleteAutomation, memoryRecall, memoryConsolidate, listMemoryNodes } from "./api.js";
 import { GoalsPanel } from "./components/GoalsPanel.js";
 import { AgentsPanel } from "./components/AgentsPanel.js";
 import { TasksPanel } from "./components/TasksPanel.js";
@@ -249,13 +249,13 @@ function Workspace({ onLogout, userId, orgId, role, theme, onToggleTheme }: { on
             : view === "goals"
               ? <GoalsPanel orgId={orgId} createGoal={createGoal} decomposeGoal={decomposeGoal} runTick={runTick} />
               : view === "agents"
-                ? <AgentsPanel listAgents={listAgents} setAgentProfile={setAgentProfile} />
+                ? <AgentsPanel listAgents={listAgents} setAgentProfile={setAgentProfile} createAgent={createAgent} />
                 : view === "tasks"
-                  ? <TasksPanel getTask={getTask} updateTask={updateTask} addTaskComment={addTaskComment} />
+                  ? <TasksPanel listTasks={listTasks} getTask={getTask} updateTask={updateTask} addTaskComment={addTaskComment} />
                   : view === "billing"
                     ? <BillingPanel getBilling={getBilling} listPlans={listPlans} billingCheckout={billingCheckout} />
                     : view === "automations"
-                      ? <AutomationsPanel listAutomations={listAutomations} createAutomation={createAutomation} setAutomationEnabled={setAutomationEnabled} deleteAutomation={deleteAutomation} />
+                      ? <AutomationsPanel listAutomations={listAutomations} createAutomation={createAutomation} setAutomationEnabled={setAutomationEnabled} deleteAutomation={deleteAutomation} threads={[...threads, ...dms].map((t) => ({ id: t.id, title: t.title }))} agents={principals.filter((p) => p.kind === "agent").map((p) => ({ id: p.id, handle: p.name }))} />
                       : view === "memory"
                         ? <MemoryPanel memoryRecall={memoryRecall} memoryConsolidate={memoryConsolidate} listMemoryNodes={listMemoryNodes} />
                         : activeThreadId
@@ -285,7 +285,7 @@ function InboxPanel({ inbox, onSelect }: { inbox: InboxItem[]; onSelect: (id: st
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><Icon name="activity" size={15} /></span>
                 <span className="min-w-0">
                   <div className="truncate text-sm font-medium text-ink">{i.title}</div>
-                  <div className="text-xs text-ink-3">you were mentioned</div>
+                  <div className="text-xs text-ink-3">{i.reason ?? "you were mentioned"}</div>
                 </span>
               </button>
             </li>

@@ -303,6 +303,21 @@ export async function setAgentProfile(agentId: string, patch: { avatarUrl?: stri
   return res.json();
 }
 
+// #108 create a new agent (handle + display name + adapter). 402 when the plan's
+// agent quota is exhausted; 403 for non-admins.
+export async function createAgent(input: { handle: string; displayName: string; adapter?: string }): Promise<Agent> {
+  const res = await fetch(`/agents`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const msg = res.status === 402 ? "agent limit reached — upgrade your plan" : res.status === 403 ? "only admins can add agents" : `createAgent ${res.status}`;
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 // #81 richer tasks — the valid priority/state values mirrored from the backend
 // (services/app/src/tasks/tasks.ts) for the inline-edit dropdowns.
 export const TASK_PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
@@ -320,6 +335,13 @@ export interface Task {
 export interface TaskComment { id: string; orgId: string; taskId: string; authorKind: string; authorId: string; body: string; createdAt: string; }
 export interface TaskRelation { id: string; orgId: string; fromTaskId: string; toTaskId: string; relation: "blocks" | "related" | "duplicate"; createdAt: string; }
 export interface TaskDetail { task: Task; comments: TaskComment[]; relations: TaskRelation[]; }
+
+export async function listTasks(): Promise<Task[]> {
+  const res = await fetch(`/tasks`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listTasks ${res.status}`);
+  const { tasks } = (await res.json()) as { tasks: Task[] };
+  return tasks;
+}
 
 export async function getTask(id: string): Promise<TaskDetail> {
   const res = await fetch(`/tasks/${id}`, { headers: { ...authHeaders() } });

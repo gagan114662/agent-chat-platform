@@ -108,6 +108,16 @@ export function GoalsPanel({
 
       {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
+      {goals.length === 0 && (
+        <div className="mb-2 rounded-lg border border-dashed border-line bg-surface px-3 py-3 text-xs text-ink-3">
+          No goals yet. A good goal is outcome-shaped with clear success criteria. Examples:
+          <ul className="mt-1.5 list-disc space-y-1 pl-4">
+            <li><span className="text-ink-2">Ship dark mode</span> — criteria: toggle works, persists, all panels themed.</li>
+            <li><span className="text-ink-2">Cut p95 API latency below 200ms</span> — criteria: dashboard shows &lt;200ms for 24h.</li>
+          </ul>
+          Create one above, then <span className="text-ink-2">Decompose</span> it into tasks your agents can pick up.
+        </div>
+      )}
       <ul className="space-y-2">
         {goals.map((g) => (
           <li key={g.id} className="rounded-lg border border-line bg-surface px-3 py-2">

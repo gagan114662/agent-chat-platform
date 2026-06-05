@@ -45,7 +45,29 @@ export async function unreadCounts(db: DB, orgId: string, userId: string): Promi
   return [...rows].map((r) => ({ threadId: r.thread_id, unread: Number(r.unread) }));
 }
 
-export interface InboxItem { threadId: string; title: string; latestAt: Date; }
+export interface InboxItem { threadId: string; title: string; latestAt: Date; reason?: string; }
+
+// #107: runs needing a human's eyes — failed/timed-out/error runs and runs
+// awaiting approval — surfaced in Activity so failures aren't invisible. Org-scoped.
+const ATTENTION_STATES: Record<string, string> = {
+  timeout: "run timed out",
+  checks_failed: "checks failed",
+  error: "run errored",
+  held_for_human: "awaiting your approval",
+  awaiting_plan_approval: "plan awaiting your approval",
+};
+export async function runsInbox(db: DB, orgId: string): Promise<InboxItem[]> {
+  const rows = await db.execute<{ thread_id: string; title: string; state: string }>(sql`
+    SELECT th.id AS thread_id, th.title AS title, r.state AS state
+    FROM runs r
+    JOIN tasks t ON t.id = r.task_id AND t.org_id = ${orgId}
+    JOIN threads th ON th.id = t.thread_id AND th.org_id = ${orgId}
+    WHERE r.org_id = ${orgId}
+      AND r.state IN ('timeout','checks_failed','error','held_for_human','awaiting_plan_approval')
+  `);
+  const now = new Date();
+  return [...rows].map((r) => ({ threadId: r.thread_id, title: r.title, latestAt: now, reason: ATTENTION_STATES[r.state] ?? r.state }));
+}
 
 // Threads where an unread message (createdAt > lastReadAt) mentions @<handle>
 // (case-insensitive), most recent first. Org+user scoped.
@@ -64,5 +86,5 @@ export async function mentionsInbox(db: DB, orgId: string, userId: string, handl
     GROUP BY m.thread_id, t.title
     ORDER BY MAX(m.created_at) DESC
   `);
-  return [...rows].map((r) => ({ threadId: r.thread_id, title: r.title, latestAt: new Date(r.latest_at) }));
+  return [...rows].map((r) => ({ threadId: r.thread_id, title: r.title, latestAt: new Date(r.latest_at), reason: "you were mentioned" }));
 }

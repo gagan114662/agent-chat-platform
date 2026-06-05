@@ -78,9 +78,9 @@ export function ContextExplorer({
   return (
     <div className="flex flex-1 flex-col overflow-y-auto bg-surface p-6 text-sm text-ink">
       <div className="mb-4">
-        <h1 className="text-lg font-semibold text-[#15151f]">Context Explorer</h1>
+        <h1 className="text-lg font-semibold text-ink">Context Explorer</h1>
         <div className="text-xs text-ink-3">
-          {stats.nodes} memories · {stats.edges} edges{loading ? " · loading…" : ""}
+          Visual <span className="text-ink-2">graph</span> of how memories connect — for search &amp; recall, use <span className="text-ink-2">Memory</span>. · {stats.nodes} memories · {stats.edges} edges{loading ? " · loading…" : ""}
         </div>
       </div>
 

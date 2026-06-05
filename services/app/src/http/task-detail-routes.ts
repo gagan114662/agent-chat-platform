@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import {
   updateTask, addTaskComment, listTaskComments,
@@ -21,6 +21,16 @@ function statusFor(err: Error): number {
 }
 
 export function registerTaskDetailRoutes(app: FastifyInstance, d: TaskDetailDeps) {
+  // List all tasks for the actor's org (newest first) — powers the Tasks board
+  // (#106). Org-scoped: only the caller's org's tasks are returned.
+  app.get("/tasks", async (req, reply) => {
+    const { orgId } = actor(req);
+    const rows = await d.db.select().from(tasks)
+      .where(eq(tasks.orgId, orgId))
+      .orderBy(desc(tasks.dueDate));
+    return reply.code(200).send({ tasks: rows });
+  });
+
   // PATCH a task's priority/due/status, org-scoped (#14). Invalid value → 400;
   // cross-org/unknown task → 404.
   app.patch("/tasks/:id", async (req, reply) => {

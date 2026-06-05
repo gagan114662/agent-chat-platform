@@ -68,16 +68,18 @@ export function MemoryPanel({
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-ink">Memory</h2>
         <button
           onClick={consolidate}
           disabled={busy}
+          title="Cluster recent memories into higher-level summaries"
           className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
         >
           Consolidate memory
         </button>
       </div>
+      <p className="mb-4 text-xs text-ink-3">Search &amp; recall memories and consolidate them into summaries — to see how they connect as a graph, use <span className="text-ink-2">Context</span>.</p>
 
       {consolidated && (
         <div className="mb-4 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink-2">

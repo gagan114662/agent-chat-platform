@@ -16,7 +16,7 @@ const detail: TaskDetail = {
 describe("TasksPanel", () => {
   it("renders a task with its comments and relations (#81)", async () => {
     const getTask = vi.fn(async () => detail);
-    render(<TasksPanel initialTaskId="tk1" getTask={getTask} updateTask={vi.fn()} addTaskComment={vi.fn()} />);
+    render(<TasksPanel initialTaskId="tk1" listTasks={vi.fn(async () => [])} getTask={getTask} updateTask={vi.fn()} addTaskComment={vi.fn()} />);
     expect(await screen.findByText("Wire the panel")).toBeInTheDocument();
     expect(screen.getByText("first comment")).toBeInTheDocument();
     expect(screen.getByText(/blocks/)).toBeInTheDocument();
@@ -27,7 +27,7 @@ describe("TasksPanel", () => {
     const getTask = vi.fn(async () => detail);
     const updated: Task = { ...detail.task, state: "in_progress" };
     const updateTask = vi.fn(async () => updated);
-    render(<TasksPanel initialTaskId="tk1" getTask={getTask} updateTask={updateTask} addTaskComment={vi.fn()} />);
+    render(<TasksPanel initialTaskId="tk1" listTasks={vi.fn(async () => [])} getTask={getTask} updateTask={updateTask} addTaskComment={vi.fn()} />);
     await screen.findByText("Wire the panel");
     fireEvent.change(screen.getByLabelText(/state/i), { target: { value: "in_progress" } });
     await waitFor(() => expect(updateTask).toHaveBeenCalledWith("tk1", { state: "in_progress" }));
@@ -37,11 +37,19 @@ describe("TasksPanel", () => {
     const getTask = vi.fn(async () => detail);
     const newComment: TaskComment = { id: "c2", orgId: "acme", taskId: "tk1", authorKind: "human", authorId: "alice", body: "nice", createdAt: new Date(1).toISOString() };
     const addTaskComment = vi.fn(async () => newComment);
-    render(<TasksPanel initialTaskId="tk1" getTask={getTask} updateTask={vi.fn()} addTaskComment={addTaskComment} />);
+    render(<TasksPanel initialTaskId="tk1" listTasks={vi.fn(async () => [])} getTask={getTask} updateTask={vi.fn()} addTaskComment={addTaskComment} />);
     await screen.findByText("Wire the panel");
     fireEvent.change(screen.getByPlaceholderText(/add a comment/i), { target: { value: "nice" } });
     fireEvent.click(screen.getByRole("button", { name: /comment/i }));
     await waitFor(() => expect(addTaskComment).toHaveBeenCalledWith("tk1", "nice"));
     expect(await screen.findByText("nice")).toBeInTheDocument();
   });
+
+  it("renders a board column with a task card from listTasks (#106)", async () => {
+    const t: Task = { id: "tk9", orgId: "acme", threadId: "th1", title: "Board card", state: "in_progress", priority: "medium", dueDate: null, createdByKind: "human", createdById: "alice" };
+    render(<TasksPanel listTasks={vi.fn(async () => [t])} getTask={vi.fn(async () => detail)} updateTask={vi.fn()} addTaskComment={vi.fn()} />);
+    expect(await screen.findByText("Board card")).toBeInTheDocument();
+    expect(screen.getByText("In progress")).toBeInTheDocument();
+  });
+
 });
