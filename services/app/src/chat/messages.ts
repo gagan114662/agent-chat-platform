@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gt, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lt, or } from "drizzle-orm";
 import type { DB } from "../db/client.js";
-import { messages } from "../db/schema.js";
+import { files, messages } from "../db/schema.js";
+import { signFileUrl } from "../files/files.js";
 
 export interface NewMessage {
   orgId: string;
@@ -11,10 +12,30 @@ export interface NewMessage {
   body: string;
   kind?: "chat" | "system" | "pr_card" | "plan_card";
   metadata?: Record<string, unknown>;
+  // #76: optional #80 file ids to attach. Each must belong to the same org —
+  // cross-org / unknown ids are silently dropped (no leak). The surviving ids are
+  // stored in metadata.attachments. Omitting fileIds leaves metadata untouched.
+  fileIds?: string[];
   id?: string;
 }
 
+// validateOrgFileIds keeps only the ids that name a file in the given org,
+// preserving caller order and de-duplicating. Cross-org / unknown ids fall away.
+async function validateOrgFileIds(db: DB, orgId: string, fileIds: string[]): Promise<string[]> {
+  const wanted = [...new Set(fileIds)];
+  if (wanted.length === 0) return [];
+  const rows = await db.select({ id: files.id }).from(files)
+    .where(and(eq(files.orgId, orgId), inArray(files.id, wanted)));
+  const allowed = new Set(rows.map((r) => r.id));
+  return wanted.filter((id) => allowed.has(id));
+}
+
 export async function createMessage(db: DB, m: NewMessage) {
+  let metadata: Record<string, unknown> = m.metadata ?? {};
+  if (m.fileIds && m.fileIds.length > 0) {
+    const attachments = await validateOrgFileIds(db, m.orgId, m.fileIds);
+    if (attachments.length > 0) metadata = { ...metadata, attachments };
+  }
   const row = {
     id: m.id ?? randomUUID(),
     orgId: m.orgId,
@@ -23,10 +44,53 @@ export async function createMessage(db: DB, m: NewMessage) {
     authorId: m.authorId,
     kind: m.kind ?? "chat",
     body: m.body,
-    metadata: m.metadata ?? {},
+    metadata,
   };
   const [inserted] = await db.insert(messages).values(row).onConflictDoNothing().returning();
   return inserted ?? row;
+}
+
+export interface ResolvedAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  downloadUrl: string;
+}
+
+// #76 messageAttachments resolves a message's metadata.attachments file ids into
+// renderable metadata (name/contentType/size) plus a short-lived signed download
+// URL (the #80 get-op signature → /files/:id/download?sig=…). Org-scoped: only
+// files in `orgId` resolve, so a foreign caller (or a message whose ids aren't in
+// the org) gets nothing. Returns [] when the message has no attachments.
+export async function messageAttachments(
+  db: DB,
+  orgId: string,
+  message: { metadata?: unknown },
+): Promise<ResolvedAttachment[]> {
+  const meta = (message.metadata ?? {}) as { attachments?: unknown };
+  const ids = Array.isArray(meta.attachments)
+    ? meta.attachments.filter((x): x is string => typeof x === "string")
+    : [];
+  if (ids.length === 0) return [];
+
+  const rows = await db.select().from(files)
+    .where(and(eq(files.orgId, orgId), inArray(files.id, ids)));
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  // Preserve the stored order; drop any id that no longer resolves in this org.
+  const out: ResolvedAttachment[] = [];
+  for (const id of ids) {
+    const f = byId.get(id);
+    if (!f) continue;
+    out.push({
+      id: f.id,
+      name: f.name,
+      contentType: f.contentType,
+      size: f.size,
+      downloadUrl: `/files/${f.id}/download?sig=${signFileUrl(f.id, "get")}`,
+    });
+  }
+  return out;
 }
 
 // #89 cursor pagination. Messages are totally ordered by the tuple (createdAt, id).

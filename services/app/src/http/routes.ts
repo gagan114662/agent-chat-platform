@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
 import type postgres from "postgres";
 import type { Client } from "@temporalio/client";
-import { createMessage, listMessages } from "../chat/messages.js";
+import { createMessage, listMessages, messageAttachments } from "../chat/messages.js";
 import { summarizeThread } from "../chat/summarize.js";
 import { notify } from "../db/client.js";
 import { handleMentions } from "../chat/handle-mentions.js";
@@ -22,16 +22,22 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
     if (!thread) return reply.code(404).send({ error: "thread not found" });
     const q = req.query as { before?: string; after?: string; limit?: string };
     const limit = q.limit !== undefined ? Number(q.limit) : undefined;
-    return listMessages(d.db, threadId, orgId, {
+    const rows = await listMessages(d.db, threadId, orgId, {
       before: q.before,
       after: q.after,
       limit: Number.isFinite(limit) ? limit : undefined,
     });
+    // #76: resolve any file attachments (org-scoped, with signed download URLs)
+    // for messages that carry them. Messages without attachments are unchanged.
+    return Promise.all(rows.map(async (m) => {
+      const attachments = await messageAttachments(d.db, orgId, m);
+      return attachments.length > 0 ? { ...m, attachments } : m;
+    }));
   });
 
   app.post("/threads/:id/messages", async (req, reply) => {
     const { id: threadId } = req.params as { id: string };
-    const { body } = req.body as { body: string };
+    const { body, fileIds } = req.body as { body: string; fileIds?: string[] };
     const { orgId, userId } = actor(req);
 
     // #29: viewers are read-only — block message posts before any DB work.
@@ -43,7 +49,7 @@ export function registerRoutes(app: FastifyInstance, d: Deps) {
     const [thread] = await d.db.select().from(threads).where(and(eq(threads.id, threadId), eq(threads.orgId, orgId)));
     if (!thread) return reply.code(404).send({ error: "thread not found" });
 
-    const msg = await createMessage(d.db, { orgId, threadId, authorKind: "human", authorId: userId, body });
+    const msg = await createMessage(d.db, { orgId, threadId, authorKind: "human", authorId: userId, body, fileIds });
     await notify(d.sql, THREAD_CHANNEL, { threadId, message: msg });
 
     // #27: the mention loop is now the shared, depth-aware handleMentions. A human
