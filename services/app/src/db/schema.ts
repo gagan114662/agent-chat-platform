@@ -397,3 +397,15 @@ export const automations = pgTable("automations", {
   createdById: text("created_by_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ orgIx: index("automations_org_ix").on(t.orgId) }));
+
+// #69 contacts: public marketing-form lead capture. NO orgId — leads come from
+// anonymous visitors via the landing contact form (POST /contact, a public
+// route). `help` is the free-text message; `website` is the optional company URL.
+export const contacts = pgTable("contacts", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  website: text("website"),
+  help: text("help"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

@@ -43,6 +43,9 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
     "/auth/google", "/auth/google/callback",
     // #86 public API discovery: the OpenAPI spec + Swagger UI docs page.
     "/openapi.json", "/docs",
+    // #69 public marketing contact form: anonymous landing visitors submit a
+    // lead — no session/org. The route validates the payload itself.
+    "/contact",
   ]);
   app.addHook("preHandler", async (req, reply) => {
     const token = bearer(req);
