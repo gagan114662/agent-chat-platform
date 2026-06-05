@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { testDb, closeDb } from "../db/test-harness.js";
 import { buildAgentIntent, runChatFusionActivity, type RunFusionActivityInput } from "./activities.js";
 import { createNode } from "../memory/memory.js";
-import { orgs, runs } from "../db/schema.js";
+import { orgs, runs, workspaces, agents } from "../db/schema.js";
 
 const h = testDb();
 afterAll(async () => { await closeDb(h.sql); });
@@ -36,6 +36,54 @@ describe("buildAgentIntent (#26 recall wiring)", () => {
     const intent = "add realtime notify to the auth flow";
     // org o1 has no memory of its own → unchanged
     expect(await buildAgentIntent(h.db, "o1", intent)).toBe(intent);
+  });
+});
+
+describe("buildAgentIntent (#74 systemPrompt + contextDirs)", () => {
+  beforeEach(async () => {
+    await h.db.insert(workspaces).values({ id: "w1", orgId: "o1", name: "WS" });
+    await h.db.insert(agents).values({
+      id: "a-prefs", orgId: "o1", workspaceId: "w1", handle: "reviewer", displayName: "Reviewer", adapter: "fake",
+      config: { systemPrompt: "You are a careful reviewer.", contextDirs: ["src/auth"] },
+    });
+    await h.db.insert(agents).values({
+      id: "a-bare", orgId: "o1", workspaceId: "w1", handle: "plain", displayName: "Plain", adapter: "fake", config: {},
+    });
+  });
+
+  it("prepends the systemPrompt + focus-dirs hint, with the original task preserved as its own task line", async () => {
+    const intent = "fix the login bug";
+    const out = await buildAgentIntent(h.db, "o1", intent, "a-prefs");
+
+    expect(out.startsWith("## Instructions\nYou are a careful reviewer.")).toBe(true);
+    expect(out).toContain("## Focus directories: src/auth");
+    // The original task is preserved verbatim as its own line (clean for #26).
+    expect(out.split("\n")).toContain(intent);
+    // systemPrompt leads, the task follows, focus dirs after it.
+    expect(out.indexOf("## Instructions")).toBeLessThan(out.indexOf(intent));
+    expect(out.indexOf(intent)).toBeLessThan(out.indexOf("## Focus directories"));
+  });
+
+  it("orders prefs before recalled memory (systemPrompt → task → focus dirs → recall)", async () => {
+    await createNode(h.db, { orgId: "o1", kind: "decision", label: "Auth uses scrypt for login" });
+    const intent = "fix the login bug";
+    const out = await buildAgentIntent(h.db, "o1", intent, "a-prefs");
+
+    expect(out).toContain("## Relevant prior context");
+    expect(out.indexOf("## Focus directories")).toBeLessThan(out.indexOf("## Relevant prior context"));
+  });
+
+  it("an agent with no prefs yields just the task (+ recall) — first line stays the task", async () => {
+    const intent = "fix the login bug";
+    const out = await buildAgentIntent(h.db, "o1", intent, "a-bare");
+    expect(out).toBe(intent); // no prefs, no memory → unchanged
+    expect(out.split("\n")[0]).toBe(intent);
+  });
+
+  it("is org-scoped: another org's agent id yields no prefs", async () => {
+    // o2 has no such agent → prefs ignored, intent unchanged.
+    const intent = "fix the login bug";
+    expect(await buildAgentIntent(h.db, "o2", intent, "a-prefs")).toBe(intent);
   });
 });
 

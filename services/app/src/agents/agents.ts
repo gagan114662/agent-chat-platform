@@ -71,6 +71,36 @@ export function agentMcp(agent: { config?: unknown } | null | undefined): string
   return names.length > 0 ? names : undefined;
 }
 
+// AgentPrefs is the optional per-agent preferences (#74) stored on the agent's
+// jsonb `config`: a custom `systemPrompt` (persona), `contextDirs` (focus dirs),
+// and a free-form `preferences` bag. All optional; absent = today's behavior.
+export interface AgentPrefs {
+  systemPrompt?: string;
+  contextDirs?: string[];
+  preferences?: Record<string, unknown>;
+}
+
+// agentPrefs reads the per-agent preferences (#74) off an agent's jsonb config.
+// Tolerant of an absent/loosely-typed config (jsonb): only well-typed values are
+// surfaced — `systemPrompt` only when a non-empty string, `contextDirs` only as a
+// non-empty array of non-empty strings, `preferences` only as a plain object.
+// Anything malformed is ignored so a bad config never injects prompt/scope.
+export function agentPrefs(agent: { config?: unknown } | null | undefined): AgentPrefs {
+  const cfg = agent?.config;
+  if (!cfg || typeof cfg !== "object") return {};
+  const c = cfg as Record<string, unknown>;
+  const out: AgentPrefs = {};
+  if (typeof c.systemPrompt === "string" && c.systemPrompt !== "") out.systemPrompt = c.systemPrompt;
+  if (Array.isArray(c.contextDirs)) {
+    const dirs = c.contextDirs.filter((d): d is string => typeof d === "string" && d !== "");
+    if (dirs.length > 0) out.contextDirs = dirs;
+  }
+  if (c.preferences && typeof c.preferences === "object" && !Array.isArray(c.preferences)) {
+    out.preferences = c.preferences as Record<string, unknown>;
+  }
+  return out;
+}
+
 // resolveMention finds an agent by org + handle. #91: an optional
 // `fromWorkspaceId` scopes PRIVATE agents (visibility = "private") to their own
 // workspace — a private agent is resolvable only from within its workspace.
