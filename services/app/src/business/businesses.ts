@@ -4,6 +4,7 @@ import type { DB } from "../db/client.js";
 import {
   businesses, businessLedger, paymentIntents, leads, outreachCampaigns, repos, tasks,
 } from "../db/schema.js";
+import { record } from "../audit/audit-log.js";
 
 // #146: when a human approves a draft a goal task created, that task's real outcome
 // is verified → mark it done (#145). Inline (not imported) to avoid a cycle.
@@ -83,6 +84,8 @@ export async function decidePaymentIntent(db: DB, args: { orgId: string; intentI
     if (pi.customer) await addLead(db, { orgId: args.orgId, businessId: pi.businessId, identifier: pi.customer, stage: "customer", source: "payment" });
     await verifyDraftTask(db, args.orgId, pi.taskId); // #146: close the goal task that drafted this
   }
+  // #150.3: tamper-evident record of the money decision (who, what, how much).
+  await record(db, { orgId: args.orgId, actorKind: "human", actorId: args.byUserId, action: args.approve ? "payment.approved" : "payment.declined", resource: pi.businessId, payload: { amountCents: pi.amountCents, customer: pi.customer } });
   return row;
 }
 
@@ -140,5 +143,6 @@ export async function decideCampaign(db: DB, args: { orgId: string; campaignId: 
   const [row] = await db.update(outreachCampaigns).set({ state: "sent", approvedBy: args.byUserId, sentCount: reached })
     .where(and(eq(outreachCampaigns.id, args.campaignId), eq(outreachCampaigns.orgId, args.orgId))).returning();
   await verifyDraftTask(db, args.orgId, c.taskId); // #146: close the goal task that drafted this
+  await record(db, { orgId: args.orgId, actorKind: "human", actorId: args.byUserId, action: "outreach.sent", resource: c.businessId, payload: { channel: c.channel, reached } });
   return row;
 }

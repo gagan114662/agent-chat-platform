@@ -230,6 +230,22 @@ export const outreachCampaigns = pgTable("outreach_campaigns", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// #150.3 append-only, hash-chained audit log (tamper-evident). hash = sha256(
+// prevHash + canonical(entry)); a broken link is detectable.
+export const auditLog = pgTable("audit_log", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  seq: integer("seq").notNull(),
+  prevHash: text("prev_hash").notNull().default(""),
+  hash: text("hash").notNull(),
+  actorKind: text("actor_kind").notNull(),
+  actorId: text("actor_id").notNull(),
+  action: text("action").notNull(),
+  resource: text("resource").notNull().default(""),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // #148 prepaid credit ledger: append-only; balance = sum(deltaCents). Positive =
 // top-up/grant, negative = metered agent compute.
 export const creditLedger = pgTable("credit_ledger", {

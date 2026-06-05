@@ -11,6 +11,7 @@ import { buildMergeGate } from "./gate.js";
 import { reporterFromEnv } from "../billing/billing.js";
 import { reportRunUsage } from "../billing/report.js";
 import { meter, meteringEnabled, centsPerRun } from "../billing/credits.js";
+import { record } from "../audit/audit-log.js";
 import { captureDecision } from "../memory/capture.js";
 import { recallForIntent, formatRecall } from "../memory/memory.js";
 import { agentPrefs } from "../agents/agents.js";
@@ -163,6 +164,8 @@ export async function runChatFusionActivity(
     // #148: meter this run's compute against the prepaid credit ledger (only when
     // metering is enabled via ACP_CENTS_PER_RUN; otherwise a no-op).
     if (meteringEnabled()) await meter(db, input.sink.orgId, centsPerRun(), `run ${input.sink.runId} (${result.outcome})`);
+    // #150.3: tamper-evident record of the run outcome (the merge/PR action).
+    await record(db, { orgId: input.sink.orgId, actorKind: "agent", actorId: input.sink.agentId, action: `run.${result.outcome}`, resource: input.sink.runId, payload: { prNumber: result.prNumber ?? null } });
     await captureDecision(db, {
       orgId: input.sink.orgId, runId: input.sink.runId, agentId: input.sink.agentId, threadId: input.sink.threadId,
       intent: input.intent, outcome: result.outcome, prNumber: result.prNumber,
