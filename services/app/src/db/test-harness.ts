@@ -3,6 +3,7 @@ import { makeDb } from "./client.js";
 
 const TABLES = [
   "api_keys",
+  "files",
   "sessions",
   "team_members", "teams",
   "read_state",
