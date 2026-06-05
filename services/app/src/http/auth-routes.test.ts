@@ -14,7 +14,7 @@ beforeEach(async () => {
   await h.reset();
   await h.db.insert(orgs).values({ id: "o1", name: "O" });
   await h.db.insert(workspaces).values({ id: "w1", orgId: "o1", name: "W" });
-  await h.db.insert(members).values({ id: "m1", orgId: "o1", workspaceId: "w1", displayName: "You" });
+  await h.db.insert(members).values({ id: "m1", orgId: "o1", workspaceId: "w1", displayName: "You", email: "you@x.io" });
 });
 
 describe("auth routes", () => {
@@ -74,6 +74,58 @@ describe("auth routes", () => {
       expect(noPw.statusCode).toBe(401);
       const ok = await app.inject({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, payload: { memberId: "m1", password: "pw" } });
       expect(ok.statusCode).toBe(201);
+      await app.close();
+    } finally {
+      process.env.ACP_ALLOW_DEV_HEADERS = "1";
+    }
+  });
+
+  it("magic-link: request 200 (+dev token) → verify 200 (session) → 401 on reuse (#84)", async () => {
+    const app = makeApp();
+    const reqRes = await app.inject({ method: "POST", url: "/auth/magic-link/request", headers: { "content-type": "application/json" }, payload: { email: "you@x.io" } });
+    expect(reqRes.statusCode).toBe(200);
+    // dev headers are on in tests → the token is surfaced once
+    const token = reqRes.json().token as string;
+    expect(token).toMatch(/^ml_/);
+    expect(JSON.stringify(reqRes.json())).not.toContain("tokenHash");
+
+    const ver = await app.inject({ method: "POST", url: "/auth/magic-link/verify", headers: { "content-type": "application/json" }, payload: { token } });
+    expect(ver.statusCode).toBe(200);
+    const sessionToken = ver.json().token as string;
+    expect(ver.json().member.id).toBe("m1");
+    // the issued session authenticates
+    const me = await app.inject({ method: "GET", url: "/auth/me", headers: { authorization: `Bearer ${sessionToken}` } });
+    expect(me.statusCode).toBe(200);
+    expect(me.json().userId).toBe("m1");
+
+    // single-use: reusing the magic-link token → 401
+    const reuse = await app.inject({ method: "POST", url: "/auth/magic-link/verify", headers: { "content-type": "application/json" }, payload: { token } });
+    expect(reuse.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("magic-link: request for an unknown email is still 200 with no token (no enumeration) (#84)", async () => {
+    const app = makeApp();
+    const res = await app.inject({ method: "POST", url: "/auth/magic-link/request", headers: { "content-type": "application/json" }, payload: { email: "ghost@x.io" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().token).toBeUndefined();
+    await app.close();
+  });
+
+  it("magic-link: verify with a bad token → 401 (#84)", async () => {
+    const app = makeApp();
+    const res = await app.inject({ method: "POST", url: "/auth/magic-link/verify", headers: { "content-type": "application/json" }, payload: { token: "ml_nope" } });
+    expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("magic-link: in prod (no dev headers) request is 200 but NEVER leaks the token (#84)", async () => {
+    delete process.env.ACP_ALLOW_DEV_HEADERS;
+    try {
+      const app = makeApp();
+      const res = await app.inject({ method: "POST", url: "/auth/magic-link/request", headers: { "content-type": "application/json" }, payload: { email: "you@x.io" } });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().token).toBeUndefined();
       await app.close();
     } finally {
       process.env.ACP_ALLOW_DEV_HEADERS = "1";
