@@ -22,6 +22,7 @@ import { registerDiffRoutes } from "./http/diff-routes.js";
 import { registerExecRoutes } from "./http/exec-routes.js";
 import { registerChecksRoutes } from "./http/checks-routes.js";
 import { registerNotesRoutes } from "./http/notes-routes.js";
+import { registerToolsRoutes } from "./http/tools-routes.js";
 import { registerRootCauseRoutes } from "./http/rootcause-routes.js";
 import { registerDebugRoutes } from "./http/debug-routes.js";
 import { registerFileRoutes } from "./http/file-routes.js";
@@ -102,6 +103,7 @@ export async function buildServer() {
   registerExecRoutes(app, { db, sandboxUrl }); // #72 admin exec route → sandbox /exec
   registerChecksRoutes(app, { db });
   registerNotesRoutes(app, { db });
+  registerToolsRoutes(app, { db }); // #99 persistent internal tools (HTML + publish)
   registerRootCauseRoutes(app, { db });
   registerDebugRoutes(app, { db });
   registerFileRoutes(app, { db });
