@@ -134,6 +134,29 @@ export async function setAgentShared(db: DB, { orgId, agentId, shared }: { orgId
   return a;
 }
 
+// #74: set an agent's preferences on its jsonb `config` (org-scoped). MERGES the
+// provided prefs into the existing config so other config keys — model/provider
+// (#58), mcpServers (#57) — are preserved (never clobbered). Only the provided
+// pref keys (systemPrompt/contextDirs/preferences) are overwritten. Returns the
+// updated agent, or undefined if no agent with that id exists in the org
+// (cross-org → undefined, no mutation). Validation of contextDirs is the caller's.
+export async function setAgentConfig(
+  db: DB,
+  { orgId, agentId, prefs }: { orgId: string; agentId: string; prefs: { systemPrompt?: string; contextDirs?: string[]; preferences?: Record<string, unknown> } },
+) {
+  const [existing] = await db.select().from(agents).where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+  if (!existing) return undefined; // cross-org or missing → no mutation
+  const base = (existing.config && typeof existing.config === "object" ? existing.config : {}) as Record<string, unknown>;
+  const merged: Record<string, unknown> = { ...base };
+  if (prefs.systemPrompt !== undefined) merged.systemPrompt = prefs.systemPrompt;
+  if (prefs.contextDirs !== undefined) merged.contextDirs = prefs.contextDirs;
+  if (prefs.preferences !== undefined) merged.preferences = prefs.preferences;
+  const [a] = await db.update(agents).set({ config: merged })
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
+    .returning();
+  return a;
+}
+
 // #91: the allowed agent visibility values. "public" = resolvable org-wide
 // (today's behavior); "private" = resolvable only within its workspace.
 export const AGENT_VISIBILITIES = ["public", "private"] as const;
