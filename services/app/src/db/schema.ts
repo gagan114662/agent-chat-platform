@@ -475,3 +475,27 @@ export const paymentDecisions = pgTable("payment_decisions", {
   reason: text("reason").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ orgIx: index("payment_decisions_org_ix").on(t.orgId, t.createdAt) }));
+
+// #118 inbound revenue: a treasury ledger (double-entry-ish: credit = money in,
+// debit = money out) + invoices. The SOFTWARE side of "get paid" — live capture
+// is via the billing/Stripe processor (#85) using the operator's account; this
+// records what came in/out so the treasury balance + audit (#115) are first-class.
+export const treasuryLedger = pgTable("treasury_ledger", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  direction: text("direction").notNull(), // 'credit' (in) | 'debit' (out)
+  amountCents: integer("amount_cents").notNull(),
+  source: text("source").notNull().default(""), // 'invoice' | 'subscription' | 'checkout' | 'agent_payout' | ...
+  ref: text("ref"), // external id (invoice id, Stripe payment id, txn id)
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ orgIx: index("treasury_ledger_org_ix").on(t.orgId, t.createdAt) }));
+
+export const invoices = pgTable("invoices", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  customer: text("customer").notNull().default(""),
+  amountCents: integer("amount_cents").notNull(),
+  status: text("status").notNull().default("draft"), // draft | sent | paid | void
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+}, (t) => ({ orgIx: index("invoices_org_ix").on(t.orgId, t.status) }));

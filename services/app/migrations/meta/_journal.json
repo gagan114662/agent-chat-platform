@@ -267,6 +267,13 @@
       "when": 1783004800000,
       "tag": "0037_payment_decisions",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1783091200000,
+      "tag": "0038_treasury",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@ import { makeDb } from "./client.js";
 
 const TABLES = [
   "payment_decisions",
+  "treasury_ledger", "invoices",
   "tools",
   "notes",
   "contacts",
