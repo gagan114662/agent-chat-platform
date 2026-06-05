@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
-import { channels, threads, repos, workspaces } from "../db/schema.js";
+import { channels, threads, repos, workspaces, threadRepos } from "../db/schema.js";
 
 // #89: archived channels are hidden by default; pass includeArchived to show them.
 export function listChannels(db: DB, orgId: string, opts?: { includeArchived?: boolean }) {
@@ -52,6 +52,14 @@ export async function createThread(db: DB, t: NewThread) {
   const [thread] = await db.insert(threads).values({
     id: randomUUID(), orgId: t.orgId, channelId: t.channelId, title: t.title, repoId: t.repoId ?? null,
   }).returning();
+  // #75 multi-repo: keep threads.repoId (single/primary, back-compat) AND mirror it
+  // into thread_repos as the primary row so the join is the source of truth for the
+  // repo set. A repo-less thread gets no thread_repos row.
+  if (t.repoId) {
+    await db.insert(threadRepos).values({
+      orgId: t.orgId, threadId: thread.id, repoId: t.repoId, isPrimary: true,
+    }).onConflictDoNothing();
+  }
   return thread;
 }
 

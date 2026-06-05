@@ -88,8 +88,23 @@ export const threads = pgTable("threads", {
   kind: text("kind").notNull().default("channel"),     // 'channel' | 'dm'
   dmPeerKind: text("dm_peer_kind"),                    // 'human' | 'agent' (dm only)
   dmPeerId: text("dm_peer_id"),
+  // #75 fork lineage: when a thread is created via forkThread, this records the
+  // source thread id (a shallow fork copies the repo set + wiring, not messages).
+  // Nullable — normally-created threads have none.
+  forkedFrom: text("forked_from"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// #75 thread_repos: a thread can reference many repos, exactly one of which is the
+// primary (back-compat: mirrored from threads.repoId, and the fusion run dispatch
+// still uses the primary). Org-scoped — both the thread and repo must be in the
+// org. The composite PK (orgId, threadId, repoId) makes add idempotent.
+export const threadRepos = pgTable("thread_repos", {
+  orgId: text("org_id").notNull(),
+  threadId: text("thread_id").notNull(),
+  repoId: text("repo_id").notNull(),
+  isPrimary: boolean("is_primary").notNull().default(false),
+}, (t) => ({ pk: primaryKey({ columns: [t.orgId, t.threadId, t.repoId] }) }));
 
 export const messages = pgTable("messages", {
   id: text("id").primaryKey(),
