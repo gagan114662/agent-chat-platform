@@ -359,3 +359,36 @@ export async function bulkCreateTasks(threadId: string, items: BulkTaskItem[]): 
   if (!res.ok) throw new Error(`bulkCreateTasks ${res.status}`);
   return res.json();
 }
+
+// #99 persistent internal tools: a registry of agent/admin-built HTML
+// tools/dashboards. Content is rendered ONLY in a `sandbox=""` iframe (ToolView).
+export interface Tool {
+  id: string;
+  orgId: string;
+  workspaceId: string;
+  name: string;
+  kind: "dashboard" | "form" | "page";
+  content: string;
+  published: boolean;
+  createdByKind: string;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function listTools(
+  workspaceId: string,
+  opts: { publishedOnly?: boolean } = {},
+): Promise<Tool[]> {
+  const qs = new URLSearchParams({ workspaceId });
+  if (opts.publishedOnly) qs.set("publishedOnly", "1");
+  const res = await fetch(`/tools?${qs.toString()}`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`listTools ${res.status}`);
+  return res.json();
+}
+
+export async function getTool(id: string): Promise<Tool> {
+  const res = await fetch(`/tools/${id}`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`getTool ${res.status}`);
+  return res.json();
+}
