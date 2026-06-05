@@ -104,6 +104,88 @@ describe("memory routes", () => {
     await app.close();
   });
 
+  it("POST /memory/nodes/:id/supersede happy-path bumps version; 409 on stale version; cross-org 404", async () => {
+    const app = makeApp();
+    const old = await createNode(h.db, { orgId: "o1", kind: "fact", label: "v1", body: "old" });
+    const ok = await app.inject({
+      method: "POST", url: `/memory/nodes/${old.id}/supersede`,
+      headers: { "x-org-id": "o1", "content-type": "application/json" },
+      payload: { expectedVersion: 1, node: { kind: "fact", label: "v2", body: "new" } },
+    });
+    expect(ok.statusCode).toBe(201);
+    const fresh = ok.json() as { id: string; version: number };
+    expect(fresh.version).toBe(2);
+    // stale version → 409
+    const stale = await app.inject({
+      method: "POST", url: `/memory/nodes/${fresh.id}/supersede`,
+      headers: { "x-org-id": "o1", "content-type": "application/json" },
+      payload: { expectedVersion: 1, node: { kind: "fact", label: "v3" } },
+    });
+    expect(stale.statusCode).toBe(409);
+    // cross-org → 404
+    const xorg = await app.inject({
+      method: "POST", url: `/memory/nodes/${fresh.id}/supersede`,
+      headers: { "x-org-id": "o2", "content-type": "application/json" },
+      payload: { expectedVersion: 2, node: { kind: "fact", label: "x" } },
+    });
+    expect(xorg.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("POST /memory/nodes/:id/invalidate hides node from GET /memory and recall; revalidate restores; cross-org 404", async () => {
+    const app = makeApp();
+    const dec = await createNode(h.db, { orgId: "o1", kind: "decision", label: "Use Postgres LISTEN NOTIFY realtime" });
+    // cross-org invalidate → 404, node still active
+    const xorg = await app.inject({ method: "POST", url: `/memory/nodes/${dec.id}/invalidate`, headers: { "x-org-id": "o2" } });
+    expect(xorg.statusCode).toBe(404);
+
+    const inv = await app.inject({ method: "POST", url: `/memory/nodes/${dec.id}/invalidate`, headers: { "x-org-id": "o1" } });
+    expect(inv.statusCode).toBe(200);
+    // hidden from GET /memory
+    const list = await app.inject({ method: "GET", url: "/memory", headers: { "x-org-id": "o1" } });
+    expect(list.json().map((n: { id: string }) => n.id)).not.toContain(dec.id);
+    // hidden from recall
+    const recall = await app.inject({ method: "GET", url: "/memory/recall?q=realtime%20notify%20postgres", headers: { "x-org-id": "o1" } });
+    expect(recall.json().map((n: { id: string }) => n.id)).not.toContain(dec.id);
+
+    // revalidate restores
+    const rev = await app.inject({ method: "POST", url: `/memory/nodes/${dec.id}/revalidate`, headers: { "x-org-id": "o1" } });
+    expect(rev.statusCode).toBe(200);
+    const list2 = await app.inject({ method: "GET", url: "/memory", headers: { "x-org-id": "o1" } });
+    expect(list2.json().map((n: { id: string }) => n.id)).toContain(dec.id);
+    await app.close();
+  });
+
+  it("POST /memory/contradictions creates a contradicts edge", async () => {
+    const app = makeApp();
+    const a = await createNode(h.db, { orgId: "o1", kind: "fact", label: "round" });
+    const b = await createNode(h.db, { orgId: "o1", kind: "fact", label: "flat" });
+    const res = await app.inject({
+      method: "POST", url: "/memory/contradictions",
+      headers: { "x-org-id": "o1", "content-type": "application/json" },
+      payload: { fromId: a.id, toId: b.id },
+    });
+    expect(res.statusCode).toBe(201);
+    const nb = await app.inject({ method: "GET", url: `/memory/${a.id}/neighbors`, headers: { "x-org-id": "o1" } });
+    expect(nb.json().map((n: { id: string }) => n.id)).toContain(b.id);
+    await app.close();
+  });
+
+  it("POST /memory accepts derivedFrom and creates a derived_from edge", async () => {
+    const app = makeApp();
+    const src = await createNode(h.db, { orgId: "o1", kind: "fact", label: "source" });
+    const res = await app.inject({
+      method: "POST", url: "/memory",
+      headers: { "x-org-id": "o1", "content-type": "application/json" },
+      payload: { kind: "decision", label: "derived", scope: "team", derivedFrom: [src.id] },
+    });
+    expect(res.statusCode).toBe(201);
+    const newId = (res.json() as { id: string }).id;
+    const nb = await app.inject({ method: "GET", url: `/memory/${newId}/neighbors`, headers: { "x-org-id": "o1" } });
+    expect(nb.json().map((n: { id: string }) => n.id)).toContain(src.id);
+    await app.close();
+  });
+
   it("GET /memory/recall returns intent-relevant nodes, org-scoped; missing q → []", async () => {
     await h.db.insert(orgs).values({ id: "o2", name: "O2" });
     const app = makeApp();
