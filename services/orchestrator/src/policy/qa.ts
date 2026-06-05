@@ -1,4 +1,5 @@
 import type { ChangedFile } from "./risk.js";
+import { browserQaRunner } from "./browser-qa.js";
 
 const UI_RE = /\.(tsx|jsx|css|scss|html|svelte|vue)$/i;
 
@@ -17,3 +18,13 @@ export const passThroughQa: QaRunner = {
     return { passed: true, summary: "QA stub: passed (browser QA not yet wired)" };
   },
 };
+
+// Selects the QA runner from the environment: when `QA_BASE_URL` is configured,
+// returns the real Playwright-backed browser QA runner (optionally with a
+// per-PR preview URL pattern via `QA_PREVIEW_URL_PATTERN`); otherwise falls back
+// to the pass-through stub so behavior is unchanged when QA is not configured.
+export function makeQaRunner(): QaRunner {
+  const baseUrl = process.env.QA_BASE_URL;
+  if (!baseUrl) return passThroughQa;
+  return browserQaRunner({ baseUrl, previewUrlPattern: process.env.QA_PREVIEW_URL_PATTERN });
+}
