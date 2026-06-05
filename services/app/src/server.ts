@@ -10,6 +10,7 @@ import { registerTaskDetailRoutes } from "./http/task-detail-routes.js";
 import { registerFanoutRoutes } from "./http/fanout-routes.js";
 import { registerSelectRoutes } from "./http/select-routes.js";
 import { registerNavRoutes } from "./http/nav-routes.js";
+import { registerThreadReposRoutes } from "./http/thread-repos-routes.js";
 import { registerTeamRoutes } from "./http/team-routes.js";
 import { registerNotifyRoutes } from "./http/notify-routes.js";
 import { registerDmRoutes } from "./http/dm-routes.js";
@@ -88,6 +89,7 @@ export async function buildServer() {
   registerFanoutRoutes(app, { db, sql, temporal, sandboxUrl });
   registerSelectRoutes(app, { db, sql });
   registerNavRoutes(app, { db });
+  registerThreadReposRoutes(app, { db }); // #75: multi-repo per thread + fork
   registerTeamRoutes(app, { db });
   registerNotifyRoutes(app, { db });
   registerDmRoutes(app, { db });

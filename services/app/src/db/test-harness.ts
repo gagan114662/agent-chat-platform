@@ -17,6 +17,7 @@ const TABLES = [
   "log_events",
   "incidents",
   "task_relations", "task_comments",
+  "thread_repos",
   "run_checkpoints", "run_events", "runs", "tasks", "messages", "threads", "channels",
   "agents", "members", "repos", "workspaces", "orgs",
 ];
