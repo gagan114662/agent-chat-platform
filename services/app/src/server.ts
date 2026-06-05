@@ -31,6 +31,7 @@ import { registerIngestRoutes } from "./http/ingest-routes.js";
 import { registerLogIngestRoutes } from "./http/log-ingest-routes.js";
 import { registerWebhookRoutes } from "./http/webhook-routes.js";
 import { registerAuth } from "./http/auth-routes.js";
+import { registerSessionRoutes } from "./http/session-routes.js";
 import { registerApiKeyRoutes } from "./http/apikey-routes.js";
 import { registerInviteRoutes } from "./http/invite-routes.js";
 import { registerAutomationRoutes } from "./http/automation-routes.js";
@@ -104,6 +105,7 @@ export async function buildServer() {
   registerLogIngestRoutes(app, { db, sql });
   registerWebhookRoutes(app, { db, sql });
   registerApiKeyRoutes(app, { db });
+  registerSessionRoutes(app, { db });
   registerInviteRoutes(app, { db });
   registerAutomationRoutes(app, { db, sql, temporal, sandboxUrl });
   registerBillingRoutes(app, { db });
