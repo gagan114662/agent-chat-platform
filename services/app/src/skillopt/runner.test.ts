@@ -60,9 +60,9 @@ describe("optimizeAgentSkill (live)", () => {
   it("rejects (no new version) once the lesson is already present", async () => {
     // pre-seed the skill with every lesson → nothing left to improve
     const full = "- Run the test suite locally and make checks pass before opening the PR.\n"
-      + "- Keep the change small and focused so the run completes well within the time budget.\n"
+      + "- Break a large task into focused steps, but still finish the whole task — don't ship a partial change.\n"
       + "- Read the error output and fix the root cause before re-running; don't retry blindly.\n"
-      + "- Make the smallest change that satisfies the task's acceptance criteria.";
+      + "- Achieve the task's actual outcome. If something is impossible from the sandbox (a real account, credential, deploy target, or payment), STOP and say exactly what is blocked — do NOT make a token change and report done.";
     await saveSkillVersion(h.db, "o1", "a1", full);
     const out = await optimizeAgentSkill(h.db, "o1", "a1");
     expect(out.accepted).toBe(false);

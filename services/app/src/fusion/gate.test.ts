@@ -35,3 +35,30 @@ describe("buildMergeGate", () => {
     expect(passingQa.run).toHaveBeenCalledOnce();
   });
 });
+
+describe("placeholderBlock (#145)", () => {
+  it("holds a PR that adds a placeholder/TODO to a production file", async () => {
+    const gate = buildMergeGate(github([
+      { filename: "index.html", additions: 2, deletions: 0, status: "modified", patch: '+++ b/index.html\n+<a href="https://pay.example.com/resume-review">Buy</a>' } as any,
+    ]), { owner: "o", repo: "r", autonomy: "autopilot-merge" });
+    const d = await gate({ prNumber: 1, prUrl: "u", commitSha: "s", branch: "b" });
+    expect(d.merge).toBe(false);
+    expect(d.reason).toMatch(/placeholder.*index\.html/i);
+  });
+
+  it("ignores placeholders in docs/tests (not production)", async () => {
+    const gate = buildMergeGate(github([
+      { filename: "NOTES.md", additions: 1, deletions: 0, status: "modified", patch: "+pay.example.com/resume-review TODO replace before launch" } as any,
+    ]), { owner: "o", repo: "r", autonomy: "autopilot-merge" });
+    const d = await gate({ prNumber: 1, prUrl: "u", commitSha: "s", branch: "b" });
+    expect(d.merge).toBe(true); // docs don't block; only production files
+  });
+
+  it("merges a clean production change", async () => {
+    const gate = buildMergeGate(github([
+      { filename: "src/app.ts", additions: 1, deletions: 0, status: "modified", patch: "+export const price = 4900;" } as any,
+    ]), { owner: "o", repo: "r", autonomy: "autopilot-merge" });
+    const d = await gate({ prNumber: 1, prUrl: "u", commitSha: "s", branch: "b" });
+    expect(d.merge).toBe(true);
+  });
+});

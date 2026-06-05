@@ -16,12 +16,15 @@ const EDIT_BUDGET = { maxChars: 280 };
 // Concrete, reusable lessons keyed to a failure signal — the heuristic proposer
 // appends the first relevant one not already in the doc. Each is also what the
 // evaluator rewards, so adding a relevant lesson strictly improves the score.
+// #145: lessons must push toward the REAL outcome, never toward a token change.
+// (The old "make the smallest change" lesson was actively training agents to do a
+// one-line edit and merge — faking completion.)
 const LESSONS: { trigger: RegExp; text: string }[] = [
   { trigger: /checks_failed|fail/i, text: "- Run the test suite locally and make checks pass before opening the PR." },
-  { trigger: /timeout/i, text: "- Keep the change small and focused so the run completes well within the time budget." },
+  { trigger: /timeout/i, text: "- Break a large task into focused steps, but still finish the whole task — don't ship a partial change." },
   { trigger: /error/i, text: "- Read the error output and fix the root cause before re-running; don't retry blindly." },
 ];
-const DEFAULT_LESSON = "- Make the smallest change that satisfies the task's acceptance criteria.";
+const DEFAULT_LESSON = "- Achieve the task's actual outcome. If something is impossible from the sandbox (a real account, credential, deploy target, or payment), STOP and say exactly what is blocked — do NOT make a token change and report done.";
 
 // gatherRollouts: the agent's recent runs as scored rollouts (merged = 1, failure
 // = 0, in-flight/held = 0.5), newest first.
