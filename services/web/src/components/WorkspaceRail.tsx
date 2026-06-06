@@ -36,6 +36,13 @@ export function WorkspaceRail({ active, inboxCount = 0, onSelect, theme = "dark"
             <button
               key={it.view}
               type="button"
+              // #143.5: navigate on pointer-DOWN as well as click. A click on an
+              // unfocused window (e.g. when driven by a browser tool, or after
+              // switching apps) is consumed focusing the window, so onClick never
+              // fires — the reported "first click does nothing, second works".
+              // pointerdown fires on the press regardless; setView is idempotent so
+              // the paired onClick (kept for keyboard) is harmless.
+              onPointerDown={onSelect[it.view]}
               onClick={onSelect[it.view]}
               title={it.label}
               aria-label={it.label}
