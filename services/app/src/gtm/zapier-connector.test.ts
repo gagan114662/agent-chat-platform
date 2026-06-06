@@ -10,7 +10,7 @@ describe("ZapierConnector (distribution rail)", () => {
     const c = new ZapierConnector("https://hooks.zapier.test/x", "Bearer z", fetchImpl as unknown as typeof fetch);
     const res = await c.deliver(action);
     expect(res).toEqual({ sent: true, reach: 3 });
-    const [url, init] = (fetchImpl.mock.calls[0] ?? []) as [string, RequestInit & { headers: Record<string, string>; body: string }];
+    const [url, init] = (fetchImpl.mock.calls[0] ?? []) as unknown as [string, RequestInit & { headers: Record<string, string>; body: string }];
     expect(url).toBe("https://hooks.zapier.test/x");
     expect(init.method).toBe("POST");
     expect(init.headers.authorization).toBe("Bearer z");
