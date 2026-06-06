@@ -30,13 +30,14 @@ export const noopGtmConnector: GtmConnector = async (a) => ({ sent: false, reach
 // Deterministic action generator: turn a playbook + business context into a concrete,
 // review-free action. A production upgrade swaps in the LLM gateway (#147) for the copy;
 // the SHAPE (what effect each action kind has) stays the same.
-function buildAction(pb: GtmPlaybook, ctx: { name: string; offer?: string; priceCents?: number; liveUrl?: string | null; audienceSize: number }): GtmAction {
+function buildAction(pb: GtmPlaybook, ctx: { name: string; offer?: string; priceCents?: number; liveUrl?: string | null; offerUrl?: string | null; audienceSize: number }): GtmAction {
   const price = ctx.priceCents != null ? `$${(ctx.priceCents / 100).toFixed(2)}` : "the listed price";
   const offer = ctx.offer ?? ctx.name;
+  const cta = ctx.offerUrl ?? ctx.liveUrl ?? "(offer page)"; // the REAL, transactable buy page
   const base = { fn: pb.fn, skill: pb.id, actionKind: pb.actionKind, audienceSize: ctx.audienceSize };
   switch (pb.actionKind) {
     case "outreach":
-      return { ...base, summary: `Demand-gen push for ${ctx.name}: ${offer} at ${price}`, payload: { channel: "email", offer, price, cta: ctx.liveUrl ?? "(offer page)" } };
+      return { ...base, summary: `Demand-gen push for ${ctx.name}: ${offer} at ${price}`, payload: { channel: "email", offer, price, cta } };
     case "sequence":
       return { ...base, summary: `3-step outbound sequence for ${ctx.name} (${offer})`, payload: { steps: ["intro", "value + proof", "offer + CTA"], offer } };
     case "content":
@@ -72,7 +73,10 @@ export async function runGtmMotion(db: DB, args: {
   if (!biz) throw new Error("business not found");
   const [offer] = await db.select().from(offerings).where(and(eq(offerings.orgId, orgId), eq(offerings.businessId, businessId), eq(offerings.active, true)));
   const audience = await db.select({ id: leads.id }).from(leads).where(and(eq(leads.orgId, orgId), eq(leads.businessId, businessId)));
-  const ctx = { name: biz.name, offer: offer?.name, priceCents: offer?.priceCents, liveUrl: biz.liveUrl, audienceSize: audience.length };
+  // CTA target: the platform-served transactable offer page (real, catalog-priced Buy).
+  const baseUrl = process.env.PUBLIC_BASE_URL ?? "https://acp-convene.fly.dev";
+  const offerUrl = offer ? `${baseUrl}/public/offer/${offer.id}` : biz.liveUrl;
+  const ctx = { name: biz.name, offer: offer?.name, priceCents: offer?.priceCents, liveUrl: biz.liveUrl, offerUrl, audienceSize: audience.length };
 
   const playbooks = playbooksFor(args.fn);
   const out: GtmRunResult["actions"] = [];
