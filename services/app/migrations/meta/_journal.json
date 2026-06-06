@@ -344,6 +344,13 @@
       "when": 1783955200000,
       "tag": "0048_audit_log",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1784041600000,
+      "tag": "0049_catalog_quotes",
+      "breakpoints": true
     }
   ]
 }

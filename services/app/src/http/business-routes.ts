@@ -7,6 +7,10 @@ import {
   createPaymentIntent, listPaymentIntents, decidePaymentIntent,
   addLead, funnel, createCampaign, listCampaigns, decideCampaign,
 } from "../business/businesses.js";
+import {
+  createOffering, listOfferings, createQuote, listQuotes, checkoutQuote,
+  QuoteChargeMismatchError,
+} from "../business/catalog.js";
 
 // #141/#142 business routes. Drafts (create business / payment intent / campaign /
 // lead / cost) are member-allowed; APPROVING a payment or a campaign is admin-gated
@@ -93,5 +97,54 @@ export function registerBusinessRoutes(app: FastifyInstance, d: { db: DB }) {
     const row = await decideCampaign(d.db, { orgId, campaignId: id, approve, byUserId: userId, costCents });
     if (!row) return reply.code(404).send({ error: "campaign not found" });
     return reply.code(200).send(row);
+  });
+
+  // ---- #152 2.1 catalog ----
+  app.get("/businesses/:id/offerings", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    return reply.code(200).send({ offerings: await listOfferings(d.db, orgId, id) });
+  });
+  app.post("/businesses/:id/offerings", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { sku, name, deliverable, scope, priceCents } = (req.body ?? {}) as { sku?: string; name?: string; deliverable?: string; scope?: string; priceCents?: number };
+    if (!sku?.trim() || !name?.trim()) return reply.code(400).send({ error: "sku and name required" });
+    if (typeof priceCents !== "number" || priceCents <= 0) return reply.code(400).send({ error: "priceCents > 0 required" });
+    return reply.code(201).send(await createOffering(d.db, { orgId, businessId: id, sku: sku.trim(), name: name.trim(), deliverable, scope, priceCents }));
+  });
+
+  // ---- #152 2.2 quoting ----
+  app.get("/businesses/:id/quotes", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    return reply.code(200).send({ quotes: await listQuotes(d.db, orgId, id) });
+  });
+  // A quote derives its price from the offering — the client never sends an amount,
+  // so a wrong number has nowhere to enter.
+  app.post("/businesses/:id/quotes", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { offeringId, customer } = (req.body ?? {}) as { offeringId?: string; customer?: string };
+    if (!offeringId?.trim()) return reply.code(400).send({ error: "offeringId required" });
+    try {
+      return reply.code(201).send(await createQuote(d.db, { orgId, offeringId: offeringId.trim(), customer }));
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
+  });
+
+  // ---- #152 3.1 checkout (guardrail: charge === quote, #152 6.2) ----
+  // Resolve a quote to a payment intent for EXACTLY the quoted amount. The intent
+  // still needs a human to approve (the money gate). The returned paymentIntent.id is
+  // the real, correctly-priced target a Buy link points at — never a placeholder.
+  app.post("/quotes/:id/checkout", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    try {
+      return reply.code(201).send(await checkoutQuote(d.db, { orgId, quoteId: id }));
+    } catch (e) {
+      if (e instanceof QuoteChargeMismatchError) return reply.code(409).send({ error: e.message, quotedCents: e.quotedCents, chargeCents: e.chargeCents });
+      return reply.code(400).send({ error: (e as Error).message });
+    }
   });
 }

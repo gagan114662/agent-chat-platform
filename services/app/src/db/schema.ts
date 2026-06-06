@@ -230,6 +230,37 @@ export const outreachCampaigns = pgTable("outreach_campaigns", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// #152 2.1 the OFFER CATALOG: a typed definition of what a business sells. The
+// price lives here, once — quotes derive from it, so a customer can never be
+// shown a number that wasn't sourced from the catalog (the $15-vs-$33 class of bug).
+export const offerings = pgTable("offerings", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  businessId: text("business_id").notNull(),
+  sku: text("sku").notNull(),
+  name: text("name").notNull(),
+  deliverable: text("deliverable").notNull().default(""),
+  scope: text("scope").notNull().default(""),
+  priceCents: integer("price_cents").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// #152 2.2 a QUOTE: a price quoted to a customer, COPIED from an offering at quote
+// time (never hand-entered). quotedCents is the single number shown to the customer;
+// checkout (3.1) charges exactly this, asserted by the quote==charge guardrail (6.2).
+export const quotes = pgTable("quotes", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  businessId: text("business_id").notNull(),
+  offeringId: text("offering_id").notNull(),
+  customer: text("customer").notNull().default(""),
+  quotedCents: integer("quoted_cents").notNull(),
+  state: text("state").notNull().default("open"), // 'open'|'charged'|'expired'
+  paymentIntentId: text("payment_intent_id"),     // set at checkout
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // #150.3 append-only, hash-chained audit log (tamper-evident). hash = sha256(
 // prevHash + canonical(entry)); a broken link is detectable.
 export const auditLog = pgTable("audit_log", {
