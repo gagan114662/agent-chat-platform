@@ -5,6 +5,7 @@ import { gtmActions, businesses, offerings, leads } from "../db/schema.js";
 import { addLedgerEntry } from "../business/businesses.js";
 import { record } from "../audit/audit-log.js";
 import { playbooksFor, type GtmFunction, type GtmPlaybook } from "./playbooks.js";
+import { connectorFromEnv } from "./zapier-connector.js";
 
 // #41 the autonomous GTM motion. Runs the adopted gtm-cheat-codes playbooks for a
 // business and EXECUTES each one with NO human-in-the-loop approval gate (operator's
@@ -66,7 +67,9 @@ export async function runGtmMotion(db: DB, args: {
   connector?: GtmConnector; costPerActionCents?: number; byId?: string;
 }): Promise<GtmRunResult> {
   const { orgId, businessId } = args;
-  const connector = args.connector ?? noopGtmConnector;
+  // Default to the env connector: real Zapier when ZAPIER_MCP_URL is set, else no-op.
+  // So the autonomous motion goes live the moment the operator provisions the URL.
+  const connector = args.connector ?? connectorFromEnv();
   const costPer = args.costPerActionCents ?? 5; // small per-action GTM spend → shows in P&L (#155)
 
   const [biz] = await db.select().from(businesses).where(and(eq(businesses.id, businessId), eq(businesses.orgId, orgId)));
