@@ -176,6 +176,10 @@ export async function buildServer() {
           !req.url.startsWith("/businesses") &&
           !req.url.startsWith("/payment-intents") &&
           !req.url.startsWith("/campaigns") &&
+          !req.url.startsWith("/quotes") &&
+          !req.url.startsWith("/deliveries") &&
+          !req.url.startsWith("/accounting") &&
+          !req.url.startsWith("/support") &&
           !req.url.startsWith("/orgs") &&
           !req.url.startsWith("/agents") &&
           !req.url.startsWith("/billing") &&

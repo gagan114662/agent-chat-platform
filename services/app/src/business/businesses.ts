@@ -83,6 +83,10 @@ export async function decidePaymentIntent(db: DB, args: { orgId: string; intentI
     await addLedgerEntry(db, { orgId: args.orgId, businessId: pi.businessId, kind: "revenue", amountCents: pi.amountCents, source: "payment", memo: `payment ${pi.customer}`.trim() });
     if (pi.customer) await addLead(db, { orgId: args.orgId, businessId: pi.businessId, identifier: pi.customer, stage: "customer", source: "payment" });
     await verifyDraftTask(db, args.orgId, pi.taskId); // #146: close the goal task that drafted this
+    // #152 5.1: a paid customer is owed delivery — open a pending delivery now.
+    // Inline import to avoid a module cycle (delivery imports nothing from here).
+    const { createDelivery } = await import("./delivery.js");
+    await createDelivery(db, { orgId: args.orgId, businessId: pi.businessId, customer: pi.customer, paymentIntentId: pi.id });
   }
   // #150.3: tamper-evident record of the money decision (who, what, how much).
   await record(db, { orgId: args.orgId, actorKind: "human", actorId: args.byUserId, action: args.approve ? "payment.approved" : "payment.declined", resource: pi.businessId, payload: { amountCents: pi.amountCents, customer: pi.customer } });

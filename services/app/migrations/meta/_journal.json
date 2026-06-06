@@ -351,6 +351,13 @@
       "when": 1784041600000,
       "tag": "0049_catalog_quotes",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1784128000000,
+      "tag": "0050_delivery_support",
+      "breakpoints": true
     }
   ]
 }

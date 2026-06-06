@@ -261,6 +261,36 @@ export const quotes = pgTable("quotes", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// #152 5.1 DELIVERY: once a customer has paid + the work is complete, the
+// deliverable is packaged and handed over (a deployed URL, a file, or access). A
+// delivery is auto-created pending when a payment is approved, then fulfilled.
+export const deliveries = pgTable("deliveries", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  businessId: text("business_id").notNull(),
+  customer: text("customer").notNull().default(""),
+  paymentIntentId: text("payment_intent_id"),
+  kind: text("kind").notNull().default("url"), // 'url'|'file'|'access'
+  artifact: text("artifact").notNull().default(""), // the URL / file ref / access grant
+  state: text("state").notNull().default("pending"), // 'pending'|'delivered'
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// #152 7.1 SUPPORT: a post-sale customer message becomes a tracked ticket the agent
+// (or a human) can act on — questions, revisions, refunds.
+export const supportTickets = pgTable("support_tickets", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  businessId: text("business_id").notNull(),
+  customer: text("customer").notNull().default(""),
+  subject: text("subject").notNull().default(""),
+  body: text("body").notNull().default(""),
+  state: text("state").notNull().default("open"), // 'open'|'resolved'
+  resolution: text("resolution").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // #150.3 append-only, hash-chained audit log (tamper-evident). hash = sha256(
 // prevHash + canonical(entry)); a broken link is detectable.
 export const auditLog = pgTable("audit_log", {

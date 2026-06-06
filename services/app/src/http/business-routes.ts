@@ -11,6 +11,9 @@ import {
   createOffering, listOfferings, createQuote, listQuotes, checkoutQuote,
   QuoteChargeMismatchError,
 } from "../business/catalog.js";
+import { listDeliveries, fulfillDelivery } from "../business/delivery.js";
+import { incomeStatement, portfolioPnl } from "../business/accounting.js";
+import { openTicket, listTickets, resolveTicket } from "../business/support.js";
 
 // #141/#142 business routes. Drafts (create business / payment intent / campaign /
 // lead / cost) are member-allowed; APPROVING a payment or a campaign is admin-gated
@@ -146,5 +149,58 @@ export function registerBusinessRoutes(app: FastifyInstance, d: { db: DB }) {
       if (e instanceof QuoteChargeMismatchError) return reply.code(409).send({ error: e.message, quotedCents: e.quotedCents, chargeCents: e.chargeCents });
       return reply.code(400).send({ error: (e as Error).message });
     }
+  });
+
+  // ---- #152 5.1 delivery ----
+  // A pending delivery is auto-created when a payment is approved (see
+  // decidePaymentIntent). Fulfilling hands the artifact over (deployed URL by default).
+  app.get("/businesses/:id/deliveries", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    return reply.code(200).send({ deliveries: await listDeliveries(d.db, orgId, id) });
+  });
+  app.post("/deliveries/:id/fulfill", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { artifact, kind } = (req.body ?? {}) as { artifact?: string; kind?: string };
+    const row = await fulfillDelivery(d.db, { orgId, deliveryId: id, artifact, kind });
+    if (!row) return reply.code(404).send({ error: "delivery not found" });
+    return reply.code(200).send(row);
+  });
+
+  // ---- #152 8.2 accounting ----
+  app.get("/businesses/:id/accounting", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const b = await getBusiness(d.db, orgId, id);
+    if (!b) return reply.code(404).send({ error: "business not found" });
+    return reply.code(200).send(await incomeStatement(d.db, orgId, id));
+  });
+  app.get("/accounting/portfolio", async (req, reply) => {
+    const { orgId } = actor(req);
+    return reply.code(200).send(await portfolioPnl(d.db, orgId));
+  });
+
+  // ---- #152 7.1 support ----
+  app.get("/businesses/:id/support", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { state } = (req.query ?? {}) as { state?: "open" | "resolved" };
+    return reply.code(200).send({ tickets: await listTickets(d.db, orgId, id, { state }) });
+  });
+  app.post("/businesses/:id/support", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { customer, subject, body } = (req.body ?? {}) as { customer?: string; subject?: string; body?: string };
+    if (!body?.trim()) return reply.code(400).send({ error: "body required" });
+    return reply.code(201).send(await openTicket(d.db, { orgId, businessId: id, customer, subject, body: body.trim() }));
+  });
+  app.post("/support/:id/resolve", async (req, reply) => {
+    const { orgId, userId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { resolution } = (req.body ?? {}) as { resolution?: string };
+    const row = await resolveTicket(d.db, { orgId, ticketId: id, resolution: resolution ?? "", byActor: userId });
+    if (!row) return reply.code(404).send({ error: "ticket not found" });
+    return reply.code(200).send(row);
   });
 }
