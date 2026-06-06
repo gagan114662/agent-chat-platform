@@ -7,6 +7,7 @@ import { tick, type StartRun } from "./tick.js";
 import { autonomousGoals, setGoalAutonomy } from "./goals.js";
 import { progressGoal, type GoalOutcome, type NextStepGen } from "./progress.js";
 import { runBusinessGoal } from "../business/actions.js";
+import { runGtmMotion } from "../gtm/runner.js";
 import { LoopGuard, fingerprint } from "./loop-guard.js";
 import { enforceBudget } from "./budget.js";
 
@@ -75,7 +76,16 @@ export async function runAutonomyCycle(d: SchedulerDeps): Promise<CycleResult> {
       // #146: a business goal advances the funnel — execute its open tasks as
       // business actions (draft charges/campaigns → pending human approval) before
       // judging completion.
-      if (g.businessId) await runBusinessGoal(d.db, orgId, g.id);
+      if (g.businessId) {
+        await runBusinessGoal(d.db, orgId, g.id);
+        // #41: a business being grown autonomously also runs the GTM motion — no human
+        // gate (operator's choice). Behind ACP_GTM_AUTONOMY so it's opt-in per deploy.
+        // Failures here must not stall the goal loop.
+        if (process.env.ACP_GTM_AUTONOMY === "1") {
+          try { await runGtmMotion(d.db, { orgId, businessId: g.businessId, byId: "scheduler" }); }
+          catch (err) { console.warn("[acp] gtm motion failed:", String(err)); }
+        }
+      }
       const outcome = await progressGoal(d.db, orgId, g.id, { gen: d.gen });
       if (outcome.status === "done") loopGuard.reset(g.id); // completed → clear its trail
       goals.push({ goalId: g.id, title: g.title, outcome });

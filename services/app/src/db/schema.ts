@@ -291,6 +291,24 @@ export const supportTickets = pgTable("support_tickets", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// #41 GTM motion actions. The autonomous GTM runner records every action it takes
+// here (and in the audit log) — autonomy without a human gate still means every send /
+// asset / audit is traceable. `sent` is true only when a real connector delivered it;
+// false means recorded-but-not-physically-sent (no operator connector wired yet).
+export const gtmActions = pgTable("gtm_actions", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  businessId: text("business_id").notNull(),
+  fn: text("fn").notNull(),                 // GtmFunction
+  skill: text("skill").notNull(),           // playbook id
+  actionKind: text("action_kind").notNull(),
+  summary: text("summary").notNull().default(""),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+  sent: boolean("sent").notNull().default(false),
+  reach: integer("reach").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // #150.3 append-only, hash-chained audit log (tamper-evident). hash = sha256(
 // prevHash + canonical(entry)); a broken link is detectable.
 export const auditLog = pgTable("audit_log", {

@@ -15,6 +15,8 @@ import { listDeliveries, fulfillDelivery } from "../business/delivery.js";
 import { incomeStatement, portfolioPnl } from "../business/accounting.js";
 import { openTicket, listTickets, resolveTicket } from "../business/support.js";
 import { discoverOpportunities, spawnBusiness, spawnTopOpportunity, rebalancePortfolio, type OpportunitySpec } from "../business/factory.js";
+import { GTM_PLAYBOOKS, type GtmFunction } from "../gtm/playbooks.js";
+import { runGtmMotion, listGtmActions } from "../gtm/runner.js";
 
 // #141/#142 business routes. Drafts (create business / payment intent / campaign /
 // lead / cost) are member-allowed; APPROVING a payment or a campaign is admin-gated
@@ -234,5 +236,26 @@ export function registerBusinessRoutes(app: FastifyInstance, d: { db: DB }) {
     if (!(await isAdmin(userId, orgId))) return reply.code(403).send({ error: "forbidden — rebalancing kills/scales businesses (admin only)" });
     const { totalBudgetCents, killMarginPct, scaleMarginPct } = (req.body ?? {}) as { totalBudgetCents?: number; killMarginPct?: number; scaleMarginPct?: number };
     return reply.code(200).send(await rebalancePortfolio(d.db, { orgId, totalBudgetCents, killMarginPct, scaleMarginPct, byId: userId }));
+  });
+
+  // ---- #41 GTM motion (adopted gtm-cheat-codes playbook; autonomous, no human gate) ----
+  app.get("/gtm/playbooks", async () => ({ playbooks: GTM_PLAYBOOKS }));
+  app.get("/businesses/:id/gtm/actions", async (req, reply) => {
+    const { orgId } = actor(req);
+    const { id } = req.params as { id: string };
+    return reply.code(200).send({ actions: await listGtmActions(d.db, orgId, id) });
+  });
+  // Run the GTM motion for a business NOW — executes every applicable playbook with no
+  // approval gate. Real sends require an operator connector (none wired → recorded, not
+  // sent). Optionally scope to one function.
+  app.post("/businesses/:id/gtm/run", async (req, reply) => {
+    const { orgId, userId } = actor(req);
+    const { id } = req.params as { id: string };
+    const { fn } = (req.body ?? {}) as { fn?: GtmFunction };
+    try {
+      return reply.code(200).send(await runGtmMotion(d.db, { orgId, businessId: id, fn, byId: userId }));
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
   });
 }
