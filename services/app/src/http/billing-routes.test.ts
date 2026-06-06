@@ -15,6 +15,7 @@ function fakeStripe() {
   const make: MakeStripe = () => ({
     async createCheckoutSession(args) { calls.checkout.push(args); return { url: `https://checkout.test/${(args as { priceId: string }).priceId}` }; },
     async createPortalSession(args) { calls.portal.push(args); return { url: "https://portal.test/session" }; },
+    async createPaymentSession() { return { id: "cs_test", url: "https://checkout.test/payment" }; },
   });
   return { make, calls };
 }

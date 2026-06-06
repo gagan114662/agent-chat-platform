@@ -256,8 +256,9 @@ export const quotes = pgTable("quotes", {
   offeringId: text("offering_id").notNull(),
   customer: text("customer").notNull().default(""),
   quotedCents: integer("quoted_cents").notNull(),
-  state: text("state").notNull().default("open"), // 'open'|'charged'|'expired'
-  paymentIntentId: text("payment_intent_id"),     // set at checkout
+  state: text("state").notNull().default("open"), // 'open'|'charged'|'paid'|'expired'
+  paymentIntentId: text("payment_intent_id"),     // set at internal (gated) checkout
+  stripeSessionId: text("stripe_session_id"),      // set when a real Stripe Checkout Session is opened
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

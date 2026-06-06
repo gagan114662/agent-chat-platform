@@ -58,6 +58,10 @@ export function reporterFromEnv(): BillingReporter {
 export interface StripeClient {
   createCheckoutSession(args: { priceId: string; orgId: string; customerId?: string | null; successUrl?: string; cancelUrl?: string }): Promise<{ url: string }>;
   createPortalSession(args: { customerId: string; returnUrl?: string }): Promise<{ url: string }>;
+  // One-time payment for an arbitrary amount (the business loop: a quote at its exact
+  // quoted price). Uses ad-hoc price_data so no pre-created Stripe Price is needed —
+  // the amount IS the quote, so quoted === charged holds through to Stripe.
+  createPaymentSession(args: { amountCents: number; currency?: string; productName: string; clientReferenceId: string; customerEmail?: string; successUrl: string; cancelUrl: string }): Promise<{ id: string; url: string }>;
 }
 
 export type MakeStripe = () => StripeClient;
@@ -95,6 +99,28 @@ class StripeRestClient implements StripeClient {
     form.set("customer", args.customerId);
     form.set("return_url", args.returnUrl ?? "https://reload.chat/billing");
     return this.post("billing_portal/sessions", form);
+  }
+
+  async createPaymentSession(args: { amountCents: number; currency?: string; productName: string; clientReferenceId: string; customerEmail?: string; successUrl: string; cancelUrl: string }): Promise<{ id: string; url: string }> {
+    const form = new URLSearchParams();
+    form.set("mode", "payment");
+    form.set("line_items[0][quantity]", "1");
+    form.set("line_items[0][price_data][currency]", args.currency ?? "usd");
+    form.set("line_items[0][price_data][unit_amount]", String(Math.round(args.amountCents)));
+    form.set("line_items[0][price_data][product_data][name]", args.productName);
+    form.set("client_reference_id", args.clientReferenceId);
+    if (args.customerEmail) form.set("customer_email", args.customerEmail);
+    form.set("success_url", args.successUrl);
+    form.set("cancel_url", args.cancelUrl);
+    const res = await this.fetchImpl(`https://api.stripe.com/v1/checkout/sessions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.apiKey}`, "content-type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    if (!res.ok) throw new Error(`stripe checkout/sessions ${res.status}: ${await res.text()}`);
+    const json = (await res.json()) as { id?: string; url?: string };
+    if (!json.id || !json.url) throw new Error("stripe checkout/sessions: missing id/url");
+    return { id: json.id, url: json.url };
   }
 }
 

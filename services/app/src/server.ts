@@ -48,6 +48,7 @@ import { registerAutomationRoutes } from "./http/automation-routes.js";
 import { registerBillingRoutes } from "./http/billing-routes.js";
 import { registerOpenApiRoutes } from "./http/openapi-routes.js";
 import { registerContactRoutes } from "./http/contact-routes.js";
+import { registerStripeRoutes } from "./http/stripe-routes.js";
 import { resolveSession } from "./auth/auth.js";
 import { eq } from "drizzle-orm";
 import { threads } from "./db/schema.js";
@@ -134,6 +135,7 @@ export async function buildServer() {
   registerBillingRoutes(app, { db });
   registerOpenApiRoutes(app); // #86: GET /openapi.json + /docs (public)
   registerContactRoutes(app, { db }); // #69: POST /contact (public marketing lead capture)
+  registerStripeRoutes(app, { db }); // actual revenue: public quote checkout + Stripe webhook
 
   // Public liveness/health probe (in PUBLIC_PATHS so the auth preHandler won't 401 it).
   app.get("/healthz", async () => ({ ok: true }));
@@ -183,6 +185,7 @@ export async function buildServer() {
           !req.url.startsWith("/opportunities") &&
           !req.url.startsWith("/factory") &&
           !req.url.startsWith("/gtm") &&
+          !req.url.startsWith("/public/") &&
           !req.url.startsWith("/orgs") &&
           !req.url.startsWith("/agents") &&
           !req.url.startsWith("/billing") &&

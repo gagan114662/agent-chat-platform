@@ -71,8 +71,10 @@ export function registerAuth(app: FastifyInstance, d: { db: DB }) {
       // /files/:id/download) authenticate via an HMAC `?sig=` token enforced in the
       // route, so they bypass the session 401 here too (the route verifies the sig).
       // POST /files and GET /files/:id (metadata) stay under normal auth.
+      // /public/* is the customer-facing surface (e.g. opening a Stripe Checkout
+      // Session for a quote) — no user session; the quote id is the capability.
       if (!PUBLIC_PATHS.has(path) && !path.startsWith("/ingest/") && !path.startsWith("/webhooks/")
-          && !isSignedFilePath(path)) {
+          && !path.startsWith("/public/") && !isSignedFilePath(path)) {
         return reply.code(401).send({ error: "unauthenticated" });
       }
     }
