@@ -15,6 +15,48 @@ export function registerStripeRoutes(app: FastifyInstance, d: { db: DB; makeStri
   const makeStripe = d.makeStripe ?? defaultStripe;
   const baseUrl = process.env.PUBLIC_BASE_URL ?? "https://acp-convene.fly.dev";
 
+  // A real, catalog-priced, transactable offer page served BY the platform. Replaces
+  // the static placeholder ("$19" + href="STRIPE_PAYMENT_LINK_HERE") with a price read
+  // live from the catalog and a Buy button wired to /public/buy → Stripe. The GTM
+  // motion can point its CTA straight here. Public; no money until the operator's key.
+  app.get("/public/offer/:offeringId", async (req, reply) => {
+    const { offeringId } = req.params as { offeringId: string };
+    const [off] = await d.db.select().from(offerings).where(eq(offerings.id, offeringId));
+    if (!off || !off.active) return reply.code(404).type("text/html").send("<!doctype html><meta charset=utf-8><title>Not available</title><p style='font:16px system-ui;padding:3rem'>This offer is not available.</p>");
+    const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+    const priceNum = off.priceCents % 100 === 0 ? String(off.priceCents / 100) : (off.priceCents / 100).toFixed(2);
+    const price = `$${priceNum}`;
+    const html = `<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>${esc(off.name)}</title><style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0f0f11;color:#f0f0f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem 1rem}
+.card{background:#1a1a1f;border:1px solid #2e2e38;border-radius:16px;max-width:520px;width:100%;padding:3rem 2.5rem;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+h1{font-size:1.6rem;margin-bottom:.5rem}.scope{color:#9aa;margin-bottom:1.5rem}
+.price{font-size:3rem;font-weight:800;margin:1rem 0 .25rem}.price sup{font-size:1.3rem;top:-1.1rem;position:relative}
+.note{color:#9aa;font-size:.85rem;margin-bottom:1.5rem}
+input{width:100%;padding:.8rem 1rem;border-radius:10px;border:1px solid #2e2e38;background:#0f0f11;color:#f0f0f0;font-size:1rem;margin-bottom:.75rem}
+button{width:100%;padding:.9rem;border:0;border-radius:10px;background:#2563eb;color:#fff;font-size:1rem;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}.msg{margin-top:1rem;min-height:1.2rem;font-size:.9rem;color:#f87171}
+</style></head><body><div class=card>
+<h1>${esc(off.name)}</h1><div class=scope>${esc(off.scope || off.deliverable || "")}</div>
+<div class=price><sup>$</sup>${priceNum}</div>
+<div class=note>One-time · Instant checkout · secure payment via Stripe</div>
+<input id=email type=email placeholder="you@email.com" autocomplete=email>
+<button id=buy>Buy now — ${price}</button>
+<div class=msg id=msg></div></div>
+<script>
+const btn=document.getElementById('buy'),msg=document.getElementById('msg');
+btn.onclick=async()=>{btn.disabled=true;msg.textContent='';msg.style.color='#f87171';
+ try{const r=await fetch('/public/buy/${off.id}',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value||undefined})});
+  const j=await r.json();
+  if(r.ok&&j.url){window.location=j.url;return;}
+  msg.textContent=j.error||'Could not start checkout.';}
+ catch(e){msg.textContent='Network error, please retry.';}
+ btn.disabled=false;};
+</script></body></html>`;
+    return reply.code(200).type("text/html").header("cache-control", "no-cache").send(html);
+  });
+
   // Customer-facing one-shot: an anonymous visitor buys an offering. Creates a quote
   // from the catalog (price sourced from the offering — quoted === charged) and opens
   // a Stripe Checkout Session in one call. This is what the live offer page's Buy
