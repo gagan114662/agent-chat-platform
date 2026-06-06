@@ -77,11 +77,11 @@ export async function spawnBusiness(db: DB, args: { orgId: string; spec: Opportu
     `Capture an inbound lead for ${spec.title}`,
     spec.successMetric,
   ].join("\n");
-  const goal = await createGoal(db, { orgId, title: `Grow ${spec.title} to first revenue`, criteria, byKind: args.byKind ?? "agent", byId: args.byId ?? "factory", businessId: business.id });
+  const created = await createGoal(db, { orgId, title: `Grow ${spec.title} to first revenue`, criteria, byKind: args.byKind ?? "agent", byId: args.byId ?? "factory", businessId: business.id });
   // Hand it straight to the autonomy engine: autonomy ON + state ACTIVE so the
   // scheduler picks it up immediately. Business goals are driven by their criteria
   // (runBusinessGoal) + the GTM motion, not by task decomposition — no human step.
-  await db.update(goals).set({ autonomy: true, state: "active" }).where(and(eq(goals.orgId, orgId), eq(goals.id, goal.id)));
+  const [goal] = await db.update(goals).set({ autonomy: true, state: "active" }).where(and(eq(goals.orgId, orgId), eq(goals.id, created.id))).returning();
   await record(db, { orgId, actorKind: "agent", actorId: args.byId ?? "factory", action: "business.spawned", resource: business.id, payload: { spec, offeringId: offering.id, goalId: goal.id } });
   return { business, offering, goal };
 }
