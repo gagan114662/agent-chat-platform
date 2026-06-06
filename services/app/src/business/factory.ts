@@ -4,7 +4,7 @@ import { offerings, goals } from "../db/schema.js";
 import { createBusiness } from "./businesses.js";
 import { createOffering } from "./catalog.js";
 import { incomeStatement, portfolioPnl } from "./accounting.js";
-import { createGoal, setGoalAutonomy } from "../autonomy/goals.js";
+import { createGoal } from "../autonomy/goals.js";
 import { record } from "../audit/audit-log.js";
 
 // #152 the FACTORY tier: discover opportunities (#154) → spawn a business unit from a
@@ -78,7 +78,10 @@ export async function spawnBusiness(db: DB, args: { orgId: string; spec: Opportu
     spec.successMetric,
   ].join("\n");
   const goal = await createGoal(db, { orgId, title: `Grow ${spec.title} to first revenue`, criteria, byKind: args.byKind ?? "agent", byId: args.byId ?? "factory", businessId: business.id });
-  await setGoalAutonomy(db, orgId, goal.id, true); // hand it to the autonomy engine
+  // Hand it straight to the autonomy engine: autonomy ON + state ACTIVE so the
+  // scheduler picks it up immediately. Business goals are driven by their criteria
+  // (runBusinessGoal) + the GTM motion, not by task decomposition — no human step.
+  await db.update(goals).set({ autonomy: true, state: "active" }).where(and(eq(goals.orgId, orgId), eq(goals.id, goal.id)));
   await record(db, { orgId, actorKind: "agent", actorId: args.byId ?? "factory", action: "business.spawned", resource: business.id, payload: { spec, offeringId: offering.id, goalId: goal.id } });
   return { business, offering, goal };
 }
