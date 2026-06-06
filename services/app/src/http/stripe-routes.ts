@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import type { DB } from "../db/client.js";
-import { quotes } from "../db/schema.js";
+import { quotes, offerings } from "../db/schema.js";
 import { defaultStripe, type MakeStripe } from "../billing/billing.js";
+import { createQuote } from "../business/catalog.js";
 import { startQuoteStripeCheckout, fulfillPaidQuote } from "../business/stripe-checkout.js";
 import { verifyStripeSignature } from "../integrations/stripe-webhook.js";
 
@@ -14,7 +15,29 @@ export function registerStripeRoutes(app: FastifyInstance, d: { db: DB; makeStri
   const makeStripe = d.makeStripe ?? defaultStripe;
   const baseUrl = process.env.PUBLIC_BASE_URL ?? "https://acp-convene.fly.dev";
 
-  // Customer-facing: create (or report) the checkout URL for a quote.
+  // Customer-facing one-shot: an anonymous visitor buys an offering. Creates a quote
+  // from the catalog (price sourced from the offering — quoted === charged) and opens
+  // a Stripe Checkout Session in one call. This is what the live offer page's Buy
+  // button hits. orgId is resolved from the offering (the offering id is the capability).
+  app.post("/public/buy/:offeringId", async (req, reply) => {
+    const { offeringId } = req.params as { offeringId: string };
+    const { email } = (req.body ?? {}) as { email?: string };
+    const [off] = await d.db.select().from(offerings).where(eq(offerings.id, offeringId));
+    if (!off) return reply.code(404).send({ error: "offering not found" });
+    if (!off.active) return reply.code(409).send({ error: "offering is not available" });
+    let stripe;
+    try { stripe = makeStripe(); }
+    catch { return reply.code(400).send({ error: "payments not configured yet — operator must set STRIPE_API_KEY" }); }
+    try {
+      const q = await createQuote(d.db, { orgId: off.orgId, offeringId, customer: email });
+      const res = await startQuoteStripeCheckout(d.db, { orgId: off.orgId, quoteId: q.id, stripe, baseUrl, customerEmail: email });
+      return reply.code(201).send({ quoteId: q.id, amountCents: q.quotedCents, url: res.url });
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
+  });
+
+  // Customer-facing: create (or report) the checkout URL for an existing quote.
   app.post("/public/checkout/:quoteId", async (req, reply) => {
     const { quoteId } = req.params as { quoteId: string };
     const { email } = (req.body ?? {}) as { email?: string };
