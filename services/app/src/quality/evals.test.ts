@@ -20,6 +20,14 @@ describe("quality evals (#151)", () => {
     expect(scanDiff([file("src/app.ts", ["export const price = 4900;"])])).toEqual([]);
   });
 
+  it("blocks a dead purchase CTA (placeholder Buy link), but not a real one (#156)", () => {
+    expect(scanDiff([file("index.html", ['<a href="#">Buy now</a>'])]).some((f) => f.check === "dead-cta")).toBe(true);
+    expect(scanDiff([file("index.html", ['<a href="javascript:void(0)">Checkout</a>'])]).some((f) => f.check === "dead-cta")).toBe(true);
+    // a real, wired CTA and an unrelated anchor are fine
+    expect(scanDiff([file("index.html", ['<a href="/checkout?quote=q_123">Buy now</a>'])])).toEqual([]);
+    expect(scanDiff([file("index.html", ['<a href="#pricing">See pricing</a>'])])).toEqual([]);
+  });
+
   it("warns when a deliverable does not cover an acceptance criterion", () => {
     const dl = "Added a Stripe checkout button and a pricing section.";
     const fails = criteriaCoverage(dl, "Stripe checkout works\nDeploy to a public URL");

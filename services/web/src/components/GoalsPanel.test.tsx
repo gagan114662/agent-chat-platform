@@ -11,7 +11,8 @@ describe("GoalsPanel", () => {
     fireEvent.change(screen.getByPlaceholderText(/goal title/i), { target: { value: "Ship it" } });
     fireEvent.change(screen.getByPlaceholderText(/criteria/i), { target: { value: "done" } });
     fireEvent.click(screen.getByRole("button", { name: /create goal/i }));
-    await waitFor(() => expect(createGoal).toHaveBeenCalledWith("Ship it", "done"));
+    // createGoal(title, criteria, businessId?) — businessId is undefined with no target selected (#146).
+    await waitFor(() => expect(createGoal).toHaveBeenCalledWith("Ship it", "done", undefined));
     // The created goal renders in the list (by title now, not raw id).
     expect(await screen.findByText("Ship it")).toBeInTheDocument();
   });

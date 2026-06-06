@@ -22,12 +22,19 @@ const SECRET = [
 ];
 const NON_PRODUCTION = /(\.md$|\.txt$|readme|license|changelog|\/test|test\/|\.test\.|\.spec\.|__tests__|fixture|\.stories\.|\.env\.example)/i;
 
+// #156 a DEAD purchase CTA: a buy/checkout/pay control wired to a dead target
+// (href="#", empty, or javascript:void) — the "placeholder Buy link" failure mode.
+// Named-placeholder URLs (CHECKOUT_URL_HERE etc.) are already caught by PLACEHOLDER;
+// this catches the structurally-dead ones. CTA word + dead target on the same line.
+const CTA_WORD = /\b(buy(\s*now)?|check\s*out|checkout|pay(\s*now)?|purchase|subscribe|order\s*now|add\s*to\s*cart|complete\s*(your\s*)?(purchase|order|payment))\b/i;
+const DEAD_TARGET = /(href|formaction|action|data-href|to)\s*=\s*["'](\s*#?\s*|javascript:\s*(void\s*\(\s*0?\s*\)|;)\s*)["']/i;
+
 function addedLines(f: ChangedFile): string[] {
   if (!f.patch) return [];
   return f.patch.split("\n").filter((l: string) => l.startsWith("+") && !l.startsWith("+++"));
 }
 
-// scanDiff: placeholder + secret failures across the diff's PRODUCTION files.
+// scanDiff: placeholder + secret + dead-CTA failures across the diff's PRODUCTION files.
 export function scanDiff(files: ChangedFile[]): EvalFailure[] {
   const out: EvalFailure[] = [];
   for (const f of files) {
@@ -35,6 +42,7 @@ export function scanDiff(files: ChangedFile[]): EvalFailure[] {
     for (const line of addedLines(f)) {
       for (const re of SECRET) if (re.test(line)) out.push({ check: "secret-scan", severity: "block", reason: `possible leaked secret in ${f.filename}` });
       if (prod) for (const re of PLACEHOLDER) if (re.test(line)) { out.push({ check: "placeholder", severity: "block", reason: `placeholder/TODO in production file ${f.filename}` }); break; }
+      if (prod && CTA_WORD.test(line) && DEAD_TARGET.test(line)) out.push({ check: "dead-cta", severity: "block", reason: `dead purchase CTA (buy/checkout link goes nowhere) in ${f.filename}` });
     }
   }
   // de-dupe identical reasons

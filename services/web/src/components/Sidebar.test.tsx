@@ -25,6 +25,8 @@ describe("Sidebar", () => {
   it("calls onCreateChannel when a channel name is entered", () => {
     const onCreateChannel = vi.fn();
     render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId="t1" onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={onCreateChannel} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);
+    // The create form is collapsed behind a + to declutter (#191) — open it first.
+    fireEvent.click(screen.getByText(/new channel \/ thread/i));
     fireEvent.change(screen.getByPlaceholderText(/new channel/i), { target: { value: "random" } });
     fireEvent.click(screen.getByRole("button", { name: /create channel/i }));
     expect(onCreateChannel).toHaveBeenCalledWith("random");
@@ -47,10 +49,9 @@ describe("Sidebar", () => {
   });
   it("shows the real authenticated identity instead of the dev stub (#68)", () => {
     render(<Sidebar channels={channels} threads={threads} dms={[]} principals={[]} repos={[]} activeThreadId={null} identity={{ userId: "alice", orgId: "acme", role: "admin" }} onSelectThread={() => {}} onCreateThread={() => {}} onCreateChannel={() => {}} onStartDm={() => {}} onOpenContext={() => {}} canCreateChannel={true} />);
-    const id = screen.getByText(/alice/);
-    expect(id).toHaveTextContent("alice");
-    expect(id).toHaveTextContent("acme");
-    expect(id).toHaveTextContent("admin");
+    // The cleaner footer (#193) shows the name + a "@handle · role" line (no raw orgId).
+    expect(screen.getByText("alice")).toBeInTheDocument();          // name span
+    expect(screen.getByText(/@alice · admin/)).toBeInTheDocument(); // handle + role span
     expect(screen.queryByText(/dev stub/)).not.toBeInTheDocument();
     expect(screen.queryByText(/m1 · org o1/)).not.toBeInTheDocument();
   });

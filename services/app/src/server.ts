@@ -180,6 +180,8 @@ export async function buildServer() {
           !req.url.startsWith("/deliveries") &&
           !req.url.startsWith("/accounting") &&
           !req.url.startsWith("/support") &&
+          !req.url.startsWith("/opportunities") &&
+          !req.url.startsWith("/factory") &&
           !req.url.startsWith("/orgs") &&
           !req.url.startsWith("/agents") &&
           !req.url.startsWith("/billing") &&

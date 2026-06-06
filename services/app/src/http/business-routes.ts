@@ -14,6 +14,7 @@ import {
 import { listDeliveries, fulfillDelivery } from "../business/delivery.js";
 import { incomeStatement, portfolioPnl } from "../business/accounting.js";
 import { openTicket, listTickets, resolveTicket } from "../business/support.js";
+import { discoverOpportunities, spawnBusiness, spawnTopOpportunity, rebalancePortfolio, type OpportunitySpec } from "../business/factory.js";
 
 // #141/#142 business routes. Drafts (create business / payment intent / campaign /
 // lead / cost) are member-allowed; APPROVING a payment or a campaign is admin-gated
@@ -202,5 +203,36 @@ export function registerBusinessRoutes(app: FastifyInstance, d: { db: DB }) {
     const row = await resolveTicket(d.db, { orgId, ticketId: id, resolution: resolution ?? "", byActor: userId });
     if (!row) return reply.code(404).send({ error: "ticket not found" });
     return reply.code(200).send(row);
+  });
+
+  // ---- #154 opportunity discovery ----
+  app.get("/opportunities", async (req, reply) => {
+    const { limit } = (req.query ?? {}) as { limit?: string };
+    return reply.code(200).send({ opportunities: discoverOpportunities({ limit: limit ? Number(limit) : undefined }) });
+  });
+
+  // ---- #153 business spawner ----
+  // Spawn from a provided spec, or spawn the top-ranked discovered opportunity.
+  app.post("/factory/spawn", async (req, reply) => {
+    const { orgId, userId } = actor(req);
+    const { spec } = (req.body ?? {}) as { spec?: OpportunitySpec };
+    if (!spec?.title || typeof spec.priceCents !== "number") return reply.code(400).send({ error: "spec with title + priceCents required" });
+    return reply.code(201).send(await spawnBusiness(d.db, { orgId, spec, byId: userId }));
+  });
+  app.post("/factory/spawn-top", async (req, reply) => {
+    const { orgId, userId } = actor(req);
+    const out = await spawnTopOpportunity(d.db, { orgId, byId: userId });
+    if (!out) return reply.code(404).send({ error: "no validated opportunity to spawn" });
+    return reply.code(201).send(out);
+  });
+
+  // ---- #155 portfolio manager ----
+  // Reallocate budget + auto kill/scale by margin. Consequential (pauses goals,
+  // retires offerings) → admin-gated, and every decision is audit-logged.
+  app.post("/factory/rebalance", async (req, reply) => {
+    const { orgId, userId } = actor(req);
+    if (!(await isAdmin(userId, orgId))) return reply.code(403).send({ error: "forbidden — rebalancing kills/scales businesses (admin only)" });
+    const { totalBudgetCents, killMarginPct, scaleMarginPct } = (req.body ?? {}) as { totalBudgetCents?: number; killMarginPct?: number; scaleMarginPct?: number };
+    return reply.code(200).send(await rebalancePortfolio(d.db, { orgId, totalBudgetCents, killMarginPct, scaleMarginPct, byId: userId }));
   });
 }
