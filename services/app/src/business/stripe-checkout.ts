@@ -29,8 +29,8 @@ export async function startQuoteStripeCheckout(db: DB, args: {
     productName: off?.name ?? "Purchase",
     clientReferenceId: q.id,
     customerEmail: args.customerEmail ?? (q.customer || undefined),
-    successUrl: `${args.baseUrl}/?checkout=success&quote=${q.id}`,
-    cancelUrl: `${args.baseUrl}/?checkout=cancel&quote=${q.id}`,
+    successUrl: `${args.baseUrl}/public/thanks/${q.id}`,
+    cancelUrl: `${args.baseUrl}/public/offer/${q.offeringId}?checkout=cancel`,
   });
   await db.update(quotes).set({ stripeSessionId: session.id }).where(and(eq(quotes.id, q.id), eq(quotes.orgId, args.orgId)));
   await record(db, { orgId: args.orgId, actorKind: "system", actorId: "stripe", action: "quote.checkout_session", resource: q.businessId, payload: { quoteId: q.id, sessionId: session.id, amountCents: q.quotedCents } });

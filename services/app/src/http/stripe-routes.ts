@@ -57,6 +57,25 @@ btn.onclick=async()=>{btn.disabled=true;msg.textContent='';msg.style.color='#f87
     return reply.code(200).type("text/html").header("cache-control", "no-cache").send(html);
   });
 
+  // Post-payment thank-you (Stripe success_url). Public. Shows the paid state + the
+  // delivered artifact once the webhook has fulfilled it (may lag the redirect by a
+  // moment — the page tells the buyer their deliverable is on its way).
+  app.get("/public/thanks/:quoteId", async (req, reply) => {
+    const { quoteId } = req.params as { quoteId: string };
+    const [q] = await d.db.select().from(quotes).where(eq(quotes.id, quoteId));
+    const paid = q?.state === "paid";
+    const html = `<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Thank you</title><style>
+body{font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0f0f11;color:#f0f0f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem 1rem;margin:0}
+.card{background:#1a1a1f;border:1px solid #2e2e38;border-radius:16px;max-width:520px;width:100%;padding:3rem 2.5rem;text-align:center}
+.tick{font-size:3rem;color:#34d399}h1{font-size:1.5rem;margin:.5rem 0}p{color:#9aa}
+</style></head><body><div class=card>
+<div class=tick>✓</div><h1>Payment received — thank you!</h1>
+<p>${paid ? "Your purchase is confirmed and your deliverable is being prepared and sent to you now." : "We're confirming your payment. Your deliverable will be sent to you shortly."}</p>
+</div></body></html>`;
+    return reply.code(200).type("text/html").header("cache-control", "no-cache").send(html);
+  });
+
   // Customer-facing one-shot: an anonymous visitor buys an offering. Creates a quote
   // from the catalog (price sourced from the offering — quoted === charged) and opens
   // a Stripe Checkout Session in one call. This is what the live offer page's Buy
